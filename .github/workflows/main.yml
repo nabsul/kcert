@@ -1,7 +1,7 @@
 # Run on every pull request to check that it builds
-name: Pull Request Validation
+name: Main Branch Continuous Deploy
 on:
-  push:
+  pull_request:
     branches: [ main ]
   workflow_dispatch:
 jobs:
@@ -10,11 +10,14 @@ jobs:
     steps:
       - uses: actions/checkout@v2
       - name: Build the Docker image
-        run: docker build -t kcert .
+        run: docker build -t kcert
       - name: Log into registry
         run: echo "${{ secrets.DOCKER_TOKEN }}" | docker login -u ${{ secrets.DOCKER_USER }} --password-stdin
       - name: Push to registry
         run: |
-          IMAGE=docker.pkg.github.com/nabsul/kcert:pr-${{ github.sha }}
+          IMAGE=nabsul/kcert:main-${{ github.run_number }}
+          docker tag kcert $IMAGE
+          docker push $IMAGE
+          IMAGE=nabsul/kcert:main-latest
           docker tag kcert $IMAGE
           docker push $IMAGE
