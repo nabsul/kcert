@@ -41,3 +41,15 @@ For example: To run in a namespace called `myns1`:
 
 - Change the deployment yaml file so that everything is deployed to that namespace
 - Add an environment variable in the deployment with name `KCERT_NAMESPACE` and value `myns1`
+
+## Building from Scratch
+
+You're welcome to use my build which is hosted on Docker hub at `nabsul/kcert`.
+However, it's not really a good security practice to run un-trusted Docker images.
+To build your own:
+
+- Create a Docker account if you don't have one
+- Create your own repo to publish your images to
+- Build the docker image: `docker build -t myusername/kcert:v0001 .`
+- Publish the image to Docker Hub: `docker push myusername/kcert:v0001`
+- In the `deploy.yml` file, replace `nabsul/kcert:test0001` with your image
