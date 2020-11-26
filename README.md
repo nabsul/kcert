@@ -22,6 +22,13 @@ The goal of this project is to provide a simple, easy to run, easy to understand
 - You select an ingress and manually trigger fetching/renewing the cert
 - The renewal runs "live" with success/failure logs displayed at the end
 
+For the  actual cert authentication:
+
+- A temporary path is added to your ingress that redirects `.well-know/acme-challenge` to `KCert`
+- `KCert` requests a cert and authenticates using HTTP Challenge
+- `KCert` stores the final certificate in the TLS secret referenced by the ingress
+- `KCert` cleans up and removes the temporary path
+
 ## How to Use
 
 To run `KCert` in your `default` namespace:
