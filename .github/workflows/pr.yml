@@ -1,5 +1,5 @@
 # Run on every pull request to check that it builds
-name: CI
+name: Pull Request Validation
 on:
   pull_request:
     branches: [ main ]
