@@ -25,7 +25,7 @@ namespace KCert.Lib
             _kube = kube;
         }
 
-        public async Task<GetCertResult> GetCertAsync(string ingressName, KCertParams p, ECDsa sign)
+        public async Task<GetCertResult> GetCertAsync(string ns, string ingressName, KCertParams p, ECDsa sign)
         {
             string domain, kid, nonce;
             Uri orderUri, finalizeUri, certUri;
@@ -36,12 +36,18 @@ namespace KCert.Lib
             var serviceName = _cfg.GetValue<string>("ServiceName");
             var servicePort = _cfg.GetValue<string>("ServicePort");
             var secretName = _cfg.GetValue<string>("SecretName");
-            var ns = _cfg.GetValue<string>("Namespace");
+            var kcertNs = _cfg.GetValue<string>("Namespace");
 
-            var result = new GetCertResult { IngressName = ingressName };
+            var result = new GetCertResult { IngressNamespace = ns, IngressName = ingressName };
 
             try
             {
+                if (ns != kcertNs)
+                {
+                    await _kube.CreateServiceAsync(ns, serviceName, kcertNs, servicePort);
+                    AddLog(result, $"Temporary service in namespace {ns} created");
+                }
+
                 await UpdateIngressAsync(ns, ingressName, i => i.AddHttpChallenge(serviceName, servicePort));
                 AddLog(result, $"Route Added");
 
@@ -65,6 +71,12 @@ namespace KCert.Lib
 
                 await UpdateIngressAsync(ns, ingressName, i => i.RemoveHttpChallenge());
                 AddLog(result, $"Route Removed");
+
+                if (ns != kcertNs)
+                {
+                    await _kube.DeleteServiceAsync(ns, serviceName);
+                    AddLog(result, $"Deleted temporary service in namespace {ns} created");
+                }
 
                 result.Success = true;
             }

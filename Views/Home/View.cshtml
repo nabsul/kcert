@@ -10,7 +10,7 @@
 <h1>Ingress: @ingress.Namespace() / @ingress.Name()</h1>
 
 <p>
-    <a class="btn btn-success" asp-action="Renew" asp-route-name="@ingress.Name()">Fetch new Cert</a>
+    <a class="btn btn-success" asp-action="Renew" asp-route-ns="@ingress.Namespace()" asp-route-name="@ingress.Name()">Fetch new Cert</a>
 </p>
 
 <p>
