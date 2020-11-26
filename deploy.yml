@@ -1,0 +1,73 @@
+apiVersion: v1
+kind: ServiceAccount
+metadata:
+  name: kcert
+  namespace: default
+---
+apiVersion: rbac.authorization.k8s.io/v1
+kind: Role
+metadata:
+  name: kcert
+rules:
+- apiGroups: [""]
+  resources: ["secrets"]
+  verbs: ["get", "list", "create", "update", "patch", "delete"]
+- apiGroups: ["networking.k8s.io"]
+  resources: ["ingresses"]
+  verbs: ["get", "list", "create", "update", "patch", "delete"]
+---
+apiVersion: rbac.authorization.k8s.io/v1
+kind: RoleBinding
+metadata:
+  name: kcert
+  namespace: default
+subjects:
+- kind: ServiceAccount
+  name: kcert
+  namespace: default
+roleRef:
+  kind: Role
+  name: kcert
+  apiGroup: rbac.authorization.k8s.io
+---
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: kcert
+  labels:
+    app: kcert
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app: kcert
+  template:
+    metadata:
+      labels:
+        app: kcert
+    spec:
+      serviceAccountName: kcert
+      containers:
+      - name: nginx
+        image: nabsul/kcert:test001
+        ports:
+        - containerPort: 80
+          name: http
+        env:
+        - name: ASPNETCORE_ENVIRONMENT
+          value: Development
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: kcert
+  labels:
+    app: kcert
+spec:
+  ports:
+    - name: http
+      protocol: TCP
+      port: 80
+      targetPort: 80
+  selector:
+    app: kcert

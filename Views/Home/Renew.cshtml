@@ -1,0 +1,21 @@
+﻿@model KCert.Lib.GetCertResult
+@{
+    ViewData["Title"] = $"Cert Creation - {Model.IngressName}";
+}
+
+<h1>Certificate Renewal Results: @Model.IngressName</h1>
+
+<p>
+    <a class="btn btn-success" asp-action="View" asp-route-name="@Model.IngressName">Return To Cert</a>
+</p>
+
+<pre>@string.Join("\n", Model.Logs)</pre>
+
+@if (Model.Error != null)
+{
+    <pre>@Model.Error.GetType().Name</pre>
+    <pre>@Model.Error.Message</pre>
+    <pre>@Model.Error.GetType().Name</pre>
+    <pre>@Model.Error.Message</pre>
+    <pre>@Model.Error.StackTrace</pre>
+}

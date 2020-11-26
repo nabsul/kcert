@@ -1,0 +1,36 @@
+﻿@inject K8sClient _kube
+@model List<Networkingv1beta1Ingress>
+@{
+    ViewData["Title"] = "Ingress";
+}
+
+<div>
+    <h1 class="display-4">Ingress</h1>
+    <table class="table">
+        <thead>
+            <tr>
+                <th scope="col">Namespace</th>
+                <th scope="col">Name</th>
+                <th scope="col">Hosts</th>
+                <th scope="col">Secret Name</th>
+                <th scope="col">Created</th>
+                <th scope="col">Expiration</th>
+            </tr>
+        </thead>
+        <tbody>
+        @foreach (var i in Model)
+        {
+            var s = i.SecretName() == null ? null : await _kube.GetSecretAsync(i.Namespace(), i.SecretName());
+            var c = s?.Cert();
+            <tr>
+                <td>@i.Namespace()</td>
+                <td><a asp-action="View" asp-route-name="@i.Name()">@i.Name()</a></td>
+                <td>@Html.Raw(string.Join("<br>", i.Hosts().Select(h => $"<a href='https://{h}'>{h}</a>")))</td>
+                <td>@s?.Name()</td>
+                <td>@c?.NotBefore.ToString("s")</td>
+                <td>@c?.NotAfter.ToString("s")</td>
+            </tr>
+        }
+        </tbody>
+    </table>
+</div>
