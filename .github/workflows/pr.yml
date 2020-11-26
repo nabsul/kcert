@@ -1,0 +1,13 @@
+# Run on every pull request to check that it builds
+name: CI
+on:
+  pull_request:
+    branches: [ main ]
+  workflow_dispatch:
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v2
+      - name: Build the Docker image
+        run: docker build -t nabsul/kcert .
