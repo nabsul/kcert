@@ -1,7 +1,7 @@
 # Run on every pull request to check that it builds
 name: Main Branch Continuous Deploy
 on:
-  pull_request:
+  push:
     branches: [ main ]
   workflow_dispatch:
 jobs:
