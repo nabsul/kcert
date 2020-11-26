@@ -6,11 +6,11 @@ on:
   workflow_dispatch:
 jobs:
   build:
-    runs-on: ubuntu-latest
+    runs-on: ubuntu-20.04
     steps:
       - uses: actions/checkout@v2
       - name: Build the Docker image
-        run: docker build -t kcert
+        run: docker build -t kcert .
       - name: Log into registry
         run: echo "${{ secrets.DOCKER_TOKEN }}" | docker login -u ${{ secrets.DOCKER_USER }} --password-stdin
       - name: Push to registry
