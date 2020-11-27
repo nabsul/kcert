@@ -3,7 +3,7 @@
 @{
     var ingress = Model;
     var secret = await _kube.GetSecretAsync(ingress.Namespace(), ingress.SecretName());
-    var cert = secret.Cert();
+    var cert = secret?.Cert();
     ViewData["Title"] = $"Ingress - {Model.Namespace()} / {Model.Name()}";
 }
 
@@ -19,15 +19,15 @@
         <tbody>
             <tr>
                 <th scope="row">Secret Name</th>
-                <td>@secret.Name()</td>
+                <td>@secret?.Name()</td>
             </tr>
             <tr>
                 <th scope="row">Created</th>
-                <td>@cert.NotBefore.ToString("s")</td>
+                <td>@cert?.NotBefore.ToString("s")</td>
             </tr>
             <tr>
                 <th scope="row">Expiration</th>
-                <td>@cert.NotAfter.ToString("s")</td>
+                <td>@cert?.NotAfter.ToString("s")</td>
             </tr>
         </tbody>
     </table>

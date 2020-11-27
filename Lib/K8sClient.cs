@@ -37,7 +37,7 @@ namespace KCert.Lib
 
                 var svc = new V1Service
                 {
-                    Metadata = new V1ObjectMeta { Name = name, NamespaceProperty = ns },
+                    Metadata = new V1ObjectMeta { Name = name },
                     Spec = GetServiceSpec(kcertNs, name, servicePort),
                 };
                 await _client.CreateNamespacedServiceAsync(svc, ns);
@@ -50,7 +50,15 @@ namespace KCert.Lib
             {
                 Type = "ExternalName",
                 ExternalName = $"{name}.{ns}",
-                Ports = new List<V1ServicePort> { new V1ServicePort { Name = servicePort } },
+                Ports = new List<V1ServicePort>
+                {
+                    new V1ServicePort
+                    {
+                        Name = servicePort,
+                        Port = 80,
+                        TargetPort = 80,
+                    }
+                },
             };
         }
 
