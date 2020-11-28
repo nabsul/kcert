@@ -20,13 +20,11 @@ namespace KCert.Lib
             _client = client;
         }
 
-        public async Task CreateServiceAsync(string ns, string name, string kcertNs, string servicePort)
+        public async Task<V1Service> GetServiceAsync(string ns, string name)
         {
             try
             {
-                var svc = await _client.ReadNamespacedServiceAsync(name, ns);
-                svc.Spec = GetServiceSpec(kcertNs, name, servicePort);
-                await _client.ReplaceNamespacedServiceAsync(svc, name, ns);
+                return await _client.ReadNamespacedServiceAsync(name, ns);
             }
             catch (HttpOperationException ex)
             {
@@ -35,13 +33,27 @@ namespace KCert.Lib
                     throw;
                 }
 
-                var svc = new V1Service
-                {
-                    Metadata = new V1ObjectMeta { Name = name },
-                    Spec = GetServiceSpec(kcertNs, name, servicePort),
-                };
-                await _client.CreateNamespacedServiceAsync(svc, ns);
+                return null;
             }
+        }
+
+        public async Task CreateServiceAsync(string ns, string name, string kcertNs, string servicePort)
+        {
+            var svc = await GetServiceAsync(ns, name);
+
+            if (svc != null)
+            {
+                svc.Spec = GetServiceSpec(kcertNs, name, servicePort);
+                await _client.ReplaceNamespacedServiceAsync(svc, name, ns);
+                return;
+            }
+
+            svc = new V1Service
+            {
+                Metadata = new V1ObjectMeta { Name = name },
+                Spec = GetServiceSpec(kcertNs, name, servicePort),
+            };
+            await _client.CreateNamespacedServiceAsync(svc, ns);
         }
 
         private static V1ServiceSpec GetServiceSpec(string ns, string name, string servicePort)

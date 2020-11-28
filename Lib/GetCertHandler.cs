@@ -69,21 +69,31 @@ namespace KCert.Lib
                 await SaveCertAsync(sign, ns, ingressName, rsa, certUri, kid, nonce);
                 AddLog(result, $"Saved cert");
 
-                await UpdateIngressAsync(ns, ingressName, i => i.RemoveHttpChallenge());
-                AddLog(result, $"Route Removed");
-
-                if (ns != kcertNs)
-                {
-                    await _kube.DeleteServiceAsync(ns, serviceName);
-                    AddLog(result, $"Deleted temporary service in namespace {ns} created");
-                }
-
                 result.Success = true;
             }
             catch (Exception ex)
             {
+                _log.LogError(ex, "Renew failed");
                 result.Success = false;
                 result.Error = ex;
+            }
+
+            try
+            {
+                await UpdateIngressAsync(ns, ingressName, i => i.RemoveHttpChallenge());
+                AddLog(result, $"Route Removed");
+
+                if (ns != kcertNs && null != await _kube.GetServiceAsync(ns, serviceName))
+                {
+                    await _kube.DeleteServiceAsync(ns, serviceName);
+                    AddLog(result, $"Deleted temporary service in namespace {ns} created");
+                }
+            }
+            catch (Exception ex)
+            {
+                AddLog(result, $"Failed to clean up afterwards: {ex.Message}");
+                result.Error = result.Error == null ? result.Error = ex : new AggregateException(result.Error, ex);
+                result.Success = false;
             }
 
             return result;
