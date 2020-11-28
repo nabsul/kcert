@@ -5,6 +5,7 @@ namespace KCert.Lib
 {
     public class GetCertResult
     {
+        public string IngressNamespace { get; set; }
         public string IngressName { get; set; }
         public bool Success { get; set; }
         public List<string> Logs { get; set; } = new List<string>();

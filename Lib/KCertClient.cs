@@ -31,12 +31,12 @@ namespace KCert.Lib
 
         public async Task<IList<Networkingv1beta1Ingress>> GetAllIngressesAsync()
         {
-            return await _kube.GetAllIngressesAsync(_cfg["namespace"]);
+            return await _kube.GetAllIngressesAsync();
         }
 
-        public async Task<Networkingv1beta1Ingress> GetIngressAsync(string name)
+        public async Task<Networkingv1beta1Ingress> GetIngressAsync(string ns, string name)
         {
-            return await _kube.GetIngressAsync(_cfg["namespace"], name);
+            return await _kube.GetIngressAsync(ns, name);
         }
 
         public async Task<KCertParams> GetConfigAsync()
@@ -62,10 +62,10 @@ namespace KCert.Lib
             return Base64UrlTextEncoder.Encode(result);
         }
 
-        public async Task<GetCertResult> GetCertAsync(string ingressName)
+        public async Task<GetCertResult> GetCertAsync(string ns, string ingressName)
         {
             var p = await GetConfigAsync();
-            return await _getCert.GetCertAsync(ingressName, p, GetSigner(p.Key));
+            return await _getCert.GetCertAsync(ns, ingressName, p, GetSigner(p.Key));
         }
 
         private static ECDsa GetSigner(string key)

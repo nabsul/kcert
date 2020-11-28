@@ -20,6 +20,65 @@ namespace KCert.Lib
             _client = client;
         }
 
+        public async Task<V1Service> GetServiceAsync(string ns, string name)
+        {
+            try
+            {
+                return await _client.ReadNamespacedServiceAsync(name, ns);
+            }
+            catch (HttpOperationException ex)
+            {
+                if (ex.Response.StatusCode != HttpStatusCode.NotFound)
+                {
+                    throw;
+                }
+
+                return null;
+            }
+        }
+
+        public async Task CreateServiceAsync(string ns, string name, string kcertNs, string servicePort)
+        {
+            var svc = await GetServiceAsync(ns, name);
+
+            if (svc != null)
+            {
+                svc.Spec = GetServiceSpec(kcertNs, name, servicePort);
+                await _client.ReplaceNamespacedServiceAsync(svc, name, ns);
+                return;
+            }
+
+            svc = new V1Service
+            {
+                Metadata = new V1ObjectMeta { Name = name },
+                Spec = GetServiceSpec(kcertNs, name, servicePort),
+            };
+            await _client.CreateNamespacedServiceAsync(svc, ns);
+        }
+
+        private static V1ServiceSpec GetServiceSpec(string ns, string name, string servicePort)
+        {
+            return new V1ServiceSpec
+            {
+                Type = "ExternalName",
+                ExternalName = $"{name}.{ns}",
+                Ports = new List<V1ServicePort>
+                {
+                    new V1ServicePort
+                    {
+                        Name = servicePort,
+                        Port = 80,
+                        TargetPort = 80,
+                    }
+                },
+            };
+        }
+
+        public async Task DeleteServiceAsync(string ns, string name)
+        {
+            await _client.DeleteNamespacedServiceAsync(name, ns);
+        }
+
         public async Task<IList<V1Secret>> GetAllSecretsAsync(string ns)
         {
             var result = await _client.ListNamespacedSecretAsync(ns);
@@ -76,9 +135,9 @@ namespace KCert.Lib
             await _client.CreateNamespacedSecretAsync(secret, ns);
         }
 
-        public async Task<IList<Networkingv1beta1Ingress>> GetAllIngressesAsync(string ns)
+        public async Task<IList<Networkingv1beta1Ingress>> GetAllIngressesAsync()
         {
-            var result = await _client.ListNamespacedIngress2Async(ns);
+            var result = await _client.ListIngressForAllNamespaces2Async();
             return result.Items;
         }
 
