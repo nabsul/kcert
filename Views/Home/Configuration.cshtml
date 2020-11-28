@@ -18,12 +18,12 @@
     </div>
     <div class="form-group">
         <label for="AcmeEmail">ACME Account Email Address</label>
-        <input type="email" class="form-control" id="AcmeEmail" name="AcmeEmail" aria-describedby="AcmeEmailHelp" value="@Model.Email">
+        <input asp-for="Email" type="email" class="form-control" id="AcmeEmail" name="AcmeEmail" aria-describedby="AcmeEmailHelp">
         <small id="AcmeEmailHelp" class="form-text text-muted">Email address to use for account.</small>
     </div>
     <div class="form-group">
         <label for="AcmeKey">ACME Key</label>
-        <input readonly type="text" class="form-control" aria-describedby="AcmeKeyHelp" value="@Model.Key">
+        <input readonly asp-for="AcmeKey" type="text" class="form-control" aria-describedby="AcmeKeyHelp">
         <small id="AcmeKeyHelp" class="form-text text-muted">The RSA Key for your account. You might want to back this up.</small>
     </div>
     <div class="form-group form-check">
@@ -33,6 +33,20 @@
     <div class="form-group form-check">
         <input asp-for="TermsAccepted" type="checkbox" class="form-check-input" id="TermsAccepted" name="TermsAccepted">
         <label class="form-check-label" for="TermsAccepted">Accept ACME Terms</label>
+    </div>
+    <div class="form-group form-check">
+        <input asp-for="EnableAutoRenew" type="checkbox" class="form-check-input" id="EnableAutoRenew" name="EnableAutoRenew">
+        <label class="form-check-label" for="EnableAutoRenew">Automatically Renew Certificates</label>
+    </div>
+    <div class="form-group">
+        <label for="SendGridKey">SendGrid Key</label>
+        <input asp-for="SendGridKey" type="text" class="form-control" id="SendGridKey" name="SendGridKey" aria-describedby="SendGridKeyHelp">
+        <small id="SendGridKeyHelp" class="form-text text-muted">Add your SendGrid key to enable email notifications for automatic renewals.</small>
+    </div>
+    <div class="form-group">
+        <label for="SendGridFrom">SendGrid From Address</label>
+        <input asp-for="SendGridFrom" type="email" class="form-control" id="SendGridFrom" name="SendGridFrom" aria-describedby="SendGridFromHelp">
+        <small id="SendGridFromHelp" class="form-text text-muted">The email address from which emails are coming from.</small>
     </div>
     <button type="submit" class="btn btn-primary">Save</button>
 </form>

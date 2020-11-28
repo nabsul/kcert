@@ -5,7 +5,8 @@
   </PropertyGroup>
 
   <ItemGroup>
-    <PackageReference Include="KubernetesClient" Version="3.0.7" />
+    <PackageReference Include="KubernetesClient" Version="3.0.16" />
+    <PackageReference Include="SendGrid" Version="9.21.2" />
   </ItemGroup>
 
 </Project>

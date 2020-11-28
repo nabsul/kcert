@@ -38,10 +38,14 @@ namespace KCert.Controllers
 
             p.AcmeDirUrl = new Uri(form.AcmeDir);
             p.Email = form.AcmeEmail;
+            p.EnableAutoRenew = form.EnableAutoRenew;
+            p.SendGridKey = form.SendGridKey;
+            p.SendGridFrom = form.SendGridFrom;
             p.TermsAccepted = form.TermsAccepted;
+            
             if (form.NewKey)
             {
-                p.Key = _kcert.GenerateNewKey();
+                p.AcmeKey = _kcert.GenerateNewKey();
             }
             
             await _kcert.SaveConfigAsync(p);

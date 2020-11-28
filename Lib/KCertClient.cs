@@ -53,7 +53,7 @@ namespace KCert.Lib
         public async Task<string> GetThumbprintAsync()
         {
             var p = await GetConfigAsync();
-            var sign = GetSigner(p.Key);
+            var sign = GetSigner(p.AcmeKey);
             var jwk = sign.GetJwk();
             var jwkJson = JsonSerializer.Serialize(jwk);
             var jwkBytes = Encoding.UTF8.GetBytes(jwkJson);
@@ -65,7 +65,7 @@ namespace KCert.Lib
         public async Task<GetCertResult> GetCertAsync(string ns, string ingressName)
         {
             var p = await GetConfigAsync();
-            return await _getCert.GetCertAsync(ns, ingressName, p, GetSigner(p.Key));
+            return await _getCert.GetCertAsync(ns, ingressName, p, GetSigner(p.AcmeKey));
         }
 
         private static ECDsa GetSigner(string key)

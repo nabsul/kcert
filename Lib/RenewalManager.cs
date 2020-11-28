@@ -2,8 +2,6 @@
 using Microsoft.Extensions.Configuration;
 using Microsoft.Extensions.Logging;
 using System;
-using System.Collections.Generic;
-using System.Linq;
 using System.Threading.Tasks;
 
 namespace KCert.Lib
@@ -11,20 +9,18 @@ namespace KCert.Lib
     public class RenewalManager
     {
         private readonly K8sClient _k8s;
-        private readonly GetCertHandler _renew;
         private readonly KCertClient _kcert;
         private readonly IConfiguration _cfg;
         private readonly ILogger<RenewalManager> _log;
-        private readonly Task _job;
 
-        public RenewalManager(ILogger<RenewalManager> log, IConfiguration cfg, K8sClient k8s, GetCertHandler renew, KCertClient kcert)
+        public RenewalManager(ILogger<RenewalManager> log, IConfiguration cfg, K8sClient k8s, KCertClient kcert)
         {
             _cfg = cfg;
             _log = log;
-            _job = StartRenewalJobAsync();
             _k8s = k8s;
-            _renew = renew;
             _kcert = kcert;
+
+            _ = StartRenewalJobAsync();
         }
 
 
