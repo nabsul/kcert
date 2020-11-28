@@ -53,7 +53,7 @@ namespace KCert.Lib
         {
             try
             {
-                foreach (var ingress in await _k8s.GetAllIngressesAsync(""))
+                foreach (var ingress in await _k8s.GetAllIngressesAsync())
                 {
                     await TryRenewAsync(ingress);
                 }
@@ -79,7 +79,7 @@ namespace KCert.Lib
                 return;
             }
 
-            await _kcert.GetCertAsync(ingress.Name());
+            await _kcert.GetCertAsync(ingress.Namespace(), ingress.Name());
         }
     }
 }
