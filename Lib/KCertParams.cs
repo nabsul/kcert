@@ -9,12 +9,14 @@ namespace KCert.Lib
     {
         public Uri AcmeDirUrl { get; set; }
         public bool TermsAccepted { get; set; }
-        public string Email { get; set; }
+        public string AcmeEmail { get; set; }
         public string AcmeKey { get; set; }
 
         public bool EnableAutoRenew { get; set; }
-        public string SendGridKey { get; set; }
-        public string SendGridFrom { get; set; }
+        public string AwsKey { get; set; }
+        public string AwsRegion { get; set; }
+        public string AwsSecret { get; set; }
+        public string EmailFrom { get; set; }
 
         public KCertParams()
         {
@@ -25,12 +27,14 @@ namespace KCert.Lib
             var data = secret.Data;
             AcmeDirUrl = new Uri(GetString(data, "AcmeDirUrl"));
             TermsAccepted = bool.Parse(GetString(data, "TermsAccepted") ?? "false");
-            Email = GetString(data, "AcmeEmail");
+            AcmeEmail = GetString(data, "AcmeEmail");
             AcmeKey = GetString(data, "AcmeKey");
 
             EnableAutoRenew = bool.Parse(GetString(data, "EnableAutoRenew") ?? "false");
-            SendGridKey = GetString(data, "SendGridKey");
-            SendGridFrom = GetString(data, "SendGridFrom");
+            AwsRegion = GetString(data, "AwsRegion");
+            AwsKey = GetString(data, "AwsKey");
+            AwsSecret = GetString(data, "AwsSecret");
+            EmailFrom = GetString(data, "EmailFrom");
         }
 
         public IDictionary<string, byte[]> Export()
@@ -39,12 +43,14 @@ namespace KCert.Lib
             {
                 { "AcmeDirUrl", Encoding.UTF8.GetBytes(AcmeDirUrl.AbsoluteUri) },
                 { "TermsAccepted", Encoding.UTF8.GetBytes(TermsAccepted.ToString()) },
-                { "AcmeEmail", Encoding.UTF8.GetBytes(Email) },
+                { "AcmeEmail", Encoding.UTF8.GetBytes(AcmeEmail) },
                 { "AcmeKey", Encoding.UTF8.GetBytes(AcmeKey) },
 
                 { "EnableAutoRenew", Encoding.UTF8.GetBytes(EnableAutoRenew.ToString()) },
-                { "SendGridKey", Encoding.UTF8.GetBytes(SendGridKey) },
-                { "SendGridFrom", Encoding.UTF8.GetBytes(SendGridFrom) },
+                { "AwsRegion", Encoding.UTF8.GetBytes(AwsRegion) },
+                { "AwsKey", Encoding.UTF8.GetBytes(AwsKey) },
+                { "AwsSecret", Encoding.UTF8.GetBytes(AwsSecret) },
+                { "EmailFrom", Encoding.UTF8.GetBytes(EmailFrom) },
             };
         }
 

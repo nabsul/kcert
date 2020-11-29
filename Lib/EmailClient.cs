@@ -1,28 +1,39 @@
-﻿using Microsoft.Extensions.Configuration;
-using SendGrid;
-using SendGrid.Helpers.Mail;
+﻿using Amazon;
+using Amazon.SimpleEmail;
+using System;
+using System.Net;
 using System.Threading.Tasks;
 
 namespace KCert.Lib
 {
     public class EmailClient
     {
-        private readonly IConfiguration _cfg;
+        private const string CHARSET = "UTF8";
         private readonly KCertParams _params;
 
-        public EmailClient(IConfiguration cfg, KCertParams p)
+        public EmailClient(KCertParams p)
         {
-            _cfg = cfg;
             _params = p;
         }
 
-        public async Task SendAsync(string fromEmail, string toEmail, string subject, string text)
+        public async Task SendAsync(string subject, string text)
         {
-            var client = new SendGridClient(_params.SendGridKey);
-            var from = new EmailAddress { Name = "KCert Bot", Email = fromEmail };
-            var to = new EmailAddress { Name = "KCert Human", Email = toEmail };
-            var email = MailHelper.CreateSingleEmail(from, to, subject, text, null);
-            await client.SendEmailAsync(email);
+            var client = new AmazonSimpleEmailServiceClient(_params.AwsKey, _params.AwsSecret, _params.AwsRegion);
+            var result = await client.SendEmailAsync(new()
+            {
+                Source = _params.EmailFrom,
+                Destination = new() { ToAddresses = new() { _params.AcmeEmail } },
+                Message = new()
+                {
+                    Subject = new() { Charset = CHARSET, Data = subject },
+                    Body = new() { Text = new() { Charset = CHARSET, Data = text } }
+                },
+            });
+
+            if (result.HttpStatusCode != HttpStatusCode.OK)
+            {
+                throw new Exception("Error!");
+            }
         }
     }
 }

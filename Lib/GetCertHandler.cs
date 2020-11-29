@@ -51,7 +51,7 @@ namespace KCert.Lib
                 await UpdateIngressAsync(ns, ingressName, i => i.AddHttpChallenge(serviceName, servicePort));
                 AddLog(result, $"Route Added");
 
-                (domain, kid, nonce) = await InitAsync(sign, p.AcmeDirUrl, p.Email, ns, ingressName);
+                (domain, kid, nonce) = await InitAsync(sign, p.AcmeDirUrl, p.AcmeEmail, ns, ingressName);
                 AddLog(result, $"Initialized renewal process for intress {ns}/{ingressName} - domain {domain} - kid {kid}");
 
                 (orderUri, finalizeUri, authorizations, nonce) = await CreateOrderAsync(sign, domain, kid, nonce);

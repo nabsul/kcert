@@ -4,6 +4,7 @@ using KCert.Models;
 using System.Threading.Tasks;
 using KCert.Lib;
 using System;
+using System.Linq;
 
 namespace KCert.Controllers
 {
@@ -24,9 +25,17 @@ namespace KCert.Controllers
 
         [HttpGet]
         [Route("configuration")]
-        public async Task<IActionResult> ConfigurationAsync()
+        public async Task<IActionResult> ConfigurationAsync(bool sendEmail = false)
         {
             var p = await _kcert.GetConfigAsync();
+
+            if (!new[] { p.AwsKey, p.AwsSecret, p.EmailFrom }.All(string.IsNullOrWhiteSpace) && sendEmail)
+            {
+                var email = new EmailClient(p);
+                await email.SendAsync("This is a test", "Test test\n\n123");
+                return RedirectToAction("configuration");
+            }
+
             return View(p ?? new KCertParams());
         }
 
@@ -37,10 +46,12 @@ namespace KCert.Controllers
             var p = await _kcert.GetConfigAsync() ?? new KCertParams();
 
             p.AcmeDirUrl = new Uri(form.AcmeDir);
-            p.Email = form.AcmeEmail;
+            p.AcmeEmail = form.AcmeEmail;
             p.EnableAutoRenew = form.EnableAutoRenew;
-            p.SendGridKey = form.SendGridKey;
-            p.SendGridFrom = form.SendGridFrom;
+            p.AwsRegion = form.AwsRegion;
+            p.AwsKey = form.AwsKey;
+            p.AwsSecret= form.AwsSecret;
+            p.EmailFrom = form.EmailFrom;
             p.TermsAccepted = form.TermsAccepted;
             
             if (form.NewKey)
