@@ -1,67 +1,58 @@
 ﻿using k8s.Models;
 using System;
 using System.Collections.Generic;
+using System.Linq;
 using System.Text;
 
 namespace KCert.Lib
 {
     public class KCertParams
     {
-        public Uri AcmeDirUrl { get; set; }
-        public bool TermsAccepted { get; set; }
-        public string AcmeEmail { get; set; }
-        public string AcmeKey { get; set; }
+        public Uri AcmeDirUrl { get => GetUri(nameof(AcmeDirUrl)); set => SetValue(nameof(AcmeDirUrl), value); }
+        public bool TermsAccepted { get => GetBool(nameof(TermsAccepted)); set => SetValue(nameof(TermsAccepted), value); }
+        public string AcmeEmail { get => GetString(nameof(AcmeEmail)); set => SetValue(nameof(AcmeEmail), value); }
+        public string AcmeKey { get => GetString(nameof(AcmeKey)); set => SetValue(nameof(AcmeKey), value); }
 
-        public bool EnableAutoRenew { get; set; }
-        public string AwsKey { get; set; }
-        public string AwsRegion { get; set; }
-        public string AwsSecret { get; set; }
-        public string EmailFrom { get; set; }
+        public bool EnableAutoRenew { get => GetBool(nameof(EnableAutoRenew)); set => SetValue(nameof(EnableAutoRenew), value); }
+        public string AwsKey { get => GetString(nameof(AwsKey)); set => SetValue(nameof(AwsKey), value); }
+        public string AwsRegion { get => GetString(nameof(AwsRegion)); set => SetValue(nameof(AwsRegion), value); }
+        public string AwsSecret { get => GetString(nameof(AwsSecret)); set => SetValue(nameof(AwsSecret), value); }
+        public string EmailFrom { get => GetString(nameof(EmailFrom)); set => SetValue(nameof(EmailFrom), value); }
+
+        private readonly Dictionary<string, byte[]> _data;
 
         public KCertParams()
         {
+            _data = new Dictionary<string, byte[]>();
         }
 
         public KCertParams(V1Secret secret)
         {
-            var data = secret.Data;
-            AcmeDirUrl = new Uri(GetString(data, "AcmeDirUrl"));
-            TermsAccepted = bool.Parse(GetString(data, "TermsAccepted") ?? "false");
-            AcmeEmail = GetString(data, "AcmeEmail");
-            AcmeKey = GetString(data, "AcmeKey");
-
-            EnableAutoRenew = bool.Parse(GetString(data, "EnableAutoRenew") ?? "false");
-            AwsRegion = GetString(data, "AwsRegion");
-            AwsKey = GetString(data, "AwsKey");
-            AwsSecret = GetString(data, "AwsSecret");
-            EmailFrom = GetString(data, "EmailFrom");
+            _data = secret.Data.ToDictionary(kvp => kvp.Key, kvp => kvp.Value);
         }
 
-        public IDictionary<string, byte[]> Export()
-        {
-            return new Dictionary<string, byte[]>
-            {
-                { "AcmeDirUrl", Encoding.UTF8.GetBytes(AcmeDirUrl.AbsoluteUri) },
-                { "TermsAccepted", Encoding.UTF8.GetBytes(TermsAccepted.ToString()) },
-                { "AcmeEmail", Encoding.UTF8.GetBytes(AcmeEmail) },
-                { "AcmeKey", Encoding.UTF8.GetBytes(AcmeKey) },
+        private bool GetBool(string key) => bool.Parse(GetString(key));
 
-                { "EnableAutoRenew", Encoding.UTF8.GetBytes(EnableAutoRenew.ToString()) },
-                { "AwsRegion", Encoding.UTF8.GetBytes(AwsRegion) },
-                { "AwsKey", Encoding.UTF8.GetBytes(AwsKey) },
-                { "AwsSecret", Encoding.UTF8.GetBytes(AwsSecret) },
-                { "EmailFrom", Encoding.UTF8.GetBytes(EmailFrom) },
-            };
-        }
+        private Uri GetUri(string key) => new Uri(GetString(key));
 
-        private static string GetString(IDictionary<string, byte[]> data, string k)
+        public IDictionary<string, byte[]> Export() => _data;
+        private string GetString(string k)
         {
-            if (!data.TryGetValue(k, out var b))
+            if (_data.TryGetValue(k, out var b))
             {
                 return null;
             }
 
             return Encoding.UTF8.GetString(b);
+        }
+
+        private void SetValue(string k, bool v) => SetValue(k, v.ToString());
+
+        private void SetValue(string k, Uri uri) => SetValue(k, uri.AbsoluteUri);
+
+        private void SetValue(string k, string value)
+        {
+            _data[k] = Encoding.UTF8.GetBytes(value);
         }
     }
 }
