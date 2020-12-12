@@ -4,17 +4,18 @@ using KCert.Models;
 using System.Threading.Tasks;
 using KCert.Lib;
 using System;
-using System.Linq;
 
 namespace KCert.Controllers
 {
     public class HomeController : Controller
     {
         private readonly KCertClient _kcert;
+        private readonly EmailClient _email;
 
-        public HomeController(KCertClient kcert)
+        public HomeController(KCertClient kcert, EmailClient email)
         {
             _kcert = kcert;
+            _email = email;
         }
 
         public async Task<IActionResult> IndexAsync()
@@ -29,10 +30,9 @@ namespace KCert.Controllers
         {
             var p = await _kcert.GetConfigAsync();
 
-            if (!new[] { p.AwsKey, p.AwsSecret, p.EmailFrom }.All(string.IsNullOrWhiteSpace) && sendEmail)
+            if (sendEmail && _email.CanSendEmails(p))
             {
-                var email = new EmailClient(p);
-                await email.SendAsync("This is a test", "Test test\n\n123");
+                await _email.SendAsync(p, "This is a test", "Test test\n\n123");
                 return RedirectToAction("configuration");
             }
 

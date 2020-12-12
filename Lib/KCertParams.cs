@@ -38,7 +38,7 @@ namespace KCert.Lib
         public IDictionary<string, byte[]> Export() => _data;
         private string GetString(string k)
         {
-            if (_data.TryGetValue(k, out var b))
+            if (!_data.TryGetValue(k, out var b))
             {
                 return null;
             }

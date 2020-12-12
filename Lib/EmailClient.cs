@@ -1,6 +1,7 @@
 ﻿using Amazon;
 using Amazon.SimpleEmail;
 using System;
+using System.Linq;
 using System.Net;
 using System.Threading.Tasks;
 
@@ -9,20 +10,21 @@ namespace KCert.Lib
     public class EmailClient
     {
         private const string CHARSET = "UTF8";
-        private readonly KCertParams _params;
 
-        public EmailClient(KCertParams p)
+        public bool CanSendEmails(KCertParams p)
         {
-            _params = p;
+            var allFields = new[] { p.AwsKey, p.AwsSecret, p.AwsRegion, p.EmailFrom, p.AcmeEmail };
+            return !allFields.Any(string.IsNullOrWhiteSpace);
         }
 
-        public async Task SendAsync(string subject, string text)
+        public async Task SendAsync(KCertParams p, string subject, string text)
         {
-            var client = new AmazonSimpleEmailServiceClient(_params.AwsKey, _params.AwsSecret, _params.AwsRegion);
+            var region = RegionEndpoint.GetBySystemName(p.AwsRegion);
+            var client = new AmazonSimpleEmailServiceClient(p.AwsKey, p.AwsSecret, region);
             var result = await client.SendEmailAsync(new()
             {
-                Source = _params.EmailFrom,
-                Destination = new() { ToAddresses = new() { _params.AcmeEmail } },
+                Source = p.EmailFrom,
+                Destination = new() { ToAddresses = new() { p.AcmeEmail } },
                 Message = new()
                 {
                     Subject = new() { Charset = CHARSET, Data = subject },
