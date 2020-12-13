@@ -55,7 +55,7 @@ namespace KCert.Lib
             while(true)
             {
                 var p = await _kcert.GetConfigAsync();
-                if (p.EnableAutoRenew)
+                if (p?.EnableAutoRenew ?? false)
                 {
                     tok.ThrowIfCancellationRequested();
                     await StartRenewalJobAsync();
