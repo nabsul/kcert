@@ -41,13 +41,13 @@ namespace KCert.Lib
 
         public async Task<KCertParams> GetConfigAsync()
         {
-            var s = await _kube.GetSecretAsync(_cfg["namespace"], _cfg["secretName"]);
+            var s = await _kube.GetSecretAsync(_cfg["Namespace"], _cfg["SecretName"]);
             return s == null ? null : new KCertParams(s);
         }
 
         public async Task SaveConfigAsync(KCertParams p)
         {
-            await _kube.SaveSecretDataAsync(_cfg["namespace"], _cfg["secretName"], p.Export());
+            await _kube.SaveSecretDataAsync(_cfg["Namespace"], _cfg["SecretName"], p.Export());
         }
 
         public async Task<string> GetThumbprintAsync()
