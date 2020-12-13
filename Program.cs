@@ -1,6 +1,13 @@
 using Microsoft.AspNetCore.Hosting;
 using Microsoft.Extensions.Configuration;
 using Microsoft.Extensions.Hosting;
+using Microsoft.Extensions.DependencyInjection;
+using KCert.Lib;
+using System.Threading.Tasks;
+using Microsoft.Extensions.Logging;
+using System.Threading;
+using System.Diagnostics;
+using System;
 
 namespace KCert
 {
@@ -8,7 +15,9 @@ namespace KCert
     {
         public static void Main(string[] args)
         {
-            CreateHostBuilder(args).Build().Run();
+            var host = CreateHostBuilder(args).Build();
+            _ = StartRenewalServiceAsync(host);
+            host.Run();
         }
 
         public static IHostBuilder CreateHostBuilder(string[] args) =>
@@ -21,5 +30,19 @@ namespace KCert
                 {
                     webBuilder.UseStartup<Startup>();
                 });
+
+        private static async Task StartRenewalServiceAsync(IHost host)
+        {
+            var log = host.Services.GetService<ILogger<Program>>();
+            var renewal = host.Services.GetService<RenewalManager>();
+            try
+            {
+                await renewal.StartRenewalServiceAsync();
+            }
+            catch(Exception ex)
+            {
+                log.LogError(ex, $"Renewal service failed unexpectedly");
+            }
+        }
     }
 }

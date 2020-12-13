@@ -11,11 +11,13 @@ namespace KCert.Controllers
     {
         private readonly KCertClient _kcert;
         private readonly EmailClient _email;
+        private readonly RenewalManager _renewal;
 
-        public HomeController(KCertClient kcert, EmailClient email)
+        public HomeController(KCertClient kcert, EmailClient email, RenewalManager renewal)
         {
             _kcert = kcert;
             _email = email;
+            _renewal = renewal;
         }
 
         public async Task<IActionResult> IndexAsync()
@@ -28,14 +30,13 @@ namespace KCert.Controllers
         [Route("configuration")]
         public async Task<IActionResult> ConfigurationAsync(bool sendEmail = false)
         {
-            var p = await _kcert.GetConfigAsync();
-
-            if (sendEmail && _email.CanSendEmails(p))
+            if (sendEmail)
             {
-                await _email.SendAsync(p, "This is a test", "Test test\n\n123");
+                await _email.SendTestEmailAsync();
                 return RedirectToAction("configuration");
             }
 
+            var p = await _kcert.GetConfigAsync();
             return View(p ?? new KCertParams());
         }
 
@@ -60,6 +61,7 @@ namespace KCert.Controllers
             }
             
             await _kcert.SaveConfigAsync(p);
+            _renewal.RefreshSettings();
             return RedirectToAction("Configuration");
         }
 

@@ -11,14 +11,55 @@ namespace KCert.Lib
     {
         private const string CHARSET = "UTF8";
 
-        public bool CanSendEmails(KCertParams p)
+        private const string TestSubject = "KCert Test Email";
+        private const string TestMessage = "If you received this, then KCert is able to send emails!";
+
+
+        private static string RenewalSubject(GetCertResult result)
         {
-            var allFields = new[] { p.AwsKey, p.AwsSecret, p.AwsRegion, p.EmailFrom, p.AcmeEmail };
-            return !allFields.Any(string.IsNullOrWhiteSpace);
+            var status = result.Success ? "succeeded" : "failed";
+            return $"KCert Renewal of ingress [{result.IngressName}] {status}";
         }
 
-        public async Task SendAsync(KCertParams p, string subject, string text)
+        private static string RenewalMessage(GetCertResult result)
         {
+            var lines = new[]
+            {
+                $"Renewal of ingress [{result.IngressNamespace}] [{result.IngressName}] completed with status: " + (result.Success ? "Success" : "Failure"),
+                "\nLogs:\n",
+                string.Join('\n', result.Logs),
+                result.Error == null ? "" : $"Error:\n\n{result.Error.Message}\n\n{result.Error.StackTrace}"
+            };
+
+            return string.Join('\n', lines);
+        }
+
+        private readonly KCertClient _kcert;
+
+        public EmailClient(KCertClient kcert)
+        {
+            _kcert = kcert;
+        }
+
+        public async Task SendTestEmailAsync()
+        {
+            await SendAsync(TestSubject, TestMessage);
+        }
+
+        public async Task NotifyRenewalResultAsync(GetCertResult result)
+        {
+            await SendAsync(RenewalSubject(result), RenewalMessage(result));
+        }
+
+        private async Task SendAsync(string subject, string text)
+        {
+            var p = await _kcert.GetConfigAsync();
+
+            if (!CanSendEmails(p))
+            {
+                return;
+            }
+
             var region = RegionEndpoint.GetBySystemName(p.AwsRegion);
             var client = new AmazonSimpleEmailServiceClient(p.AwsKey, p.AwsSecret, region);
             var result = await client.SendEmailAsync(new()
@@ -36,6 +77,12 @@ namespace KCert.Lib
             {
                 throw new Exception("Error!");
             }
+        }
+
+        private static bool CanSendEmails(KCertParams p)
+        {
+            var allFields = new[] { p.AwsKey, p.AwsSecret, p.AwsRegion, p.EmailFrom, p.AcmeEmail };
+            return !allFields.Any(string.IsNullOrWhiteSpace);
         }
     }
 }

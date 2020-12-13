@@ -2,6 +2,7 @@
 using Microsoft.Extensions.Configuration;
 using Microsoft.Extensions.Logging;
 using System;
+using System.Threading;
 using System.Threading.Tasks;
 
 namespace KCert.Lib
@@ -10,57 +11,74 @@ namespace KCert.Lib
     {
         private readonly K8sClient _k8s;
         private readonly KCertClient _kcert;
+        private readonly EmailClient _email;
         private readonly IConfiguration _cfg;
         private readonly ILogger<RenewalManager> _log;
 
-        public RenewalManager(ILogger<RenewalManager> log, IConfiguration cfg, K8sClient k8s, KCertClient kcert)
+        private CancellationTokenSource _cancel;
+
+        public RenewalManager(ILogger<RenewalManager> log, IConfiguration cfg, K8sClient k8s, KCertClient kcert, EmailClient email)
         {
             _cfg = cfg;
             _log = log;
             _k8s = k8s;
             _kcert = kcert;
-
-            _ = StartRenewalJobAsync();
+            _email = email;
         }
 
+        private TimeSpan SleepTime => TimeSpan.FromHours(_cfg.GetValue<int>("Renewals:HoursBetweenChecks"));
+
+        public async Task StartRenewalServiceAsync()
+        {
+            while(true)
+            {
+                _log.LogInformation("Starting up renewal service loop.");
+                _cancel = new CancellationTokenSource();
+                try
+                {
+                    await RunLoopAsync(_cancel.Token);
+                }
+                catch(TaskCanceledException)
+                {
+                    _log.LogInformation($"Renewal loop cancelled. Restarting.");
+                }
+            }
+        }
+
+        public void RefreshSettings()
+        {
+            _cancel.Cancel();
+        }
+
+        private async Task RunLoopAsync(CancellationToken tok)
+        {
+            while(true)
+            {
+                var p = await _kcert.GetConfigAsync();
+                if (p.EnableAutoRenew)
+                {
+                    tok.ThrowIfCancellationRequested();
+                    await StartRenewalJobAsync();
+                }
+
+                await Task.Delay(SleepTime, tok);
+            }
+        }
 
         private async Task StartRenewalJobAsync()
         {
-            if (!_cfg.GetValue<bool>("Renewal:enabled"))
-            {
-                _log.LogInformation("Existing because renewal is disabled.");
-                return;
-            }
-
             try
             {
-                while (true)
-                {
-                    _log.LogInformation("Checking for ingresses that need renewals...");
-                    await StartRenewalJobInnerAsync();
-                    _log.LogInformation("Renewal check completed.");
-                    var delay = TimeSpan.FromHours(_cfg.GetValue<int>("renewal:HoursBetweenChecks"));
-                    await Task.Delay(delay);
-                }
-            }
-            catch (Exception ex)
-            {
-                _log.LogError(ex, $"Renewal manager job failed: {ex.Message}");
-            }
-        }
-
-        private async Task StartRenewalJobInnerAsync()
-        {
-            try
-            {
+                _log.LogInformation("Checking for ingresses that need renewals...");
                 foreach (var ingress in await _k8s.GetAllIngressesAsync())
                 {
                     await TryRenewAsync(ingress);
                 }
+                _log.LogInformation("Renewal check completed.");
             }
             catch (Exception ex)
             {
-                _log.LogError(ex, $"Renewal job failed: {ex.Message}");
+                _log.LogError(ex, $"Renewal manager job failed: {ex.Message}");
             }
         }
 
@@ -79,7 +97,8 @@ namespace KCert.Lib
                 return;
             }
 
-            await _kcert.GetCertAsync(ingress.Namespace(), ingress.Name());
+            var result = await _kcert.GetCertAsync(ingress.Namespace(), ingress.Name());
+            await _email.NotifyRenewalResultAsync(result);
         }
     }
 }

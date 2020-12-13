@@ -21,6 +21,7 @@ namespace KCert
         public void ConfigureServices(IServiceCollection services)
         {
             services.AddSingleton(GetK8sClient());
+            services.AddSingleton<RenewalManager>();
             services.AddSingleton<EmailClient>();
             services.AddSingleton<K8sClient>();
             services.AddSingleton<AcmeClient>();
