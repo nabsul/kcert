@@ -57,7 +57,7 @@ spec:
       serviceAccountName: kcert
       containers:
       - name: kcert
-        image: nabsul/kcert:pr-7c135906309126651641eb93e8fb8da91e469b74
+        image: nabsul/kcert:pr-d0197ff4c9c8b2771682bde3aab57899c594f48a
         ports:
         - containerPort: 80
           name: http

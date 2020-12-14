@@ -27,6 +27,7 @@ namespace KCert.Lib
         }
 
         private TimeSpan SleepTime => TimeSpan.FromHours(_cfg.GetValue<int>("Renewals:HoursBetweenChecks"));
+        private TimeSpan RenewalThreshold => TimeSpan.FromDays(_cfg.GetValue<int>("Renewals:DaysToRenewal"));
 
         public async Task StartRenewalServiceAsync()
         {
@@ -97,6 +98,14 @@ namespace KCert.Lib
                 return;
             }
 
+            var cert = secret.Cert();
+            if (DateTime.UtcNow < cert.NotAfter - RenewalThreshold)
+            {
+                _log.LogInformation($"{ingress.Namespace()} / {ingress.Name()} / {string.Join(',', ingress.Hosts())} doesn't need renewal");
+                return;
+            }
+
+            _log.LogInformation($"Renewing: {ingress.Namespace()} / {ingress.Name()} / {string.Join(',', ingress.Hosts())}");
             var result = await _kcert.GetCertAsync(ingress.Namespace(), ingress.Name());
             await _email.NotifyRenewalResultAsync(result);
         }
