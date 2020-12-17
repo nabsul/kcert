@@ -59,21 +59,22 @@ namespace KCert.Lib
                 if (p?.EnableAutoRenew ?? false)
                 {
                     tok.ThrowIfCancellationRequested();
-                    await StartRenewalJobAsync();
+                    await StartRenewalJobAsync(tok);
                 }
 
                 await Task.Delay(SleepTime, tok);
             }
         }
 
-        private async Task StartRenewalJobAsync()
+        private async Task StartRenewalJobAsync(CancellationToken tok)
         {
             try
             {
                 _log.LogInformation("Checking for ingresses that need renewals...");
                 foreach (var ingress in await _k8s.GetAllIngressesAsync())
                 {
-                    await TryRenewAsync(ingress);
+                    tok.ThrowIfCancellationRequested();
+                    await TryRenewAsync(ingress, tok);
                 }
                 _log.LogInformation("Renewal check completed.");
             }
@@ -83,7 +84,7 @@ namespace KCert.Lib
             }
         }
 
-        private async Task TryRenewAsync(Networkingv1beta1Ingress ingress)
+        private async Task TryRenewAsync(Networkingv1beta1Ingress ingress, CancellationToken tok)
         {
             var ns = ingress.Namespace();
             var secretName = ingress.SecretName();
@@ -105,6 +106,7 @@ namespace KCert.Lib
                 return;
             }
 
+            tok.ThrowIfCancellationRequested();
             _log.LogInformation($"Renewing: {ingress.Namespace()} / {ingress.Name()} / {string.Join(',', ingress.Hosts())}");
             var result = await _kcert.GetCertAsync(ingress.Namespace(), ingress.Name());
             await _email.NotifyRenewalResultAsync(result);

@@ -14,15 +14,15 @@ namespace KCert.Lib
     {
         private readonly AcmeClient _acme;
         private readonly K8sClient _kube;
-        private readonly IConfiguration _cfg;
+        private readonly KCertConfig _cfg;
         private readonly ILogger<GetCertHandler> _log;
 
-        public GetCertHandler(ILogger<GetCertHandler> log, IConfiguration cfg, AcmeClient acme, K8sClient kube)
+        public GetCertHandler(ILogger<GetCertHandler> log, AcmeClient acme, K8sClient kube, KCertConfig cfg)
         {
             _log = log;
-            _cfg = cfg;
             _acme = acme;
             _kube = kube;
+            _cfg = cfg;
         }
 
         public async Task<GetCertResult> GetCertAsync(string ns, string ingressName, KCertParams p, ECDsa sign)
@@ -31,12 +31,12 @@ namespace KCert.Lib
             Uri orderUri, finalizeUri, certUri;
             IList<Uri> authorizations;
 
-            var waitTime = TimeSpan.FromSeconds(_cfg.GetValue<int>("AcmeWaitTimeSeconds"));
-            var numRetries = _cfg.GetValue<int>("AcmeNumRetries");
-            var serviceName = _cfg.GetValue<string>("ServiceName");
-            var servicePort = _cfg.GetValue<string>("ServicePort");
-            var secretName = _cfg.GetValue<string>("SecretName");
-            var kcertNs = _cfg.GetValue<string>("Namespace");
+            var waitTime = _cfg.AcmeWaitTime;
+            var numRetries = _cfg.AcmeNumRetries;
+            var serviceName = _cfg.KCertServiceName;
+            var servicePort = _cfg.KCertServicePort;
+            var secretName = _cfg.KCertSecretName;
+            var kcertNs = _cfg.KCertNamespace;
 
             var result = new GetCertResult { IngressNamespace = ns, IngressName = ingressName };
 
@@ -52,10 +52,10 @@ namespace KCert.Lib
                 AddLog(result, $"Route Added");
 
                 (domain, kid, nonce) = await InitAsync(sign, p.AcmeDirUrl, p.AcmeEmail, ns, ingressName);
-                AddLog(result, $"Initialized renewal process for intress {ns}/{ingressName} - domain {domain} - kid {kid}");
+                AddLog(result, $"Initialized renewal process for ingress {ns}/{ingressName} - domain {domain} - kid {kid}");
 
                 (orderUri, finalizeUri, authorizations, nonce) = await CreateOrderAsync(sign, domain, kid, nonce);
-                AddLog(result, $"Order {orderUri} created with finlizeUri {finalizeUri}");
+                AddLog(result, $"Order {orderUri} created with finalizeUri {finalizeUri}");
 
                 foreach (var authUrl in authorizations)
                 {
