@@ -2,6 +2,7 @@
 using Microsoft.AspNetCore.Authentication;
 using Microsoft.Extensions.Configuration;
 using System.Collections.Generic;
+using System.Linq;
 using System.Security.Cryptography;
 using System.Text;
 using System.Text.Json;
@@ -13,13 +14,15 @@ namespace KCert.Lib
     {
         private readonly K8sClient _kube;
         private readonly GetCertHandler _getCert;
-        private readonly IConfiguration _cfg;
+        private readonly KCertConfig _cfg;
+        private readonly NamespaceFilter _filter;
 
-        public KCertClient(K8sClient kube, IConfiguration cfg, GetCertHandler getCert)
+        public KCertClient(K8sClient kube, KCertConfig cfg, GetCertHandler getCert, NamespaceFilter filter)
         {
             _kube = kube;
             _cfg = cfg;
             _getCert = getCert;
+            _filter = filter;
         }
 
         public string GenerateNewKey()
@@ -31,7 +34,8 @@ namespace KCert.Lib
 
         public async Task<IList<Networkingv1beta1Ingress>> GetAllIngressesAsync()
         {
-            return await _kube.GetAllIngressesAsync();
+            var ingresses = await _kube.GetAllIngressesAsync();
+            return ingresses.Where(i => _filter.IsManagedNamespace(i.Namespace())).ToList();
         }
 
         public async Task<Networkingv1beta1Ingress> GetIngressAsync(string ns, string name)
@@ -41,13 +45,13 @@ namespace KCert.Lib
 
         public async Task<KCertParams> GetConfigAsync()
         {
-            var s = await _kube.GetSecretAsync(_cfg["Namespace"], _cfg["SecretName"]);
+            var s = await _kube.GetSecretAsync(_cfg.KCertNamespace, _cfg.KCertSecretName);
             return s == null ? null : new KCertParams(s);
         }
 
         public async Task SaveConfigAsync(KCertParams p)
         {
-            await _kube.SaveSecretDataAsync(_cfg["Namespace"], _cfg["SecretName"], p.Export());
+            await _kube.SaveSecretDataAsync(_cfg.KCertNamespace, _cfg.KCertSecretName, p.Export());
         }
 
         public async Task<string> GetThumbprintAsync()

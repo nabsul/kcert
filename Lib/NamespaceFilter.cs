@@ -1,14 +1,17 @@
-﻿using System.Text.RegularExpressions;
+﻿using Microsoft.Extensions.Logging;
+using System.Text.RegularExpressions;
 
 namespace KCert.Lib
 {
     public class NamespaceFilter
     {
         private readonly KCertConfig _cfg;
+        private readonly ILogger<NamespaceFilter> _log;
 
-        public NamespaceFilter(KCertConfig cfg)
+        public NamespaceFilter(KCertConfig cfg, ILogger<NamespaceFilter> log)
         {
             _cfg = cfg;
+            _log = log;
         }
 
         public bool IsManagedNamespace(string ns)
