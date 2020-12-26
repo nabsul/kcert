@@ -160,7 +160,7 @@ namespace KCert.Lib
 
             if (!auth.IsChallengeDone)
             {
-                throw new Exception($"Auth {authUri} did not complete in time. Last Response: {auth.Content}");
+                throw new Exception($"Auth {authUri} did not complete in time. Last Response: {auth.Content.RootElement}");
             }
 
             return nonce;

@@ -3,80 +3,22 @@ using Microsoft.AspNetCore.Mvc;
 using KCert.Models;
 using System.Threading.Tasks;
 using KCert.Lib;
-using System;
 
 namespace KCert.Controllers
 {
     public class HomeController : Controller
     {
         private readonly KCertClient _kcert;
-        private readonly EmailClient _email;
-        private readonly RenewalManager _renewal;
 
-        public HomeController(KCertClient kcert, EmailClient email, RenewalManager renewal)
+        public HomeController(KCertClient kcert)
         {
             _kcert = kcert;
-            _email = email;
-            _renewal = renewal;
         }
 
         public async Task<IActionResult> IndexAsync()
         {
             var ingresses = await _kcert.GetAllIngressesAsync();
             return View(ingresses);
-        }
-
-        [HttpGet]
-        [Route("configuration")]
-        public async Task<IActionResult> ConfigurationAsync(bool sendEmail = false)
-        {
-            if (sendEmail)
-            {
-                await _email.SendTestEmailAsync();
-                return RedirectToAction("configuration");
-            }
-
-            var p = await _kcert.GetConfigAsync();
-            return View(p ?? new KCertParams());
-        }
-
-        [HttpPost]
-        [Route("configuration")]
-        public async Task<IActionResult> SaveConfigurationAsync([FromForm] ConfigurationForm form)
-        {
-            var p = await _kcert.GetConfigAsync() ?? new KCertParams();
-
-            p.AcmeDirUrl = new Uri(form.AcmeDir);
-            p.AcmeEmail = form.AcmeEmail;
-            p.EnableAutoRenew = form.EnableAutoRenew;
-            p.AwsRegion = form.AwsRegion;
-            p.AwsKey = form.AwsKey;
-            p.AwsSecret= form.AwsSecret;
-            p.EmailFrom = form.EmailFrom;
-            p.TermsAccepted = form.TermsAccepted;
-            
-            if (form.NewKey)
-            {
-                p.AcmeKey = _kcert.GenerateNewKey();
-            }
-            
-            await _kcert.SaveConfigAsync(p);
-            _renewal.RefreshSettings();
-            return RedirectToAction("Configuration");
-        }
-
-        [Route("ingress/{ns}/{name}")]
-        public async Task<IActionResult> ViewAsync(string ns, string name)
-        {
-            var ingress = await _kcert.GetIngressAsync(ns, name);
-            return View(ingress);
-        }
-
-        [Route("ingress/{ns}/{name}/renew")]
-        public async Task<IActionResult> RenewAsync(string ns, string name)
-        {
-            var result = await _kcert.GetCertAsync(ns, name);
-            return View(result);
         }
 
         [ResponseCache(Duration = 0, Location = ResponseCacheLocation.None, NoStore = true)]
