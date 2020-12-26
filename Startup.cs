@@ -29,6 +29,7 @@ namespace KCert
             services.AddSingleton<AcmeClient>();
             services.AddSingleton<GetCertHandler>();
             services.AddSingleton<KCertClient>();
+            
             services.AddControllersWithViews();
         }
 
@@ -41,19 +42,16 @@ namespace KCert
             }
             else
             {
-                app.UseExceptionHandler("/Home/Error");
+                app.UseExceptionHandler("/error");
                 // The default HSTS value is 30 days. You may want to change this for production scenarios, see https://aka.ms/aspnetcore-hsts.
                 app.UseHsts();
             }
 
             app.UseStaticFiles();
             app.UseRouting();
-            app.UseAuthorization();
             app.UseEndpoints(endpoints =>
             {
-                endpoints.MapControllerRoute(
-                    name: "default",
-                    pattern: "{controller=Home}/{action=Index}/{id?}");
+                endpoints.MapControllers();
             });
         }
 

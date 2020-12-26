@@ -6,6 +6,7 @@ using KCert.Lib;
 
 namespace KCert.Controllers
 {
+    [Route("")]
     public class HomeController : Controller
     {
         private readonly KCertClient _kcert;
@@ -15,12 +16,15 @@ namespace KCert.Controllers
             _kcert = kcert;
         }
 
+        [HttpGet]
+        [Route("")]
         public async Task<IActionResult> IndexAsync()
         {
             var ingresses = await _kcert.GetAllIngressesAsync();
             return View(ingresses);
         }
 
+        [Route("error")]
         [ResponseCache(Duration = 0, Location = ResponseCacheLocation.None, NoStore = true)]
         public IActionResult Error()
         {
