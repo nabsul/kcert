@@ -13,18 +13,20 @@ namespace KCert.Lib
     {
         private const string TlsSecretType = "kubernetes.io/tls";
 
+        private readonly KCertConfig _cfg;
         private readonly Kubernetes _client;
 
-        public K8sClient(Kubernetes client)
+        public K8sClient(Kubernetes client, KCertConfig cfg)
         {
             _client = client;
+            _cfg = cfg;
         }
 
-        public async Task<V1Service> GetServiceAsync(string ns, string name)
+        public async Task<V1Service> GetServiceAsync(string ns)
         {
             try
             {
-                return await _client.ReadNamespacedServiceAsync(name, ns);
+                return await _client.ReadNamespacedServiceAsync(_cfg.KCertServiceName, ns);
             }
             catch (HttpOperationException ex)
             {
@@ -37,9 +39,10 @@ namespace KCert.Lib
             }
         }
 
-        public async Task CreateServiceAsync(string ns, string name, string kcertNs, string servicePort)
+        public async Task CreateServiceAsync(string ns)
         {
-            var svc = await GetServiceAsync(ns, name);
+            var (name, kcertNs, servicePort) = (_cfg.KCertServiceName, _cfg.KCertNamespace, _cfg.KCertServicePort);
+            var svc = await GetServiceAsync(ns);
 
             if (svc != null)
             {
@@ -74,9 +77,9 @@ namespace KCert.Lib
             };
         }
 
-        public async Task DeleteServiceAsync(string ns, string name)
+        public async Task DeleteServiceAsync(string ns)
         {
-            await _client.DeleteNamespacedServiceAsync(name, ns);
+            await _client.DeleteNamespacedServiceAsync(_cfg.KCertServiceName, ns);
         }
 
         public async Task<IList<V1Secret>> GetAllSecretsAsync(string ns)

@@ -1,5 +1,4 @@
 ﻿using k8s.Models;
-using Microsoft.Extensions.Configuration;
 using Microsoft.Extensions.Logging;
 using System;
 using System.Collections.Generic;
@@ -31,24 +30,17 @@ namespace KCert.Lib
             Uri orderUri, finalizeUri, certUri;
             IList<Uri> authorizations;
 
-            var waitTime = _cfg.AcmeWaitTime;
-            var numRetries = _cfg.AcmeNumRetries;
-            var serviceName = _cfg.KCertServiceName;
-            var servicePort = _cfg.KCertServicePort;
-            var secretName = _cfg.KCertSecretName;
-            var kcertNs = _cfg.KCertNamespace;
-
             var result = new GetCertResult { IngressNamespace = ns, IngressName = ingressName };
 
             try
             {
-                if (ns != kcertNs)
+                if (ns != _cfg.KCertNamespace)
                 {
-                    await _kube.CreateServiceAsync(ns, serviceName, kcertNs, servicePort);
+                    await _kube.CreateServiceAsync(ns);
                     AddLog(result, $"Temporary service in namespace {ns} created");
                 }
 
-                await UpdateIngressAsync(ns, ingressName, i => i.AddHttpChallenge(serviceName, servicePort));
+                await UpdateIngressAsync(ns, ingressName, i => i.AddHttpChallenge(_cfg.KCertServiceName, _cfg.KCertServicePort));
                 AddLog(result, $"Route Added");
 
                 (domain, kid, nonce) = await InitAsync(sign, p.AcmeDirUrl, p.AcmeEmail, ns, ingressName);
@@ -59,12 +51,12 @@ namespace KCert.Lib
 
                 foreach (var authUrl in authorizations)
                 {
-                    nonce = await ValidateAuthorizationAsync(sign, kid, nonce, authUrl, waitTime, numRetries);
+                    nonce = await ValidateAuthorizationAsync(sign, kid, nonce, authUrl);
                     AddLog(result, $"Validated auth: {authUrl}");
                 }
 
                 var rsa = RSA.Create(2048);
-                (certUri, nonce) = await FinalizeOrderAsync(sign, rsa, orderUri, finalizeUri, domain, kid, nonce, waitTime, numRetries);
+                (certUri, nonce) = await FinalizeOrderAsync(sign, rsa, orderUri, finalizeUri, domain, kid, nonce);
                 AddLog(result, $"Finalized order and received cert URI: {certUri}");
                 await SaveCertAsync(sign, ns, ingressName, rsa, certUri, kid, nonce);
                 AddLog(result, $"Saved cert");
@@ -83,9 +75,9 @@ namespace KCert.Lib
                 await UpdateIngressAsync(ns, ingressName, i => i.RemoveHttpChallenge());
                 AddLog(result, $"Route Removed");
 
-                if (ns != kcertNs && null != await _kube.GetServiceAsync(ns, serviceName))
+                if (ns != _cfg.KCertNamespace && null != await _kube.GetServiceAsync(ns))
                 {
-                    await _kube.DeleteServiceAsync(ns, serviceName);
+                    await _kube.DeleteServiceAsync(ns);
                     AddLog(result, $"Deleted temporary service in namespace {ns} created");
                 }
             }
@@ -140,8 +132,9 @@ namespace KCert.Lib
             return (new Uri(order.Location), order.FinalizeUri, order.AuthorizationUrls, order.Nonce);
         }
 
-        private async Task<string> ValidateAuthorizationAsync(ECDsa sign, string kid, string nonce, Uri authUri, TimeSpan waitTime, int numRetries)
+        private async Task<string> ValidateAuthorizationAsync(ECDsa sign, string kid, string nonce, Uri authUri)
         {
+            var (waitTime, numRetries) = (_cfg.AcmeWaitTime, _cfg.AcmeNumRetries);
             var auth = await _acme.GetAuthzAsync(sign, authUri, kid, nonce);
             nonce = auth.Nonce;
             _log.LogInformation($"Get Auth {authUri}: {JsonSerializer.Serialize(auth.Content)}");
@@ -167,8 +160,9 @@ namespace KCert.Lib
         }
 
         private async Task<(Uri CertUri, string Nonce)> FinalizeOrderAsync(ECDsa sign, RSA rsa, Uri orderUri, Uri finalizeUri,
-            string domain, string kid, string nonce, TimeSpan waitTime, int numRetries)
+            string domain, string kid, string nonce)
         {
+            var (waitTime, numRetries) = (_cfg.AcmeWaitTime, _cfg.AcmeNumRetries);
             var finalize = await _acme.FinalizeOrderAsync(rsa, sign, finalizeUri, domain, kid, nonce);
             _log.LogInformation($"Finalize {finalizeUri}: {JsonSerializer.Serialize(finalize.Content)}");
 

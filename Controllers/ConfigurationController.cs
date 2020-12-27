@@ -27,7 +27,7 @@ namespace KCert.Controllers
             if (sendEmail)
             {
                 await _email.SendTestEmailAsync();
-                return RedirectToAction("configuration");
+                return RedirectToAction("Index");
             }
 
             var p = await _kcert.GetConfigAsync();
@@ -56,7 +56,7 @@ namespace KCert.Controllers
 
             await _kcert.SaveConfigAsync(p);
             _renewal.RefreshSettings();
-            return RedirectToAction("Configuration");
+            return RedirectToAction("Index");
         }
     }
 }

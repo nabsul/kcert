@@ -32,7 +32,7 @@ namespace KCert.Lib
             _data = secret.Data.ToDictionary(kvp => kvp.Key, kvp => kvp.Value);
         }
 
-        private bool GetBool(string key) => bool.Parse(GetString(key));
+        private bool GetBool(string key) => bool.TryParse(GetString(key), out var result) ? false : result;
 
         private Uri GetUri(string key)
         {
@@ -57,7 +57,7 @@ namespace KCert.Lib
 
         private void SetValue(string k, string value)
         {
-            _data[k] = Encoding.UTF8.GetBytes(value);
+            _data[k] = value == null ? null : Encoding.UTF8.GetBytes(value);
         }
     }
 }
