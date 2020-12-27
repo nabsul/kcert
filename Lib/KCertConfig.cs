@@ -14,15 +14,16 @@ namespace KCert.Lib
             _cfg = cfg;
         }
 
-        public string KCertNamespace => _cfg.GetValue<string>("Deploy:Namespace");
-        public string KCertSecretName => _cfg.GetValue<string>("Deploy:SecretName");
-        public string KCertServiceName => _cfg.GetValue<string>("Deploy:ServiceName");
-        public string KCertServicePort => _cfg.GetValue<string>("Deploy:ServicePort");
+        public string KCertNamespace => _cfg.GetValue<string>("KCertNamespace");
+        public string KCertSecretName => _cfg.GetValue<string>("SecretName");
+        public string KCertServiceName => _cfg.GetValue<string>("ServiceName");
+        public string KCertServicePort => _cfg.GetValue<string>("ServicePort");
         public List<string> ManagedNamespaces => _cfg.GetValue<string>("Namespaces").Split(',').ToList();
 
-        public TimeSpan AcmeWaitTime => TimeSpan.FromSeconds(_cfg.GetValue<int>("ACME:AcmeWaitTimeSeconds"));
-        public int AcmeNumRetries => _cfg.GetValue<int>("ACME:AcmeNumRetries");
-        public TimeSpan RenewalTimeBetweenChekcs => TimeSpan.FromHours(_cfg.GetValue<int>("ACME:RenewalCheckTimeHours"));
-        public TimeSpan RenewalExpirationLimit => TimeSpan.FromDays(_cfg.GetValue<int>("ACME:RenewalExpirationRenewalDays"));
+        public TimeSpan AcmeWaitTime => TimeSpan.FromSeconds(_cfg.GetValue<int>("AcmeWaitTimeSeconds"));
+        public int AcmeNumRetries => _cfg.GetValue<int>("AcmeNumRetries");
+        public TimeSpan RenewalTimeBetweenChekcs => TimeSpan.FromHours(_cfg.GetValue<int>("RenewalCheckTimeHours"));
+        public TimeSpan RenewalExpirationLimit => TimeSpan.FromDays(_cfg.GetValue<int>("RenewalExpirationRenewalDays"));
+        public bool SkipCleanup => _cfg.GetValue<bool>("SkipCleanup");
     }
 }

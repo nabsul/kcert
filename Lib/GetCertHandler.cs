@@ -42,6 +42,7 @@ namespace KCert.Lib
 
                 await UpdateIngressAsync(ns, ingressName, i => i.AddHttpChallenge(_cfg.KCertServiceName, _cfg.KCertServicePort));
                 AddLog(result, $"Route Added");
+                await Task.Delay(_cfg.AcmeWaitTime); // give ingress time to propagate
 
                 (domain, kid, nonce) = await InitAsync(sign, p.AcmeDirUrl, p.AcmeEmail, ns, ingressName);
                 AddLog(result, $"Initialized renewal process for ingress {ns}/{ingressName} - domain {domain} - kid {kid}");
@@ -68,6 +69,12 @@ namespace KCert.Lib
                 _log.LogError(ex, "Renew failed");
                 result.Success = false;
                 result.Error = ex;
+            }
+
+            if (_cfg.SkipCleanup)
+            {
+                _log.LogInformation("Leaving service and ingress modifications for debugging");
+                return result;
             }
 
             try
