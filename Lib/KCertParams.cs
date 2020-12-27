@@ -34,7 +34,11 @@ namespace KCert.Lib
 
         private bool GetBool(string key) => bool.Parse(GetString(key));
 
-        private Uri GetUri(string key) => new Uri(GetString(key));
+        private Uri GetUri(string key)
+        {
+            var uri = GetString(key);
+            return uri == null ? null : new Uri(uri);
+        }
 
         public IDictionary<string, byte[]> Export() => _data;
         private string GetString(string k)
