@@ -3,6 +3,8 @@ using Microsoft.Extensions.Logging;
 using System;
 using System.Collections.Generic;
 using System.Linq;
+using System.Net;
+using System.Net.Http;
 using System.Security.Cryptography;
 using System.Text.Json;
 using System.Threading.Tasks;
@@ -42,10 +44,11 @@ namespace KCert.Lib
 
                 await UpdateIngressAsync(ns, ingressName, i => i.AddHttpChallenge(_cfg.KCertServiceName, _cfg.KCertServicePort));
                 AddLog(result, $"Route Added");
-                await Task.Delay(_cfg.AcmeWaitTime); // give ingress time to propagate
 
                 (domain, kid, nonce) = await InitAsync(sign, p.AcmeDirUrl, p.AcmeEmail, ns, ingressName);
                 AddLog(result, $"Initialized renewal process for ingress {ns}/{ingressName} - domain {domain} - kid {kid}");
+
+                await WaitForIngressAsync(domain);
 
                 (orderUri, finalizeUri, authorizations, nonce) = await CreateOrderAsync(sign, domain, kid, nonce);
                 AddLog(result, $"Order {orderUri} created with finalizeUri {finalizeUri}");
@@ -195,6 +198,55 @@ namespace KCert.Lib
             var ingress = await _kube.GetIngressAsync(ns, ingressName);
             var secret = ingress.Spec.Tls.First().SecretName;
             await _kube.UpdateTlsSecretAsync(ns, secret, key, cert);
+        }
+
+        private async Task WaitForIngressAsync(string host)
+        {
+            var ipAddresses = await Dns.GetHostAddressesAsync(host);
+            foreach(var ip in ipAddresses)
+            {
+                if (await WaitForIngressAsync(host, ip))
+                {
+                    return;
+                }
+            }
+
+            throw new Exception($"Failed to check ACME challenge address for host [{host}]");
+        }
+
+        private async Task<bool> WaitForIngressAsync(string host, IPAddress ip)
+        {
+            _log.LogInformation($"Attempting to contact host [{host}] at ip [{ip}]");
+             var tries = _cfg.AcmeNumRetries;
+            while(0 < tries--)
+            {
+                if (await TryGetAsync(host, ip))
+                {
+                    return true;
+                }
+
+                await Task.Delay(_cfg.AcmeWaitTime);
+            }
+
+            return false;
+        }
+
+        private async Task<bool> TryGetAsync(string host, IPAddress ip)
+        {
+            using var http = new HttpClient();
+            using var req = new HttpRequestMessage(HttpMethod.Get, $"http://{ip}/.well-known/acme/test");
+            req.Headers.Host = host;
+            try
+            {
+                using var resp = await http.SendAsync(req);
+            }
+            catch (Exception ex)
+            {
+                _log.LogError(ex, "Failed to communicate with ACME endpoint.");
+                return false;
+            }
+
+            return true;
         }
     }
 }
