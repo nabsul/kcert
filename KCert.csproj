@@ -5,7 +5,8 @@
   </PropertyGroup>
 
   <ItemGroup>
-    <PackageReference Include="KubernetesClient" Version="3.0.7" />
+    <PackageReference Include="AWSSDK.SimpleEmail" Version="3.5.0.42" />
+    <PackageReference Include="KubernetesClient" Version="3.0.16" />
   </ItemGroup>
 
 </Project>

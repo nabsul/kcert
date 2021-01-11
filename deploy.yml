@@ -64,8 +64,6 @@ spec:
         env:
         - name: ASPNETCORE_ENVIRONMENT
           value: Development
-        - name: KCERT_NAMESPACE
-          value: kcert
 ---
 apiVersion: v1
 kind: Service
