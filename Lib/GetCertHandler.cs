@@ -3,8 +3,6 @@ using Microsoft.Extensions.Logging;
 using System;
 using System.Collections.Generic;
 using System.Linq;
-using System.Net;
-using System.Net.Http;
 using System.Security.Cryptography;
 using System.Text.Json;
 using System.Threading.Tasks;
@@ -36,19 +34,8 @@ namespace KCert.Lib
 
             try
             {
-                if (ns != _cfg.KCertNamespace)
-                {
-                    await _kube.CreateServiceAsync(ns);
-                    AddLog(result, $"Temporary service in namespace {ns} created");
-                }
-
-                await UpdateIngressAsync(ns, ingressName, i => i.AddHttpChallenge(_cfg.KCertServiceName, _cfg.KCertServicePort));
-                AddLog(result, $"Route Added");
-
                 (domain, kid, nonce) = await InitAsync(sign, p.AcmeDirUrl, p.AcmeEmail, ns, ingressName);
                 AddLog(result, $"Initialized renewal process for ingress {ns}/{ingressName} - domain {domain} - kid {kid}");
-
-                await WaitForIngressAsync(domain);
 
                 (orderUri, finalizeUri, authorizations, nonce) = await CreateOrderAsync(sign, domain, kid, nonce);
                 AddLog(result, $"Order {orderUri} created with finalizeUri {finalizeUri}");
@@ -74,30 +61,6 @@ namespace KCert.Lib
                 result.Error = ex;
             }
 
-            if (_cfg.SkipCleanup)
-            {
-                _log.LogInformation("Leaving service and ingress modifications for debugging");
-                return result;
-            }
-
-            try
-            {
-                await UpdateIngressAsync(ns, ingressName, i => i.RemoveHttpChallenge());
-                AddLog(result, $"Route Removed");
-
-                if (ns != _cfg.KCertNamespace && null != await _kube.GetServiceAsync(ns))
-                {
-                    await _kube.DeleteServiceAsync(ns);
-                    AddLog(result, $"Deleted temporary service in namespace {ns} created");
-                }
-            }
-            catch (Exception ex)
-            {
-                AddLog(result, $"Failed to clean up afterwards: {ex.Message}");
-                result.Error = result.Error == null ? result.Error = ex : new AggregateException(result.Error, ex);
-                result.Success = false;
-            }
-
             return result;
         }
 
@@ -105,13 +68,6 @@ namespace KCert.Lib
         {
             _log.LogInformation(message);
             result.Logs.Add(message);
-        }
-
-        private async Task UpdateIngressAsync(string ns, string name, Action<Networkingv1beta1Ingress> action)
-        {
-            var ingress = await _kube.GetIngressAsync(ns, name);
-            action(ingress);
-            await _kube.UpdateIngressAsync(ingress);
         }
 
         private async Task<(string Domain, string KID, string Nonce)> InitAsync(ECDsa sign, Uri acmeDir, string email, string ns, string ingressName)
@@ -198,55 +154,6 @@ namespace KCert.Lib
             var ingress = await _kube.GetIngressAsync(ns, ingressName);
             var secret = ingress.Spec.Tls.First().SecretName;
             await _kube.UpdateTlsSecretAsync(ns, secret, key, cert);
-        }
-
-        private async Task WaitForIngressAsync(string host)
-        {
-            var ipAddresses = await Dns.GetHostAddressesAsync(host);
-            foreach(var ip in ipAddresses)
-            {
-                if (await WaitForIngressAsync(host, ip))
-                {
-                    return;
-                }
-            }
-
-            throw new Exception($"Failed to check ACME challenge address for host [{host}]");
-        }
-
-        private async Task<bool> WaitForIngressAsync(string host, IPAddress ip)
-        {
-            _log.LogInformation($"Attempting to contact host [{host}] at ip [{ip}]");
-             var tries = _cfg.AcmeNumRetries;
-            while(0 < tries--)
-            {
-                if (await TryGetAsync(host, ip))
-                {
-                    return true;
-                }
-
-                await Task.Delay(_cfg.AcmeWaitTime);
-            }
-
-            return false;
-        }
-
-        private async Task<bool> TryGetAsync(string host, IPAddress ip)
-        {
-            using var http = new HttpClient();
-            using var req = new HttpRequestMessage(HttpMethod.Get, $"http://{ip}/.well-known/acme/test");
-            req.Headers.Host = host;
-            try
-            {
-                using var resp = await http.SendAsync(req);
-            }
-            catch (Exception ex)
-            {
-                _log.LogError(ex, "Failed to communicate with ACME endpoint.");
-                return false;
-            }
-
-            return true;
         }
     }
 }
