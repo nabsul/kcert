@@ -17,6 +17,7 @@ namespace KCert.Lib
         public string KCertNamespace => _cfg.GetValue<string>("KCertNamespace");
         public string KCertSecretName => _cfg.GetValue<string>("SecretName");
         public string KCertServiceName => _cfg.GetValue<string>("ServiceName");
+        public string KCertIngressName => _cfg.GetValue<string>("IngressName");
         public string KCertServicePort => _cfg.GetValue<string>("ServicePort");
         public List<string> ManagedNamespaces => _cfg.GetValue<string>("Namespaces").Split(',').ToList();
 
