@@ -1,8 +1,10 @@
-﻿using Microsoft.Extensions.Logging;
+﻿using k8s.Models;
+using Microsoft.Extensions.Logging;
 using System.Text.RegularExpressions;
 
 namespace KCert.Lib
 {
+    [Service]
     public class NamespaceFilter
     {
         private readonly KCertConfig _cfg;
@@ -35,6 +37,16 @@ namespace KCert.Lib
             }
 
             return false;
+        }
+
+        public bool IsManagedIngress(Networkingv1beta1Ingress ingress)
+        {
+            return !IsKCertIngress(ingress) && IsManagedNamespace(ingress.Namespace());
+        }
+
+        public bool IsKCertIngress(Networkingv1beta1Ingress ingress)
+        {
+            return ingress.Name() == _cfg.KCertIngressName && ingress.Namespace() == _cfg.KCertNamespace;
         }
     }
 }

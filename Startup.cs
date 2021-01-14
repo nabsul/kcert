@@ -5,6 +5,8 @@ using Microsoft.AspNetCore.Hosting;
 using Microsoft.Extensions.Configuration;
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Hosting;
+using System.Linq;
+using System.Reflection;
 
 namespace KCert
 {
@@ -20,16 +22,18 @@ namespace KCert
         // This method gets called by the runtime. Use this method to add services to the container.
         public void ConfigureServices(IServiceCollection services)
         {
-            services.AddSingleton(GetK8sClient());
-            services.AddSingleton<KCertConfig>();
-            services.AddSingleton<NamespaceFilter>();
-            services.AddSingleton<RenewalManager>();
-            services.AddSingleton<EmailClient>();
-            services.AddSingleton<K8sClient>();
-            services.AddSingleton<AcmeClient>();
-            services.AddSingleton<GetCertHandler>();
-            services.AddSingleton<KCertClient>();
-            
+            foreach (var type in Assembly.GetEntryAssembly().GetTypes())
+            {
+                var attr = type.GetCustomAttribute(typeof(ServiceAttribute)) as ServiceAttribute;
+                if (attr == null)
+                {
+                    continue;
+                }
+
+                var baseType = attr.Type ?? type;
+                services.AddSingleton(baseType, type);
+            }
+
             services.AddControllersWithViews();
         }
 
@@ -53,15 +57,6 @@ namespace KCert
             {
                 endpoints.MapControllers();
             });
-        }
-
-        private Kubernetes GetK8sClient()
-        {
-            var file = Configuration["Config"];
-            var k8sCfg = string.IsNullOrWhiteSpace(file)
-                ? KubernetesClientConfiguration.InClusterConfig()
-                : KubernetesClientConfiguration.BuildConfigFromConfigFile(file);
-            return new Kubernetes(k8sCfg);
         }
     }
 }

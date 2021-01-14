@@ -7,6 +7,7 @@ using System.Threading.Tasks;
 
 namespace KCert.Lib
 {
+    [Service]
     public class RenewalManager
     {
         private readonly K8sClient _k8s;

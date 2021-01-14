@@ -9,6 +9,7 @@ using System.Threading.Tasks;
 
 namespace KCert.Lib
 {
+    [Service]
     public class GetCertHandler
     {
         private readonly AcmeClient _acme;

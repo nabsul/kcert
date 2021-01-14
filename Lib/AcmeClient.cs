@@ -13,6 +13,7 @@ using System.Threading.Tasks;
 
 namespace KCert.Lib
 {
+    [Service]
     public class AcmeClient
     {
         private const string DirFieldNewNonce = "newNonce";

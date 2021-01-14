@@ -9,6 +9,7 @@ using System.Threading.Tasks;
 
 namespace KCert.Lib
 {
+    [Service]
     public class K8sClient
     {
         private const string TlsSecretType = "kubernetes.io/tls";
@@ -151,6 +152,13 @@ namespace KCert.Lib
 
         public async Task UpdateIngressAsync(Networkingv1beta1Ingress ingress)
         {
+            var old = await GetIngressAsync(ingress.Namespace(), ingress.Name());
+            if (old == null)
+            {
+                await _client.CreateNamespacedIngress2Async(ingress, ingress.Namespace());
+                return;
+            }
+
             await _client.ReplaceNamespacedIngress2Async(ingress, ingress.Name(), ingress.Namespace());
         }
 

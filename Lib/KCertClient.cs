@@ -1,7 +1,8 @@
 ﻿using k8s.Models;
 using Microsoft.AspNetCore.Authentication;
-using Microsoft.Extensions.Configuration;
 using Microsoft.Extensions.Logging;
+using Microsoft.Rest;
+using System;
 using System.Collections.Generic;
 using System.Linq;
 using System.Security.Cryptography;
@@ -11,15 +12,16 @@ using System.Threading.Tasks;
 
 namespace KCert.Lib
 {
+    [Service]
     public class KCertClient
     {
         private readonly K8sClient _kube;
         private readonly GetCertHandler _getCert;
         private readonly KCertConfig _cfg;
         private readonly NamespaceFilter _filter;
-        private readonly Logger<KCertClient> _log;
+        private readonly ILogger<KCertClient> _log;
 
-        public KCertClient(K8sClient kube, KCertConfig cfg, GetCertHandler getCert, NamespaceFilter filter, Logger<KCertClient> log)
+        public KCertClient(K8sClient kube, KCertConfig cfg, GetCertHandler getCert, NamespaceFilter filter, ILogger<KCertClient> log)
         {
             _kube = kube;
             _cfg = cfg;
@@ -38,7 +40,7 @@ namespace KCert.Lib
         public async Task<IList<Networkingv1beta1Ingress>> GetAllIngressesAsync()
         {
             var ingresses = await _kube.GetAllIngressesAsync();
-            return ingresses.Where(i => _filter.IsManagedNamespace(i.Namespace())).ToList();
+            return ingresses.Where(_filter.IsManagedIngress).ToList();
         }
 
         public async Task<Networkingv1beta1Ingress> GetIngressAsync(string ns, string name)
@@ -78,13 +80,13 @@ namespace KCert.Lib
         public async Task SyncHostsAsync()
         {
             var ingresses = await GetAllIngressesAsync();
-            var allHosts = ingresses.SelectMany(i => i.Hosts());
+            var allHosts = ingresses.SelectMany(i => i.Hosts()).Distinct();
             if (allHosts.Count() == 0)
             {
                 _log.LogWarning("Nothing to do because there are no ingresses/hosts");
             }
 
-            var kcertIngress = await GetIngressAsync(_cfg.KCertNamespace, _cfg.KCertIngressName);
+            var kcertIngress = await GetKCertIngressAsync();
             if (kcertIngress == null)
             {
                 kcertIngress = CreateKCertIngress();
@@ -92,6 +94,23 @@ namespace KCert.Lib
 
             kcertIngress.Spec.Rules = allHosts.Select(CreateRule).ToList();
             await _kube.UpdateIngressAsync(kcertIngress);
+        }
+
+        public async Task<Networkingv1beta1Ingress> GetKCertIngressAsync()
+        {
+            try
+            {
+                return await GetIngressAsync(_cfg.KCertNamespace, _cfg.KCertIngressName);
+            }
+            catch (HttpOperationException ex)
+            {
+                if (ex.Response.StatusCode == System.Net.HttpStatusCode.NotFound)
+                {
+                    return null;
+                }
+
+                throw;
+            }
         }
 
         private Networkingv1beta1Ingress CreateKCertIngress()

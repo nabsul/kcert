@@ -5,6 +5,7 @@ using System.Linq;
 
 namespace KCert.Lib
 {
+    [Service]
     public class KCertConfig
     {
         private IConfiguration _cfg;

@@ -5,8 +5,6 @@ using Microsoft.Extensions.DependencyInjection;
 using KCert.Lib;
 using System.Threading.Tasks;
 using Microsoft.Extensions.Logging;
-using System.Threading;
-using System.Diagnostics;
 using System;
 
 namespace KCert

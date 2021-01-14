@@ -7,6 +7,7 @@ using System.Threading.Tasks;
 
 namespace KCert.Lib
 {
+    [Service]
     public class EmailClient
     {
         private const string CHARSET = "UTF8";

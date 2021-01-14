@@ -24,6 +24,22 @@ namespace KCert.Controllers
             return View(ingresses);
         }
 
+        [HttpGet]
+        [Route("challenge")]
+        public async Task<IActionResult> ChallengeAsync()
+        {
+            var ingress = await _kcert.GetKCertIngressAsync();
+            return View(ingress);
+        }
+
+        [HttpPost]
+        [Route("challenge")]
+        public async Task<IActionResult> SyncChallengeHostsAsync()
+        {
+            await _kcert.SyncHostsAsync();
+            return RedirectToAction("Challenge");
+        }
+
         [Route("error")]
         [ResponseCache(Duration = 0, Location = ResponseCacheLocation.None, NoStore = true)]
         public IActionResult Error()
