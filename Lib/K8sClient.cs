@@ -147,7 +147,19 @@ namespace KCert.Lib
 
         public async Task<Networkingv1beta1Ingress> GetIngressAsync(string ns, string name)
         {
-            return await _client.ReadNamespacedIngress2Async(name, ns);
+            try
+            {
+                return await _client.ReadNamespacedIngress2Async(name, ns);
+            }
+            catch(HttpOperationException ex)
+            {
+                if (ex.Response.StatusCode == HttpStatusCode.NotFound)
+                {
+                    return null;
+                }
+
+                throw;
+            }
         }
 
         public async Task UpdateIngressAsync(Networkingv1beta1Ingress ingress)
