@@ -80,18 +80,14 @@ namespace KCert.Lib
         public async Task SyncHostsAsync()
         {
             var ingresses = await GetAllIngressesAsync();
-            var allHosts = ingresses.SelectMany(i => i.Hosts()).Distinct();
-            if (allHosts.Count() == 0)
+            var allHosts = ingresses.SelectMany(i => i.Hosts()).Distinct().ToList();
+            if (allHosts.Count == 0)
             {
-                _log.LogWarning("Nothing to do because there are no ingresses/hosts");
+                _log.LogWarning("SyncHostsAsync: Nothing to do because there are no ingresses/hosts");
+                return;
             }
 
-            var kcertIngress = await GetKCertIngressAsync();
-            if (kcertIngress == null)
-            {
-                kcertIngress = CreateKCertIngress();
-            }
-
+            var kcertIngress = await GetKCertIngressAsync() ?? CreateKCertIngress();
             kcertIngress.Spec.Rules = allHosts.Select(CreateRule).ToList();
             await _kube.UpdateIngressAsync(kcertIngress);
         }
