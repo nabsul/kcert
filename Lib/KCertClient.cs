@@ -15,12 +15,12 @@ namespace KCert.Lib
     public class KCertClient
     {
         private readonly K8sClient _kube;
-        private readonly GetCertHandler _getCert;
+        private readonly RenewalHandler _getCert;
         private readonly KCertConfig _cfg;
         private readonly NamespaceFilter _filter;
         private readonly ILogger<KCertClient> _log;
 
-        public KCertClient(K8sClient kube, KCertConfig cfg, GetCertHandler getCert, NamespaceFilter filter, ILogger<KCertClient> log)
+        public KCertClient(K8sClient kube, KCertConfig cfg, RenewalHandler getCert, NamespaceFilter filter, ILogger<KCertClient> log)
         {
             _kube = kube;
             _cfg = cfg;
@@ -70,7 +70,7 @@ namespace KCert.Lib
             return Base64UrlTextEncoder.Encode(result);
         }
 
-        public async Task<GetCertResult> GetCertAsync(string ns, string ingressName)
+        public async Task<RenewalResult> GetCertAsync(string ns, string ingressName)
         {
             var p = await GetConfigAsync();
             return await _getCert.GetCertAsync(ns, ingressName, p, GetSigner(p.AcmeKey));

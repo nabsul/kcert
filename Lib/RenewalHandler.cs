@@ -10,14 +10,14 @@ using System.Threading.Tasks;
 namespace KCert.Lib
 {
     [Service]
-    public class GetCertHandler
+    public class RenewalHandler
     {
         private readonly AcmeClient _acme;
         private readonly K8sClient _kube;
         private readonly KCertConfig _cfg;
-        private readonly ILogger<GetCertHandler> _log;
+        private readonly ILogger<RenewalHandler> _log;
 
-        public GetCertHandler(ILogger<GetCertHandler> log, AcmeClient acme, K8sClient kube, KCertConfig cfg)
+        public RenewalHandler(ILogger<RenewalHandler> log, AcmeClient acme, K8sClient kube, KCertConfig cfg)
         {
             _log = log;
             _acme = acme;
@@ -25,33 +25,30 @@ namespace KCert.Lib
             _cfg = cfg;
         }
 
-        public async Task<GetCertResult> GetCertAsync(string ns, string ingressName, KCertParams p, ECDsa sign)
+        public async Task<RenewalResult> GetCertAsync(string ns, string ingressName, KCertParams p, ECDsa sign)
         {
-            string domain, kid, nonce;
-            Uri orderUri, finalizeUri, certUri;
-            IList<Uri> authorizations;
-
-            var result = new GetCertResult { IngressNamespace = ns, IngressName = ingressName };
+            var result = new RenewalResult { IngressNamespace = ns, IngressName = ingressName };
 
             try
             {
-                (domain, kid, nonce) = await InitAsync(sign, p.AcmeDirUrl, p.AcmeEmail, ns, ingressName);
-                AddLog(result, $"Initialized renewal process for ingress {ns}/{ingressName} - domain {domain} - kid {kid}");
+                var (domain, kid, initNonce) = await InitAsync(sign, p.AcmeDirUrl, p.AcmeEmail, ns, ingressName);
+                LogInformation(result, $"Initialized renewal process for ingress {ns}/{ingressName} - domain {domain} - kid {kid}");
 
-                (orderUri, finalizeUri, authorizations, nonce) = await CreateOrderAsync(sign, domain, kid, nonce);
-                AddLog(result, $"Order {orderUri} created with finalizeUri {finalizeUri}");
+                var (orderUri, finalizeUri, authorizations, orderNonce) = await CreateOrderAsync(sign, domain, kid, initNonce);
+                LogInformation(result, $"Order {orderUri} created with finalizeUri {finalizeUri}");
 
+                var validateNonce = orderNonce;
                 foreach (var authUrl in authorizations)
                 {
-                    nonce = await ValidateAuthorizationAsync(sign, kid, nonce, authUrl);
-                    AddLog(result, $"Validated auth: {authUrl}");
+                    validateNonce = await ValidateAuthorizationAsync(sign, kid, orderNonce, authUrl);
+                    LogInformation(result, $"Validated auth: {authUrl}");
                 }
 
                 var rsa = RSA.Create(2048);
-                (certUri, nonce) = await FinalizeOrderAsync(sign, rsa, orderUri, finalizeUri, domain, kid, nonce);
-                AddLog(result, $"Finalized order and received cert URI: {certUri}");
-                await SaveCertAsync(sign, ns, ingressName, rsa, certUri, kid, nonce);
-                AddLog(result, $"Saved cert");
+                var (certUri, finalizeNonce) = await FinalizeOrderAsync(sign, rsa, orderUri, finalizeUri, domain, kid, validateNonce);
+                LogInformation(result, $"Finalized order and received cert URI: {certUri}");
+                await SaveCertAsync(sign, ns, ingressName, rsa, certUri, kid, finalizeNonce);
+                LogInformation(result, $"Saved cert");
 
                 result.Success = true;
             }
@@ -65,7 +62,7 @@ namespace KCert.Lib
             return result;
         }
 
-        private void AddLog(GetCertResult result, string message)
+        private void LogInformation(RenewalResult result, string message)
         {
             _log.LogInformation(message);
             result.Logs.Add(message);

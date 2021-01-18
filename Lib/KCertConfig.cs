@@ -26,6 +26,7 @@ namespace KCert.Lib
         public int AcmeNumRetries => _cfg.GetValue<int>("AcmeNumRetries");
         public TimeSpan RenewalTimeBetweenChekcs => TimeSpan.FromHours(_cfg.GetValue<int>("RenewalCheckTimeHours"));
         public TimeSpan RenewalExpirationLimit => TimeSpan.FromDays(_cfg.GetValue<int>("RenewalExpirationRenewalDays"));
+
         public bool SkipCleanup => _cfg.GetValue<bool>("SkipCleanup");
     }
 }

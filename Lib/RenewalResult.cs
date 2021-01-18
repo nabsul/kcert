@@ -3,7 +3,7 @@ using System.Collections.Generic;
 
 namespace KCert.Lib
 {
-    public class GetCertResult
+    public class RenewalResult
     {
         public string IngressNamespace { get; set; }
         public string IngressName { get; set; }

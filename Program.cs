@@ -32,7 +32,7 @@ namespace KCert
         private static async Task StartRenewalServiceAsync(IHost host)
         {
             var log = host.Services.GetService<ILogger<Program>>();
-            var renewal = host.Services.GetService<RenewalManager>();
+            var renewal = host.Services.GetService<RenewalWorker>();
             try
             {
                 await renewal.StartRenewalServiceAsync();

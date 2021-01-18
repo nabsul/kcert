@@ -26,7 +26,7 @@ namespace KCert.Lib
             await SendAsync(TestSubject, TestMessage);
         }
 
-        public async Task NotifyRenewalResultAsync(GetCertResult result)
+        public async Task NotifyRenewalResultAsync(RenewalResult result)
         {
             await SendAsync(RenewalSubject(result), RenewalMessage(result));
         }
@@ -65,13 +65,13 @@ namespace KCert.Lib
             return !allFields.Any(string.IsNullOrWhiteSpace);
         }
 
-        private static string RenewalSubject(GetCertResult result)
+        private static string RenewalSubject(RenewalResult result)
         {
             var status = result.Success ? "succeeded" : "failed";
             return $"KCert Renewal of ingress [{result.IngressName}] {status}";
         }
 
-        private static string RenewalMessage(GetCertResult result)
+        private static string RenewalMessage(RenewalResult result)
         {
             var lines = new[]
             {

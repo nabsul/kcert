@@ -1,14 +1,16 @@
 ﻿using k8s.Models;
 using Microsoft.AspNetCore.Authentication;
+using Microsoft.Extensions.DependencyInjection;
 using System;
 using System.Collections.Generic;
 using System.Linq;
+using System.Reflection;
 using System.Security.Cryptography;
 using System.Security.Cryptography.X509Certificates;
 
 namespace KCert.Lib
 {
-    public static class Extensions
+    public static class KCertExtensions
     {
         private const int PEMLineLen = 64;
         private const string PEMStart = "-----BEGIN PRIVATE KEY-----";
@@ -16,6 +18,21 @@ namespace KCert.Lib
 
         private const string AcmePath = "/.well-known/acme-challenge/";
         private const string PathType = "Prefix";
+
+        public static void AddKCertServices(this IServiceCollection services)
+        {
+            foreach (var type in Assembly.GetEntryAssembly().GetTypes())
+            {
+                var attr = type.GetCustomAttribute(typeof(ServiceAttribute)) as ServiceAttribute;
+                if (attr == null)
+                {
+                    continue;
+                }
+
+                var baseType = attr.Type ?? type;
+                services.AddSingleton(baseType, type);
+            }
+        }
 
         public static object GetJwk(this ECDsa sign)
         {

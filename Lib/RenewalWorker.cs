@@ -1,5 +1,4 @@
 ﻿using k8s.Models;
-using Microsoft.Extensions.Configuration;
 using Microsoft.Extensions.Logging;
 using System;
 using System.Threading;
@@ -8,17 +7,17 @@ using System.Threading.Tasks;
 namespace KCert.Lib
 {
     [Service]
-    public class RenewalManager
+    public class RenewalWorker
     {
         private readonly K8sClient _k8s;
         private readonly KCertClient _kcert;
         private readonly EmailClient _email;
-        private readonly IConfiguration _cfg;
-        private readonly ILogger<RenewalManager> _log;
+        private readonly KCertConfig _cfg;
+        private readonly ILogger<RenewalWorker> _log;
 
         private CancellationTokenSource _cancel;
 
-        public RenewalManager(ILogger<RenewalManager> log, IConfiguration cfg, K8sClient k8s, KCertClient kcert, EmailClient email)
+        public RenewalWorker(ILogger<RenewalWorker> log, KCertConfig cfg, K8sClient k8s, KCertClient kcert, EmailClient email)
         {
             _cfg = cfg;
             _log = log;
@@ -26,9 +25,6 @@ namespace KCert.Lib
             _kcert = kcert;
             _email = email;
         }
-
-        private TimeSpan SleepTime => TimeSpan.FromHours(_cfg.GetValue<int>("Renewals:HoursBetweenChecks"));
-        private TimeSpan RenewalThreshold => TimeSpan.FromDays(_cfg.GetValue<int>("Renewals:DaysToRenewal"));
 
         public async Task StartRenewalServiceAsync()
         {
@@ -63,7 +59,7 @@ namespace KCert.Lib
                     await StartRenewalJobAsync(tok);
                 }
 
-                await Task.Delay(SleepTime, tok);
+                await Task.Delay(_cfg.RenewalTimeBetweenChekcs, tok);
             }
         }
 
@@ -101,7 +97,7 @@ namespace KCert.Lib
             }
 
             var cert = secret.Cert();
-            if (DateTime.UtcNow < cert.NotAfter - RenewalThreshold)
+            if (DateTime.UtcNow < cert.NotAfter - _cfg.RenewalExpirationLimit)
             {
                 _log.LogInformation($"{ingress.Namespace()} / {ingress.Name()} / {string.Join(',', ingress.Hosts())} doesn't need renewal");
                 return;

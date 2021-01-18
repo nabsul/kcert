@@ -11,9 +11,9 @@ namespace KCert.Controllers
     {
         private readonly KCertClient _kcert;
         private readonly EmailClient _email;
-        private readonly RenewalManager _renewal;
+        private readonly RenewalWorker _renewal;
 
-        public ConfigurationController(KCertClient kcert, EmailClient email, RenewalManager renewal)
+        public ConfigurationController(KCertClient kcert, EmailClient email, RenewalWorker renewal)
         {
             _kcert = kcert;
             _email = email;
