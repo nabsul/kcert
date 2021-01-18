@@ -21,20 +21,18 @@ namespace KCert.Lib
             _kcert = kcert;
         }
 
-        public async Task SendTestEmailAsync()
+        public async Task SendTestEmailAsync(KCertParams p)
         {
-            await SendAsync(TestSubject, TestMessage);
+            await SendAsync(p, TestSubject, TestMessage);
         }
 
-        public async Task NotifyRenewalResultAsync(RenewalResult result)
+        public async Task NotifyRenewalResultAsync(KCertParams p, RenewalResult result)
         {
-            await SendAsync(RenewalSubject(result), RenewalMessage(result));
+            await SendAsync(p, RenewalSubject(result), RenewalMessage(result));
         }
 
-        private async Task SendAsync(string subject, string text)
+        private async Task SendAsync(KCertParams p, string subject, string text)
         {
-            var p = await _kcert.GetConfigAsync();
-
             if (!CanSendEmails(p))
             {
                 return;
