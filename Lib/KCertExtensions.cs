@@ -29,8 +29,7 @@ namespace KCert.Lib
                     continue;
                 }
 
-                var baseType = attr.Type ?? type;
-                services.AddSingleton(baseType, type);
+                services.AddSingleton(type);
             }
         }
 

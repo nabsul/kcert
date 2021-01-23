@@ -17,10 +17,15 @@ namespace KCert.Lib
         private readonly KCertConfig _cfg;
         private readonly Kubernetes _client;
 
-        public K8sClient(Kubernetes client, KCertConfig cfg)
+        public K8sClient(KCertConfig cfg)
         {
-            _client = client;
             _cfg = cfg;
+
+            var file = cfg.K8sConfigFile;
+            var k8sCfg = string.IsNullOrWhiteSpace(file)
+                ? KubernetesClientConfiguration.InClusterConfig()
+                : KubernetesClientConfiguration.BuildConfigFromConfigFile(file);
+            _client = new Kubernetes(k8sCfg);
         }
 
         public async Task<V1Service> GetServiceAsync(string ns)

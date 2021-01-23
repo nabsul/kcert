@@ -15,6 +15,7 @@ namespace KCert.Lib
             _cfg = cfg;
         }
 
+        public string K8sConfigFile => _cfg["Config"];
         public string KCertNamespace => _cfg.GetValue<string>("KCertNamespace");
         public string KCertSecretName => _cfg.GetValue<string>("SecretName");
         public string KCertServiceName => _cfg.GetValue<string>("ServiceName");

@@ -39,7 +39,7 @@ namespace KCert.Lib
                 }
                 catch (TaskCanceledException ex)
                 {
-                    _log.LogInformation($"Renewal loop cancelled. Exiting.");
+                    _log.LogError(ex, "Renewal loop cancelled.");
                     break;
                 }
                 catch (Exception ex)
@@ -56,10 +56,10 @@ namespace KCert.Lib
         {
             while(true)
             {
+                tok.ThrowIfCancellationRequested();
                 var p = await _kcert.GetConfigAsync();
                 if (p?.EnableAutoRenew ?? false)
                 {
-                    tok.ThrowIfCancellationRequested();
                     await StartRenewalJobAsync(p, tok);
                 }
 
