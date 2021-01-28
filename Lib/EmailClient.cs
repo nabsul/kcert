@@ -7,6 +7,7 @@ using System.Threading.Tasks;
 
 namespace KCert.Lib
 {
+    [Service]
     public class EmailClient
     {
         private const string CHARSET = "UTF8";
@@ -20,20 +21,18 @@ namespace KCert.Lib
             _kcert = kcert;
         }
 
-        public async Task SendTestEmailAsync()
+        public async Task SendTestEmailAsync(KCertParams p)
         {
-            await SendAsync(TestSubject, TestMessage);
+            await SendAsync(p, TestSubject, TestMessage);
         }
 
-        public async Task NotifyRenewalResultAsync(GetCertResult result)
+        public async Task NotifyRenewalResultAsync(KCertParams p, RenewalResult result)
         {
-            await SendAsync(RenewalSubject(result), RenewalMessage(result));
+            await SendAsync(p, RenewalSubject(result), RenewalMessage(result));
         }
 
-        private async Task SendAsync(string subject, string text)
+        private async Task SendAsync(KCertParams p, string subject, string text)
         {
-            var p = await _kcert.GetConfigAsync();
-
             if (!CanSendEmails(p))
             {
                 return;
@@ -64,13 +63,13 @@ namespace KCert.Lib
             return !allFields.Any(string.IsNullOrWhiteSpace);
         }
 
-        private static string RenewalSubject(GetCertResult result)
+        private static string RenewalSubject(RenewalResult result)
         {
             var status = result.Success ? "succeeded" : "failed";
             return $"KCert Renewal of ingress [{result.IngressName}] {status}";
         }
 
-        private static string RenewalMessage(GetCertResult result)
+        private static string RenewalMessage(RenewalResult result)
         {
             var lines = new[]
             {

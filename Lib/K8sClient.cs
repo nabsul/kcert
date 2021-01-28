@@ -9,6 +9,7 @@ using System.Threading.Tasks;
 
 namespace KCert.Lib
 {
+    [Service]
     public class K8sClient
     {
         private const string TlsSecretType = "kubernetes.io/tls";
@@ -16,10 +17,15 @@ namespace KCert.Lib
         private readonly KCertConfig _cfg;
         private readonly Kubernetes _client;
 
-        public K8sClient(Kubernetes client, KCertConfig cfg)
+        public K8sClient(KCertConfig cfg)
         {
-            _client = client;
             _cfg = cfg;
+
+            var file = cfg.K8sConfigFile;
+            var k8sCfg = string.IsNullOrWhiteSpace(file)
+                ? KubernetesClientConfiguration.InClusterConfig()
+                : KubernetesClientConfiguration.BuildConfigFromConfigFile(file);
+            _client = new Kubernetes(k8sCfg);
         }
 
         public async Task<V1Service> GetServiceAsync(string ns)
@@ -146,11 +152,30 @@ namespace KCert.Lib
 
         public async Task<Networkingv1beta1Ingress> GetIngressAsync(string ns, string name)
         {
-            return await _client.ReadNamespacedIngress2Async(name, ns);
+            try
+            {
+                return await _client.ReadNamespacedIngress2Async(name, ns);
+            }
+            catch(HttpOperationException ex)
+            {
+                if (ex.Response.StatusCode == HttpStatusCode.NotFound)
+                {
+                    return null;
+                }
+
+                throw;
+            }
         }
 
         public async Task UpdateIngressAsync(Networkingv1beta1Ingress ingress)
         {
+            var old = await GetIngressAsync(ingress.Namespace(), ingress.Name());
+            if (old == null)
+            {
+                await _client.CreateNamespacedIngress2Async(ingress, ingress.Namespace());
+                return;
+            }
+
             await _client.ReplaceNamespacedIngress2Async(ingress, ingress.Name(), ingress.Namespace());
         }
 

@@ -1,21 +1,34 @@
 ﻿using k8s.Models;
 using Microsoft.AspNetCore.Authentication;
+using Microsoft.Extensions.DependencyInjection;
 using System;
 using System.Collections.Generic;
 using System.Linq;
+using System.Reflection;
 using System.Security.Cryptography;
 using System.Security.Cryptography.X509Certificates;
 
 namespace KCert.Lib
 {
-    public static class Extensions
+    public static class KCertExtensions
     {
         private const int PEMLineLen = 64;
         private const string PEMStart = "-----BEGIN PRIVATE KEY-----";
         private const string PEMEnd = "-----END PRIVATE KEY-----";
 
-        private const string AcmePath = "/.well-known/acme-challenge/";
-        private const string PathType = "Prefix";
+        public static void AddKCertServices(this IServiceCollection services)
+        {
+            foreach (var type in Assembly.GetEntryAssembly().GetTypes())
+            {
+                var attr = type.GetCustomAttribute(typeof(ServiceAttribute)) as ServiceAttribute;
+                if (attr == null)
+                {
+                    continue;
+                }
+
+                services.AddSingleton(type);
+            }
+        }
 
         public static object GetJwk(this ECDsa sign)
         {
@@ -41,46 +54,6 @@ namespace KCert.Lib
         public static string SecretName(this Networkingv1beta1Ingress ingress) => ingress.Spec?.Tls?.FirstOrDefault()?.SecretName;
 
         public static List<string> Hosts(this Networkingv1beta1Ingress ingress) => ingress.Spec.Rules.Select(r => r.Host).ToList();
-
-        public static void AddHttpChallenge(this Networkingv1beta1Ingress ingress, string service, string port)
-        {
-            foreach (var rule in ingress.Spec.Rules)
-            {
-                TryAddHttpChallenge(rule, service, port);
-            }
-        }
-
-        public static void RemoveHttpChallenge(this Networkingv1beta1Ingress ingress)
-        {
-            foreach (var rule in ingress.Spec.Rules)
-            {
-                TryRemoveHttpChallenge(rule);
-            }
-        }
-
-        private static void TryAddHttpChallenge(Networkingv1beta1IngressRule rule, string service, string port)
-        {
-            rule.Http ??= new Networkingv1beta1HTTPIngressRuleValue();
-            rule.Http.Paths ??= new List<Networkingv1beta1HTTPIngressPath>();
-
-            var paths = rule.Http.Paths;
-            if (paths.FirstOrDefault()?.Path == AcmePath)
-            {
-                return;
-            }
-
-            var backend = new Networkingv1beta1IngressBackend(serviceName: service, servicePort: port);
-            paths.Insert(0, new Networkingv1beta1HTTPIngressPath(backend, AcmePath, PathType));
-        }
-
-        private static void TryRemoveHttpChallenge(Networkingv1beta1IngressRule rule)
-        {
-            var paths = rule?.Http?.Paths;
-            if (paths?.FirstOrDefault()?.Path == AcmePath)
-            {
-                rule.Http.Paths = paths.Skip(1).ToList();
-            }
-        }
 
         private static string InsertNewLines(string input) => string.Join('\n', SplitLines(input));
 

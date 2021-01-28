@@ -1,6 +1,7 @@
 ﻿using k8s.Models;
 using Microsoft.AspNetCore.Authentication;
-using Microsoft.Extensions.Configuration;
+using Microsoft.Extensions.Logging;
+using Microsoft.Rest;
 using System.Collections.Generic;
 using System.Linq;
 using System.Security.Cryptography;
@@ -10,19 +11,22 @@ using System.Threading.Tasks;
 
 namespace KCert.Lib
 {
+    [Service]
     public class KCertClient
     {
         private readonly K8sClient _kube;
-        private readonly GetCertHandler _getCert;
+        private readonly RenewalHandler _getCert;
         private readonly KCertConfig _cfg;
         private readonly NamespaceFilter _filter;
+        private readonly ILogger<KCertClient> _log;
 
-        public KCertClient(K8sClient kube, KCertConfig cfg, GetCertHandler getCert, NamespaceFilter filter)
+        public KCertClient(K8sClient kube, KCertConfig cfg, RenewalHandler getCert, NamespaceFilter filter, ILogger<KCertClient> log)
         {
             _kube = kube;
             _cfg = cfg;
             _getCert = getCert;
             _filter = filter;
+            _log = log;
         }
 
         public string GenerateNewKey()
@@ -35,7 +39,7 @@ namespace KCert.Lib
         public async Task<IList<Networkingv1beta1Ingress>> GetAllIngressesAsync()
         {
             var ingresses = await _kube.GetAllIngressesAsync();
-            return ingresses.Where(i => _filter.IsManagedNamespace(i.Namespace())).ToList();
+            return ingresses.Where(_filter.IsManagedIngress).ToList();
         }
 
         public async Task<Networkingv1beta1Ingress> GetIngressAsync(string ns, string name)
@@ -66,10 +70,80 @@ namespace KCert.Lib
             return Base64UrlTextEncoder.Encode(result);
         }
 
-        public async Task<GetCertResult> GetCertAsync(string ns, string ingressName)
+        public async Task<RenewalResult> GetCertAsync(string ns, string ingressName)
         {
             var p = await GetConfigAsync();
             return await _getCert.GetCertAsync(ns, ingressName, p, GetSigner(p.AcmeKey));
+        }
+
+        public async Task SyncHostsAsync()
+        {
+            var ingresses = await GetAllIngressesAsync();
+            var allHosts = ingresses.SelectMany(i => i.Hosts()).Distinct().ToList();
+            if (allHosts.Count == 0)
+            {
+                _log.LogWarning("SyncHostsAsync: Nothing to do because there are no ingresses/hosts");
+                return;
+            }
+
+            var kcertIngress = await GetKCertIngressAsync() ?? CreateKCertIngress();
+            kcertIngress.Spec.Rules = allHosts.Select(CreateRule).ToList();
+            await _kube.UpdateIngressAsync(kcertIngress);
+        }
+
+        public async Task<Networkingv1beta1Ingress> GetKCertIngressAsync()
+        {
+            try
+            {
+                return await GetIngressAsync(_cfg.KCertNamespace, _cfg.KCertIngressName);
+            }
+            catch (HttpOperationException ex)
+            {
+                if (ex.Response.StatusCode == System.Net.HttpStatusCode.NotFound)
+                {
+                    return null;
+                }
+
+                throw;
+            }
+        }
+
+        private Networkingv1beta1Ingress CreateKCertIngress()
+        {
+            return new Networkingv1beta1Ingress
+            {
+                Metadata = new V1ObjectMeta
+                {
+                    Name = _cfg.KCertIngressName,
+                    NamespaceProperty = _cfg.KCertNamespace,
+                    Annotations = new Dictionary<string, string> { { "kubernetes.io/ingress.class", "nginx" } },
+                },
+                Spec = new Networkingv1beta1IngressSpec(),
+            };
+        }
+
+        private Networkingv1beta1IngressRule CreateRule(string host)
+        {
+            return new Networkingv1beta1IngressRule
+            {
+                Host = host,
+                Http = new Networkingv1beta1HTTPIngressRuleValue
+                {
+                    Paths = new List<Networkingv1beta1HTTPIngressPath>()
+                    {
+                        new Networkingv1beta1HTTPIngressPath
+                        {
+                            Path = "/.well-known/acme-challenge/",
+                            PathType = "Prefix",
+                            Backend = new Networkingv1beta1IngressBackend
+                            {
+                                ServiceName = _cfg.KCertServiceName,
+                                ServicePort = _cfg.KCertServicePort,
+                            },
+                        },
+                    },
+                },
+            };
         }
 
         private static ECDsa GetSigner(string key)

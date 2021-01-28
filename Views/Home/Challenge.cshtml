@@ -1,0 +1,12 @@
+﻿@model Networkingv1beta1Ingress
+@{
+    ViewData["Title"] = "Challenge Ingress";
+}
+
+<h1>@(Model == null ? "No Ingress Found" : "Challenge Ingress")</h1>
+
+<form method="post" asp-action="SyncChallengeHosts">
+    <button type="submit" class="btn btn-primary">Sync Hosts</button>
+</form>
+
+<pre>@JsonSerializer.Serialize(Model?.Spec?.Rules, new JsonSerializerOptions { WriteIndented = true })</pre>
