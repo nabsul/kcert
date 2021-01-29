@@ -1,5 +1,5 @@
 ﻿@inject K8sClient _kube
-@model List<Networkingv1beta1Ingress>
+@model List<HomeViewModel>
 @{
     ViewData["Title"] = "Ingress";
 }
@@ -15,20 +15,20 @@
                 <th scope="col">Secret Name</th>
                 <th scope="col">Created</th>
                 <th scope="col">Expiration</th>
+                <th scope="col">Actions</th>
             </tr>
         </thead>
         <tbody>
-        @foreach (var i in Model)
+        @foreach (var row in Model)
         {
-            var s = i.SecretName() == null ? null : await _kube.GetSecretAsync(i.Namespace(), i.SecretName());
-            var c = s?.Cert();
             <tr>
-                <td>@i.Namespace()</td>
-                <td><a asp-controller="Ingress" asp-action="Index" asp-route-ns="@i.Namespace()" asp-route-name="@i.Name()">@i.Name()</a></td>
-                <td>@Html.Raw(string.Join("<br>", i.Hosts().Select(h => $"<a href='https://{h}'>{h}</a>")))</td>
-                <td>@s?.Name()</td>
-                <td>@c?.NotBefore.ToString("s")</td>
-                <td>@c?.NotAfter.ToString("s")</td>
+                <td>@row.Namespace</td>
+                <td>@row.IngressName</td>
+                <td>@Html.Raw(string.Join("<br>", row.Hosts.Select(h => $"<a target='_blank' href='https://{h}'>{h}</a>")))</td>
+                <td>@row.SecretName</td>
+                <td>@row.Created?.ToString("s")</td>
+                <td>@row.Expires?.ToString("s")</td>
+                <td><a class="btn btn-primary" asp-action="Renew" asp-route-ns="@row.Namespace" asp-route-secretName="@row.SecretName">Renew</a></td>
             </tr>
         }
         </tbody>

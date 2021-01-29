@@ -2,6 +2,7 @@
 using Microsoft.AspNetCore.Authentication;
 using Microsoft.Extensions.Logging;
 using Microsoft.Rest;
+using System;
 using System.Collections.Generic;
 using System.Linq;
 using System.Security.Cryptography;
@@ -70,10 +71,13 @@ namespace KCert.Lib
             return Base64UrlTextEncoder.Encode(result);
         }
 
-        public async Task<RenewalResult> GetCertAsync(string ns, string ingressName)
+        public async Task<RenewalResult> GetCertAsync(string ns, string secretName)
         {
             var p = await GetConfigAsync();
-            return await _getCert.GetCertAsync(ns, ingressName, p, GetSigner(p.AcmeKey));
+            var ingresses = await GetAllIngressesAsync();
+            var tlsEntries = ingresses.Where(i => i.Namespace() == ns).SelectMany(i => i.Spec.Tls);
+            var hosts = tlsEntries.Where(t => t.SecretName == secretName).SelectMany(t => t.Hosts).ToArray();
+            return await _getCert.GetCertAsync(ns, secretName, hosts, p, GetSigner(p.AcmeKey));
         }
 
         public async Task SyncHostsAsync()

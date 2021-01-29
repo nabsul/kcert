@@ -8,7 +8,7 @@ namespace KCert.Lib
     [Service]
     public class KCertConfig
     {
-        private IConfiguration _cfg;
+        private readonly IConfiguration _cfg;
 
         public KCertConfig(IConfiguration cfg)
         {

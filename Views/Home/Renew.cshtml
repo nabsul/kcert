@@ -1,12 +1,12 @@
 ﻿@model KCert.Lib.RenewalResult
 @{
-    ViewData["Title"] = $"Cert Creation - {Model.IngressNamespace}/{Model.IngressName}";
+    ViewData["Title"] = $"Cert Creation - {Model.SecretNamespace}/{Model.SecretName}";
 }
 
-<h1>Certificate Renewal Results: @Model.IngressNamespace/@Model.IngressName</h1>
+<h1>Certificate Renewal Results: @Model.SecretNamespace/@Model.SecretName</h1>
 
 <p>
-    <a class="btn btn-success" asp-action="Index" asp-route-ns="@Model.IngressNamespace" asp-route-name="@Model.IngressName">Return To Cert</a>
+    <a class="btn btn-success" asp-action="Index">Return To Main Page</a>
 </p>
 
 <pre>@string.Join("\n", Model.Logs)</pre>

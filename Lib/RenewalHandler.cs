@@ -25,16 +25,21 @@ namespace KCert.Lib
             _cfg = cfg;
         }
 
-        public async Task<RenewalResult> GetCertAsync(string ns, string ingressName, KCertParams p, ECDsa sign)
+        public async Task<RenewalResult> GetCertAsync(string ns, string secretName, string[] hosts, KCertParams p, ECDsa sign)
         {
-            var result = new RenewalResult { IngressNamespace = ns, IngressName = ingressName };
+            if (hosts.Length != 1)
+            {
+                throw new Exception($"Secret {ns}:{secretName} does must have one and only one host configured in ingresses. Found {hosts.Length}: {string.Join(",", hosts)}");
+            }
+
+            var result = new RenewalResult { SecretNamespace = ns, SecretName = secretName };
 
             try
             {
-                var (domain, kid, initNonce) = await InitAsync(sign, p.AcmeDirUrl, p.AcmeEmail, ns, ingressName);
-                LogInformation(result, $"Initialized renewal process for ingress {ns}/{ingressName} - domain {domain} - kid {kid}");
+                var (kid, initNonce) = await InitAsync(sign, p.AcmeDirUrl, p.AcmeEmail);
+                LogInformation(result, $"Initialized renewal process for secret {ns}/{secretName} - hosts {string.Join(",", hosts)} - kid {kid}");
 
-                var (orderUri, finalizeUri, authorizations, orderNonce) = await CreateOrderAsync(sign, domain, kid, initNonce);
+                var (orderUri, finalizeUri, authorizations, orderNonce) = await CreateOrderAsync(sign, hosts, kid, initNonce);
                 LogInformation(result, $"Order {orderUri} created with finalizeUri {finalizeUri}");
 
                 var validateNonce = orderNonce;
@@ -45,9 +50,9 @@ namespace KCert.Lib
                 }
 
                 var rsa = RSA.Create(2048);
-                var (certUri, finalizeNonce) = await FinalizeOrderAsync(sign, rsa, orderUri, finalizeUri, domain, kid, validateNonce);
+                var (certUri, finalizeNonce) = await FinalizeOrderAsync(sign, rsa, orderUri, finalizeUri, hosts.First(), kid, validateNonce);
                 LogInformation(result, $"Finalized order and received cert URI: {certUri}");
-                await SaveCertAsync(sign, ns, ingressName, rsa, certUri, kid, finalizeNonce);
+                await SaveCertAsync(sign, ns, secretName, rsa, certUri, kid, finalizeNonce);
                 LogInformation(result, $"Saved cert");
 
                 result.Success = true;
@@ -68,30 +73,21 @@ namespace KCert.Lib
             result.Logs.Add(message);
         }
 
-        private async Task<(string Domain, string KID, string Nonce)> InitAsync(ECDsa sign, Uri acmeDir, string email, string ns, string ingressName)
+        private async Task<(string KID, string Nonce)> InitAsync(ECDsa sign, Uri acmeDir, string email)
         {
             await _acme.ReadDirectoryAsync(acmeDir);
-            var ingress = await _kube.GetIngressAsync(ns, ingressName);
-            if (ingress.Spec.Rules.Count != 1)
-            {
-                throw new Exception($"Ingress {ingress.Namespace()}:{ingress.Name()} must have a single rule defined");
-            }
-
-            var rule = ingress.Spec.Rules.First();
-            var domain = rule.Host;
-
             var nonce = await _acme.GetNonceAsync();
             var account = await _acme.CreateAccountAsync(sign, email, nonce);
             _log.LogInformation($"Fetched account: {JsonSerializer.Serialize(account.Content)}");
 
             var kid = account.Location;
             nonce = account.Nonce;
-            return (domain, kid, nonce);
+            return (kid, nonce);
         }
 
-        private async Task<(Uri OrderUri, Uri FinalizeUri, List<Uri> Authorizations, string Nonce)> CreateOrderAsync(ECDsa sign, string domain, string kid, string nonce)
+        private async Task<(Uri OrderUri, Uri FinalizeUri, List<Uri> Authorizations, string Nonce)> CreateOrderAsync(ECDsa sign, string[] hosts, string kid, string nonce)
         {
-            var order = await _acme.CreateOrderAsync(sign, kid, new[] { domain }, nonce);
+            var order = await _acme.CreateOrderAsync(sign, kid, hosts, nonce);
             _log.LogInformation($"Created order: {JsonSerializer.Serialize(order.Content)}");
             return (new Uri(order.Location), order.FinalizeUri, order.AuthorizationUrls, order.Nonce);
         }
@@ -145,13 +141,11 @@ namespace KCert.Lib
             return (finalize.CertUri, finalize.Nonce);
         }
 
-        private async Task SaveCertAsync(ECDsa sign, string ns, string ingressName, RSA rsa, Uri certUri, string kid, string nonce)
+        private async Task SaveCertAsync(ECDsa sign, string ns, string secretName, RSA rsa, Uri certUri, string kid, string nonce)
         {
             var cert = await _acme.GetCertAsync(sign, certUri, kid, nonce);
             var key = rsa.GetPemKey();
-            var ingress = await _kube.GetIngressAsync(ns, ingressName);
-            var secret = ingress.Spec.Tls.First().SecretName;
-            await _kube.UpdateTlsSecretAsync(ns, secret, key, cert);
+            await _kube.UpdateTlsSecretAsync(ns, secretName, key, cert);
         }
     }
 }
