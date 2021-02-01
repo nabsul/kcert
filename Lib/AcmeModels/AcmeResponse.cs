@@ -3,13 +3,15 @@ using System.Collections.Generic;
 using System.Linq;
 using System.Text.Json;
 
-namespace KCert.Lib.Acme
+namespace KCert.Lib.AcmeModels
 {
-    public class AcmeResponse
+    public class AcmeResponse<T>
     {
         public string Nonce { get; set; }
         public string Location { get; set; }
         public JsonDocument Content { get; set; }
+        public T Response { get; set; }
+
 
         // Helper functions to extract commonly used information
         public List<Uri> AuthorizationUrls => Content.RootElement.GetProperty("authorizations").EnumerateArray().Select(i => new Uri(i.GetString())).ToList();
@@ -18,7 +20,7 @@ namespace KCert.Lib.Acme
         public Uri HttpChallengeUri => new Uri(HttpChallenge.GetProperty("url").GetString());
 
         public bool IsChallengeDone => Content.RootElement.GetProperty("challenges").EnumerateArray()
-                .Select(c => c.GetProperty("status").GetString()).Any(s => s == "valid");
+              .Select(c => c.GetProperty("status").GetString()).Any(s => s == "valid");
 
         public Uri CertUri => new Uri(Content.RootElement.GetProperty("certificate").GetString());
 

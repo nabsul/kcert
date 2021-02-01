@@ -1,5 +1,6 @@
-﻿using KCert.Lib.Acme;
+﻿using KCert.Lib.AcmeModels;
 using Microsoft.AspNetCore.Authentication;
+using Microsoft.Extensions.Logging;
 using System;
 using System.Collections.Generic;
 using System.Linq;
@@ -26,17 +27,19 @@ namespace KCert.Lib
         private const string Alg = "ES256";
 
         private readonly HttpClient _http;
+        private readonly ILogger<AcmeClient> _log;
         private JsonDocument _dir;
 
-        public AcmeClient()
+        public AcmeClient(ILogger<AcmeClient> log)
         {
             _http = new HttpClient();
+            _log = log;
         }
 
-        public Task<AcmeResponse> DeactivateAccountAsync(ECDsa sign, string kid, string nonce) => PostAsync(sign, new Uri(kid), new { status = "deactivated" }, kid, nonce);
-        public Task<AcmeResponse> GetOrderAsync(ECDsa sign, Uri uri, string kid, string nonce) => PostAsync(sign, uri, null, kid, nonce);
-        public Task<AcmeResponse> GetAuthzAsync(ECDsa sign, Uri authzUri, string kid, string nonce) => PostAsync(sign, authzUri, null, kid, nonce);
-        public Task<AcmeResponse> TriggerChallengeAsync(ECDsa sign, Uri challengeUri, string kid, string nonce) => PostAsync(sign, challengeUri, new { }, kid, nonce);
+        public Task<AcmeResponse<AccountResponse>> DeactivateAccountAsync(ECDsa sign, string kid, string nonce) => PostAsync<AccountResponse>(sign, new Uri(kid), new { status = "deactivated" }, kid, nonce);
+        public Task<AcmeResponse<OrderResponse>> GetOrderAsync(ECDsa sign, Uri uri, string kid, string nonce) => PostAsync<OrderResponse>(sign, uri, null, kid, nonce);
+        public Task<AcmeResponse<AuthzResponse>> GetAuthzAsync(ECDsa sign, Uri authzUri, string kid, string nonce) => PostAsync<AuthzResponse>(sign, authzUri, null, kid, nonce);
+        public Task<AcmeResponse<ChallengeResponse>> TriggerChallengeAsync(ECDsa sign, Uri challengeUri, string kid, string nonce) => PostAsync<ChallengeResponse>(sign, challengeUri, new { }, kid, nonce);
 
         public async Task ReadDirectoryAsync(Uri dirUri)
         {
@@ -44,20 +47,20 @@ namespace KCert.Lib
             _dir = await GetJsonAsync(resp);
         }
 
-        public async Task<AcmeResponse> CreateAccountAsync(ECDsa sign, string email, string nonce)
+        public async Task<AcmeResponse<AccountResponse>> CreateAccountAsync(ECDsa sign, string email, string nonce)
         {
             var contact = new[] { $"mailto:{email}" };
             var payloadObject = new { contact, termsOfServiceAgreed = true };
             var uri = GetFromDirectory(DirFieldNewAccount);
-            return await PostAsync(sign, uri, payloadObject, nonce);
+            return await PostAsync<AccountResponse>(sign, uri, payloadObject, nonce);
         }
 
-        public async Task<AcmeResponse> CreateOrderAsync(ECDsa sign, string kid, IEnumerable<string> hosts, string nonce)
+        public async Task<AcmeResponse<OrderResponse>> CreateOrderAsync(ECDsa sign, string kid, IEnumerable<string> hosts, string nonce)
         {
             var identifiers = hosts.Select(h => new { type = "dns", value = h }).ToArray();
             var payload = new { identifiers };
             var uri = GetFromDirectory(DirFieldNewOrder);
-            return await PostAsync(sign, uri, payload, kid, nonce);
+            return await PostAsync<OrderResponse>(sign, uri, payload, kid, nonce);
         }
 
         public async Task<string> GetCertAsync(ECDsa sign, Uri certUri, string kid, string nonce)
@@ -68,26 +71,26 @@ namespace KCert.Lib
             return await resp.Content.ReadAsStringAsync();
         }
 
-        public async Task<AcmeResponse> FinalizeOrderAsync(RSA rsa, ECDsa sign, Uri uri, string domain, string kid, string nonce)
+        public async Task<AcmeResponse<OrderResponse>> FinalizeOrderAsync(RSA rsa, ECDsa sign, Uri uri, string domain, string kid, string nonce)
         {
             var req = new CertificateRequest($"CN={domain}", rsa, HashAlgorithmName.SHA256, RSASignaturePadding.Pkcs1);
             var signed = req.CreateSigningRequest();
             var csr = Base64UrlTextEncoder.Encode(signed);
-            return await PostAsync(sign, uri, new { csr }, kid, nonce);
+            return await PostAsync<OrderResponse>(sign, uri, new { csr }, kid, nonce);
         }
 
-        private async Task<AcmeResponse> PostAsync(ECDsa sign, Uri uri, object payloadObject, string nonce)
+        private async Task<AcmeResponse<T>> PostAsync<T>(ECDsa sign, Uri uri, object payloadObject, string nonce)
         {
             var protectedObject = new { alg = Alg, jwk = sign.GetJwk(), nonce, url = uri.AbsoluteUri };
             using var resp = await PostAsync(sign, uri, payloadObject, protectedObject);
-            return await ParseJsonAsync(resp);
+            return await ParseJsonAsync<T>(resp);
         }
 
-        private async Task<AcmeResponse> PostAsync(ECDsa sign, Uri uri, object payloadObject, string kid, string nonce)
+        private async Task<AcmeResponse<T>> PostAsync<T>(ECDsa sign, Uri uri, object payloadObject, string kid, string nonce)
         {
             var protectedObject = new { alg = Alg, kid, nonce, url = uri.AbsoluteUri };
             using var resp = await PostAsync(sign, uri, payloadObject, protectedObject);
-            return await ParseJsonAsync(resp);
+            return await ParseJsonAsync<T>(resp);
         }
 
         private async Task<HttpResponseMessage> PostAsync(ECDsa sign, Uri uri, object payloadObject, object protectedObject)
@@ -110,14 +113,15 @@ namespace KCert.Lib
             return await _http.PostAsync(uri, content);
         }
 
-        private static async Task<AcmeResponse> ParseJsonAsync(HttpResponseMessage resp)
+        private async Task<AcmeResponse<T>> ParseJsonAsync<T>(HttpResponseMessage resp)
         {
             var json = await GetJsonAsync(resp);
-            return new AcmeResponse
+            return new AcmeResponse<T>
             {
                 Location = GetHeader(resp, HeaderLocation),
                 Nonce = GetHeader(resp, HeaderReplayNonce),
                 Content = json,
+                Response = JsonSerializer.Deserialize<T>(json.RootElement.ToString()),
             };
         }
 

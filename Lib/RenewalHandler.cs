@@ -126,12 +126,12 @@ namespace KCert.Lib
             var finalize = await _acme.FinalizeOrderAsync(rsa, sign, finalizeUri, domain, kid, nonce);
             _log.LogInformation($"Finalize {finalizeUri}: {JsonSerializer.Serialize(finalize.Content)}");
 
-            do
+            while(numRetries-- > 0 && !finalize.IsOrderFinalized)
             {
                 await Task.Delay(waitTime);
                 finalize = await _acme.GetOrderAsync(sign, orderUri, kid, finalize.Nonce);
                 _log.LogInformation($"Check Order {orderUri}: {JsonSerializer.Serialize(finalize.Content)}");
-            } while (numRetries-- > 0 && !finalize.IsOrderFinalized);
+            }
 
             if (!finalize.IsOrderFinalized)
             {
