@@ -1,6 +1,5 @@
 ﻿using KCert.Lib.AcmeModels;
 using Microsoft.AspNetCore.Authentication;
-using Microsoft.Extensions.Logging;
 using System;
 using System.Collections.Generic;
 using System.Linq;
@@ -27,13 +26,11 @@ namespace KCert.Lib
         private const string Alg = "ES256";
 
         private readonly HttpClient _http;
-        private readonly ILogger<AcmeClient> _log;
         private JsonDocument _dir;
 
-        public AcmeClient(ILogger<AcmeClient> log)
+        public AcmeClient()
         {
             _http = new HttpClient();
-            _log = log;
         }
 
         public Task<AcmeResponse<AccountResponse>> DeactivateAccountAsync(ECDsa sign, string kid, string nonce) => PostAsync<AccountResponse>(sign, new Uri(kid), new { status = "deactivated" }, kid, nonce);
@@ -44,7 +41,7 @@ namespace KCert.Lib
         public async Task ReadDirectoryAsync(Uri dirUri)
         {
             using var resp = await _http.GetAsync(dirUri);
-            _dir = await GetJsonAsync(resp);
+            _dir = JsonDocument.Parse(await GetContentAsync(resp));
         }
 
         public async Task<AcmeResponse<AccountResponse>> CreateAccountAsync(ECDsa sign, string email, string nonce)
@@ -113,15 +110,16 @@ namespace KCert.Lib
             return await _http.PostAsync(uri, content);
         }
 
+        private static readonly JsonSerializerOptions options = new JsonSerializerOptions { PropertyNameCaseInsensitive = true };
         private async Task<AcmeResponse<T>> ParseJsonAsync<T>(HttpResponseMessage resp)
         {
-            var json = await GetJsonAsync(resp);
+            var content = await GetContentAsync(resp);
             return new AcmeResponse<T>
             {
                 Location = GetHeader(resp, HeaderLocation),
                 Nonce = GetHeader(resp, HeaderReplayNonce),
-                Content = json,
-                Response = JsonSerializer.Deserialize<T>(json.RootElement.ToString()),
+                Content = content,
+                Response = JsonSerializer.Deserialize<T>(content, options),
             };
         }
 
@@ -150,11 +148,10 @@ namespace KCert.Lib
             throw new KeyNotFoundException($"AcmeClient::GetFromDirectory: Key not found: {field}");
         }
 
-        private static async Task<JsonDocument> GetJsonAsync(HttpResponseMessage resp)
+        private static async Task<string> GetContentAsync(HttpResponseMessage resp)
         {
             await CheckResponseStatusAsync(resp);
-            using var stream = await resp.Content.ReadAsStreamAsync();
-            return await JsonDocument.ParseAsync(stream);
+            return await resp.Content.ReadAsStringAsync();
         }
 
         private static async Task CheckResponseStatusAsync(HttpResponseMessage resp)
