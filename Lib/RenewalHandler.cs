@@ -76,8 +76,6 @@ namespace KCert.Lib
             await _acme.ReadDirectoryAsync(acmeDir);
             var nonce = await _acme.GetNonceAsync();
             var account = await _acme.CreateAccountAsync(sign, email, nonce);
-            _log.LogInformation($"Fetched account: {account.Content}");
-
             var kid = account.Location;
             nonce = account.Nonce;
             return (kid, nonce);
@@ -86,9 +84,9 @@ namespace KCert.Lib
         private async Task<(Uri OrderUri, Uri FinalizeUri, List<Uri> Authorizations, string Nonce)> CreateOrderAsync(ECDsa sign, string[] hosts, string kid, string nonce)
         {
             var order = await _acme.CreateOrderAsync(sign, kid, hosts, nonce);
-            _log.LogInformation($"Created order: {order.Content}");
-            var urls = order.Response.Authorizations.Select(a => new Uri(a)).ToList();
-            return (new Uri(order.Location), new Uri(order.Response.Finalize), urls, order.Nonce);
+            _log.LogInformation($"Created order: {order.Status}");
+            var urls = order.Authorizations.Select(a => new Uri(a)).ToList();
+            return (new Uri(order.Location), new Uri(order.Finalize), urls, order.Nonce);
         }
 
         private async Task<string> ValidateAuthorizationAsync(ECDsa sign, string kid, string nonce, Uri authUri)
@@ -96,24 +94,24 @@ namespace KCert.Lib
             var (waitTime, numRetries) = (_cfg.AcmeWaitTime, _cfg.AcmeNumRetries);
             var auth = await _acme.GetAuthzAsync(sign, authUri, kid, nonce);
             nonce = auth.Nonce;
-            _log.LogInformation($"Get Auth {authUri}: {auth.Content}");
+            _log.LogInformation($"Get Auth {authUri}: {auth.Status}");
 
-            var challengeUri = new Uri(auth.Response.Challenges.FirstOrDefault(c => c.Type == "http-01")?.Url);
+            var challengeUri = new Uri(auth.Challenges.FirstOrDefault(c => c.Type == "http-01")?.Url);
             var chall = await _acme.TriggerChallengeAsync(sign, challengeUri, kid, nonce);
             nonce = chall.Nonce;
-            _log.LogInformation($"TriggerChallenge {challengeUri}: {chall.Content}");
+            _log.LogInformation($"TriggerChallenge {challengeUri}: {chall.Status}");
 
             do
             {
                 await Task.Delay(waitTime);
                 auth = await _acme.GetAuthzAsync(sign, authUri, kid, nonce);
                 nonce = auth.Nonce;
-                _log.LogInformation($"Get Auth {authUri}: {auth.Content}");
-            } while (numRetries-- > 0 && !auth.Response.Challenges.Any(c => c.Status == "valid"));
+                _log.LogInformation($"Get Auth {authUri}: {auth.Status}");
+            } while (numRetries-- > 0 && !auth.Challenges.Any(c => c.Status == "valid"));
 
-            if (!auth.Response.Challenges.Any(c => c.Status == "valid"))
+            if (!auth.Challenges.Any(c => c.Status == "valid"))
             {
-                throw new Exception($"Auth {authUri} did not complete in time. Last Response: {auth.Content}");
+                throw new Exception($"Auth {authUri} did not complete in time. Last Response: {auth.Status}");
             }
 
             return nonce;
@@ -124,21 +122,21 @@ namespace KCert.Lib
         {
             var (waitTime, numRetries) = (_cfg.AcmeWaitTime, _cfg.AcmeNumRetries);
             var finalize = await _acme.FinalizeOrderAsync(rsa, sign, finalizeUri, domain, kid, nonce);
-            _log.LogInformation($"Finalize {finalizeUri}: {finalize.Content}");
+            _log.LogInformation($"Finalize {finalizeUri}: {finalize.Status}");
 
-            while(numRetries-- > 0 && finalize.Response.Status != "valid")
+            while(numRetries-- >= 0 && finalize.Status != "valid")
             {
                 await Task.Delay(waitTime);
                 finalize = await _acme.GetOrderAsync(sign, orderUri, kid, finalize.Nonce);
-                _log.LogInformation($"Check Order {orderUri}: {finalize.Content}");
+                _log.LogInformation($"Check Order {orderUri}: {finalize.Status}");
             }
 
-            if (finalize.Response.Status != "valid")
+            if (finalize.Status != "valid")
             {
-                throw new Exception($"Order not complete: {finalize.Content}");
+                throw new Exception($"Order not complete: {finalize.Status}");
             }
 
-            return (new Uri(finalize.Response.Certificate), finalize.Nonce);
+            return (new Uri(finalize.Certificate), finalize.Nonce);
         }
 
         private async Task SaveCertAsync(ECDsa sign, string ns, string secretName, RSA rsa, Uri certUri, string kid, string nonce)

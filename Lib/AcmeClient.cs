@@ -25,6 +25,8 @@ namespace KCert.Lib
         private const string ContentType = "application/jose+json";
         private const string Alg = "ES256";
 
+        private static readonly JsonSerializerOptions options = new JsonSerializerOptions { PropertyNameCaseInsensitive = true };
+
         private readonly HttpClient _http;
         private JsonDocument _dir;
 
@@ -33,10 +35,10 @@ namespace KCert.Lib
             _http = new HttpClient();
         }
 
-        public Task<AcmeResponse<AccountResponse>> DeactivateAccountAsync(ECDsa sign, string kid, string nonce) => PostAsync<AccountResponse>(sign, new Uri(kid), new { status = "deactivated" }, kid, nonce);
-        public Task<AcmeResponse<OrderResponse>> GetOrderAsync(ECDsa sign, Uri uri, string kid, string nonce) => PostAsync<OrderResponse>(sign, uri, null, kid, nonce);
-        public Task<AcmeResponse<AuthzResponse>> GetAuthzAsync(ECDsa sign, Uri authzUri, string kid, string nonce) => PostAsync<AuthzResponse>(sign, authzUri, null, kid, nonce);
-        public Task<AcmeResponse<ChallengeResponse>> TriggerChallengeAsync(ECDsa sign, Uri challengeUri, string kid, string nonce) => PostAsync<ChallengeResponse>(sign, challengeUri, new { }, kid, nonce);
+        public Task<AccountResponse> DeactivateAccountAsync(ECDsa sign, string kid, string nonce) => PostAsync<AccountResponse>(sign, new Uri(kid), new { status = "deactivated" }, kid, nonce);
+        public Task<OrderResponse> GetOrderAsync(ECDsa sign, Uri uri, string kid, string nonce) => PostAsync<OrderResponse>(sign, uri, null, kid, nonce);
+        public Task<AuthzResponse> GetAuthzAsync(ECDsa sign, Uri authzUri, string kid, string nonce) => PostAsync<AuthzResponse>(sign, authzUri, null, kid, nonce);
+        public Task<ChallengeResponse> TriggerChallengeAsync(ECDsa sign, Uri challengeUri, string kid, string nonce) => PostAsync<ChallengeResponse>(sign, challengeUri, new { }, kid, nonce);
 
         public async Task ReadDirectoryAsync(Uri dirUri)
         {
@@ -44,7 +46,7 @@ namespace KCert.Lib
             _dir = JsonDocument.Parse(await GetContentAsync(resp));
         }
 
-        public async Task<AcmeResponse<AccountResponse>> CreateAccountAsync(ECDsa sign, string email, string nonce)
+        public async Task<AccountResponse> CreateAccountAsync(ECDsa sign, string email, string nonce)
         {
             var contact = new[] { $"mailto:{email}" };
             var payloadObject = new { contact, termsOfServiceAgreed = true };
@@ -52,7 +54,7 @@ namespace KCert.Lib
             return await PostAsync<AccountResponse>(sign, uri, payloadObject, nonce);
         }
 
-        public async Task<AcmeResponse<OrderResponse>> CreateOrderAsync(ECDsa sign, string kid, IEnumerable<string> hosts, string nonce)
+        public async Task<OrderResponse> CreateOrderAsync(ECDsa sign, string kid, IEnumerable<string> hosts, string nonce)
         {
             var identifiers = hosts.Select(h => new { type = "dns", value = h }).ToArray();
             var payload = new { identifiers };
@@ -68,7 +70,7 @@ namespace KCert.Lib
             return await resp.Content.ReadAsStringAsync();
         }
 
-        public async Task<AcmeResponse<OrderResponse>> FinalizeOrderAsync(RSA rsa, ECDsa sign, Uri uri, string domain, string kid, string nonce)
+        public async Task<OrderResponse> FinalizeOrderAsync(RSA rsa, ECDsa sign, Uri uri, string domain, string kid, string nonce)
         {
             var req = new CertificateRequest($"CN={domain}", rsa, HashAlgorithmName.SHA256, RSASignaturePadding.Pkcs1);
             var signed = req.CreateSigningRequest();
@@ -76,14 +78,14 @@ namespace KCert.Lib
             return await PostAsync<OrderResponse>(sign, uri, new { csr }, kid, nonce);
         }
 
-        private async Task<AcmeResponse<T>> PostAsync<T>(ECDsa sign, Uri uri, object payloadObject, string nonce)
+        private async Task<T> PostAsync<T>(ECDsa sign, Uri uri, object payloadObject, string nonce) where T : AcmeResponse
         {
             var protectedObject = new { alg = Alg, jwk = sign.GetJwk(), nonce, url = uri.AbsoluteUri };
             using var resp = await PostAsync(sign, uri, payloadObject, protectedObject);
             return await ParseJsonAsync<T>(resp);
         }
 
-        private async Task<AcmeResponse<T>> PostAsync<T>(ECDsa sign, Uri uri, object payloadObject, string kid, string nonce)
+        private async Task<T> PostAsync<T>(ECDsa sign, Uri uri, object payloadObject, string kid, string nonce) where T : AcmeResponse
         {
             var protectedObject = new { alg = Alg, kid, nonce, url = uri.AbsoluteUri };
             using var resp = await PostAsync(sign, uri, payloadObject, protectedObject);
@@ -110,17 +112,13 @@ namespace KCert.Lib
             return await _http.PostAsync(uri, content);
         }
 
-        private static readonly JsonSerializerOptions options = new JsonSerializerOptions { PropertyNameCaseInsensitive = true };
-        private async Task<AcmeResponse<T>> ParseJsonAsync<T>(HttpResponseMessage resp)
+        private static async Task<T> ParseJsonAsync<T>(HttpResponseMessage resp) where T : AcmeResponse
         {
             var content = await GetContentAsync(resp);
-            return new AcmeResponse<T>
-            {
-                Location = GetHeader(resp, HeaderLocation),
-                Nonce = GetHeader(resp, HeaderReplayNonce),
-                Content = content,
-                Response = JsonSerializer.Deserialize<T>(content, options),
-            };
+            var result = JsonSerializer.Deserialize<T>(content, options);
+            result.Nonce = GetHeader(resp, HeaderReplayNonce);
+            result.Location = GetHeader(resp, HeaderLocation);
+            return result;
         }
 
         public async Task<string> GetNonceAsync()

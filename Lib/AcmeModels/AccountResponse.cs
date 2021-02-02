@@ -1,6 +1,6 @@
 ﻿namespace KCert.Lib.AcmeModels
 {
-    public class AccountResponse
+    public class AccountResponse : AcmeResponse
     {
         public string Status { get; set; }
         public string[] Contact { get; set; }
