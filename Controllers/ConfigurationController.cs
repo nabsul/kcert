@@ -19,7 +19,6 @@ namespace KCert.Controllers
         }
 
         [HttpGet]
-        [Route("")]
         public async Task<IActionResult> IndexAsync(bool sendEmail = false)
         {
             var p = await _kcert.GetConfigAsync();
@@ -34,7 +33,6 @@ namespace KCert.Controllers
         }
 
         [HttpPost]
-        [Route("")]
         public async Task<IActionResult> SaveAsync([FromForm] ConfigurationForm form)
         {
             var p = await _kcert.GetConfigAsync() ?? new KCertParams();

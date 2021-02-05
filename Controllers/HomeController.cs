@@ -22,16 +22,11 @@ namespace KCert.Controllers
         }
 
         [HttpGet]
-        [Route("")]
         public async Task<IActionResult> IndexAsync()
         {
             var ingresses = await _kcert.GetAllIngressesAsync();
-            return View(await GetViewModelsAsync(ingresses));
-        }
-
-        private async Task<List<HomeViewModel>> GetViewModelsAsync(IEnumerable<Networkingv1beta1Ingress> ingresses)
-        {
             var result = new List<HomeViewModel>();
+            
             foreach (var i in ingresses)
             {
                 foreach (var tls in i.Spec.Tls)
@@ -49,26 +44,24 @@ namespace KCert.Controllers
                 }
             }
 
-            return result;
+            return View(result);
         }
 
-        [HttpGet]
-        [Route("challenge")]
+        [HttpGet("challenge")]
         public async Task<IActionResult> ChallengeAsync()
         {
             var ingress = await _kcert.GetKCertIngressAsync();
             return View(ingress);
         }
 
-        [HttpPost]
-        [Route("challenge")]
+        [HttpPost("challenge")]
         public async Task<IActionResult> SyncChallengeHostsAsync()
         {
             await _kcert.SyncHostsAsync();
             return RedirectToAction("Challenge");
         }
 
-        [Route("renew/{ns}/{secretName}")]
+        [HttpGet("renew/{ns}/{secretName}")]
         public async Task<IActionResult> RenewAsync(string ns, string secretName)
         {
             var result = await _kcert.GetCertAsync(ns, secretName);

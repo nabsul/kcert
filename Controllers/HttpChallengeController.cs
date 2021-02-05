@@ -17,7 +17,7 @@ namespace KCert.Controllers
             _kcert = kcert;
         }
 
-        [Route("{key}")]
+        [HttpGet("{key}")]
         public async Task<IActionResult> GetChallengeResultsAsync(string key)
         {
             _log.LogInformation($"Received ACME Challenge: {key}");
