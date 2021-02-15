@@ -77,9 +77,9 @@ namespace KCert.Lib
 
         private static readonly Dictionary<Type, Func<object, string>> SetValLookup = new Dictionary<Type, Func<object, string>>
         {
-            { typeof(string), (s) => (string)s },
-            { typeof(bool), (s) => ((bool)s).ToString() },
-            { typeof(Uri), (s) => ((Uri)s).AbsoluteUri },
+            { typeof(string), (o) => (string)o },
+            { typeof(bool), (o) => ((bool)o).ToString() },
+            { typeof(Uri), (o) => ((Uri)o).AbsoluteUri },
         };
     }
 }
