@@ -34,6 +34,7 @@ namespace KCert.Controllers
             var kcertIngress = await _kcert.GetKCertIngressAsync();
             var hosts = kcertIngress.Spec.Rules.Select(r => r.Host).ToHashSet();
             _log.LogInformation($"kcert hosts: {string.Join(";", hosts)}");
+
             var result = new List<HomeViewModel>();
             
             foreach (var i in ingresses)
@@ -58,16 +59,9 @@ namespace KCert.Controllers
         }
 
         [HttpGet("configuration")]
-        public async Task<IActionResult> ConfigurationAsync(bool sendEmail = false)
+        public async Task<IActionResult> ConfigurationAsync()
         {
             var p = await _kcert.GetConfigAsync();
-
-            if (sendEmail)
-            {
-                await _email.SendTestEmailAsync(p);
-                return RedirectToAction("Index");
-            }
-
             return View(p ?? new KCertParams());
         }
 
@@ -85,13 +79,18 @@ namespace KCert.Controllers
             p.EmailFrom = form.EmailFrom;
             p.TermsAccepted = form.TermsAccepted;
 
-            if (form.NewKey)
+            if (!(form?.AcmeKey?.All(c => c == '*') ?? false))
+            {
+                p.AcmeKey = form.AcmeKey;
+            }
+
+            if (string.IsNullOrWhiteSpace(p.AcmeKey))
             {
                 p.AcmeKey = _kcert.GenerateNewKey();
             }
 
             await _kcert.SaveConfigAsync(p);
-            return RedirectToAction("Index");
+            return RedirectToAction("Configuration");
         }
 
         [HttpPost("challenge")]

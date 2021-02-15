@@ -13,7 +13,7 @@
         .ToList();
 }
 
-<h1>KCert Configuration Settings</h1>
+<h2>KCert Configuration Settings</h2>
 
 @if (!string.IsNullOrWhiteSpace(Model.AwsKey))
 {
@@ -33,23 +33,22 @@
     </div>
     <div class="form-group">
         <label for="AcmeKey">ACME Key</label>
-        <input readonly asp-for="AcmeKey" type="text" class="form-control" aria-describedby="AcmeKeyHelp">
-        <small id="AcmeKeyHelp" class="form-text text-muted">The RSA Key for your account. You might want to back this up.</small>
-    </div>
-    <div class="form-group form-check">
-        <input type="checkbox" class="form-check-input" id="NewKey" name="NewKey" value="true">
-        <label class="form-check-label" for="NewKey">Generate New Key</label>
+        <input id="AcmeKeyField" type="text" class="form-control" aria-describedby="AcmeKeyHelp" value="******">
+        <small id="AcmeKeyHelp" class="form-text text-muted">Account RSA Key. Leave empty to generate a new one. <a href="#" onclick="showKey()">show</a></small>
     </div>
     <div class="form-group form-check">
         <input asp-for="TermsAccepted" type="checkbox" class="form-check-input" id="TermsAccepted" name="TermsAccepted">
         <label class="form-check-label" for="TermsAccepted">Accept ACME Terms</label>
     </div>
-    <div class="form-group form-check">
-        <input asp-for="EnableAutoRenew" type="checkbox" class="form-check-input" id="EnableAutoRenew" name="EnableAutoRenew">
-        <label class="form-check-label" for="EnableAutoRenew">Automatically Renew Certificates</label>
+    <div>
+        <button type="submit" class="btn btn-primary">Save</button>
     </div>
+
+    <hr />
+    <h4>AWS Email Settings <small>(optional)</small></h4>
+
     <div class="form-group">
-        <label for="AwsRegion">ACME Directory URL</label>
+        <label for="AwsRegion">AWS Region</label>
         <select id="AwsRegion" name="AwsRegion" class="form-control" asp-for="AwsRegion" asp-items="regions"></select>
         <small id="AcmeDirHelp" class="form-text text-muted">The mail URL for the ACME server.</small>
     </div>
@@ -68,5 +67,26 @@
         <input asp-for="EmailFrom" type="email" class="form-control" id="EmailFrom" name="EmailFrom" aria-describedby="EmailFromHelp">
         <small id="EmailFromHelp" class="form-text text-muted">The email address from which emails are coming from.</small>
     </div>
-    <button type="submit" class="btn btn-primary">Save</button>
+    <div>
+        <button type="submit" class="btn btn-primary">Save</button>
+        <button type="submit" class="btn btn-warning">Send Test Email</button>
+    </div>
 </form>
+
+@section Scripts {
+<script>
+    const configState = {
+        key: {
+            show: false,
+            value: "@Model.AcmeKey",
+        },
+    }
+
+    const showKey = () => {
+        const cfg = configState.key
+        const el = document.getElementById('AcmeKeyField')
+        el.value = cfg.show ? '******' : configState.key.value
+        cfg.show = !cfg.show
+    }
+</script>
+}

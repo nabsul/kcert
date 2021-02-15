@@ -8,55 +8,78 @@ namespace KCert.Lib
 {
     public class KCertParams
     {
-        public Uri AcmeDirUrl { get => GetUri(nameof(AcmeDirUrl)); set => SetValue(nameof(AcmeDirUrl), value); }
-        public bool TermsAccepted { get => GetBool(nameof(TermsAccepted)); set => SetValue(nameof(TermsAccepted), value); }
-        public string AcmeEmail { get => GetString(nameof(AcmeEmail)); set => SetValue(nameof(AcmeEmail), value); }
-        public string AcmeKey { get => GetString(nameof(AcmeKey)); set => SetValue(nameof(AcmeKey), value); }
+        public Uri AcmeDirUrl { get; set; }
+        public bool TermsAccepted { get; set; }
+        public string AcmeEmail { get; set; }
+        public string AcmeKey { get; set; }
 
-        public bool EnableAutoRenew { get => GetBool(nameof(EnableAutoRenew)); set => SetValue(nameof(EnableAutoRenew), value); }
-        public string AwsKey { get => GetString(nameof(AwsKey)); set => SetValue(nameof(AwsKey), value); }
-        public string AwsRegion { get => GetString(nameof(AwsRegion)); set => SetValue(nameof(AwsRegion), value); }
-        public string AwsSecret { get => GetString(nameof(AwsSecret)); set => SetValue(nameof(AwsSecret), value); }
-        public string EmailFrom { get => GetString(nameof(EmailFrom)); set => SetValue(nameof(EmailFrom), value); }
+        public bool EnableAutoRenew { get; set; }
+        public string AwsKey { get; set; }
+        public string AwsRegion { get; set; }
+        public string AwsSecret { get; set; }
+        public string EmailFrom { get; set; }
 
-        private readonly Dictionary<string, byte[]> _data;
-
-        public KCertParams()
-        {
-            _data = new Dictionary<string, byte[]>();
-        }
+        public KCertParams() { }
 
         public KCertParams(V1Secret secret)
         {
-            _data = secret.Data.ToDictionary(kvp => kvp.Key, kvp => kvp.Value);
-        }
-
-        private bool GetBool(string key) => bool.TryParse(GetString(key), out var result) ? false : result;
-
-        private Uri GetUri(string key)
-        {
-            var uri = GetString(key);
-            return uri == null ? null : new Uri(uri);
-        }
-
-        public IDictionary<string, byte[]> Export() => _data;
-        private string GetString(string k)
-        {
-            if (!_data.TryGetValue(k, out var b))
+            var data = secret.Data.ToDictionary(kvp => kvp.Key, kvp => kvp.Value);
+            foreach (var p in typeof(KCertParams).GetProperties())
             {
-                return null;
+                if (!data.TryGetValue(p.Name, out var value))
+                {
+                    continue;
+                }
+
+                object result = null;
+                if (value != null)
+                {
+                    if (!GetValLookup.TryGetValue(p.PropertyType, out var func))
+                    {
+                        throw new Exception($"Don't know how to get Property {p.Name} of type {p.PropertyType}");
+                    }
+                    
+                    result = func(Encoding.UTF8.GetString(value));
+                }
+
+                p.SetValue(this, result);
             }
-
-            return Encoding.UTF8.GetString(b);
         }
 
-        private void SetValue(string k, bool v) => SetValue(k, v.ToString());
-
-        private void SetValue(string k, Uri uri) => SetValue(k, uri.AbsoluteUri);
-
-        private void SetValue(string k, string value)
+        public IDictionary<string, byte[]> Export()
         {
-            _data[k] = value == null ? null : Encoding.UTF8.GetBytes(value);
+            var result = new Dictionary<string, byte[]>();
+            foreach (var p in typeof(KCertParams).GetProperties())
+            {
+                byte[] value = null;
+                var propValue = p.GetValue(this);
+                if (propValue != null)
+                {
+                    if (!SetValLookup.TryGetValue(p.PropertyType, out var func))
+                    {
+                        throw new Exception($"Don't know how to set Property {p.Name} of type {p.PropertyType}");
+                    }
+
+                    var stringValue = func(propValue);
+                    value = Encoding.UTF8.GetBytes(stringValue);
+                }
+                result.Add(p.Name, value);
+            }
+            return result;
         }
+
+        private static readonly Dictionary<Type, Func<string, object>> GetValLookup = new Dictionary<Type, Func<string, object>>
+        {
+            { typeof(string), (s) => s },
+            { typeof(bool), (s) => bool.Parse(s) },
+            { typeof(Uri), (s) => new Uri(s) },
+        };
+
+        private static readonly Dictionary<Type, Func<object, string>> SetValLookup = new Dictionary<Type, Func<object, string>>
+        {
+            { typeof(string), (s) => (string)s },
+            { typeof(bool), (s) => ((bool)s).ToString() },
+            { typeof(Uri), (s) => ((Uri)s).AbsoluteUri },
+        };
     }
 }

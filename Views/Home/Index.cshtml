@@ -1,9 +1,13 @@
 ﻿@inject K8sClient _kube
 @model (List<HomeViewModel>, Networkingv1beta1Ingress)
 @{ ViewData["Title"] = "Ingress";
-                var (ingresses, kcertIngress) = Model; }
+    var (ingresses, kcertIngress) = Model; }
 
 <h2>Managed Ingresses</h2>
+
+<form method="post" asp-action="SyncChallengeHosts">
+    <button type="submit" class="btn btn-primary">Sync Challenge Routes</button>
+</form>
 
 <div>
     <table class="table">
@@ -31,35 +35,8 @@
     <td>@row.Expires?.ToString("s")</td>
     <td><a class="btn btn-@(row.HasChallengeEntry ? "warning" : "danger") " asp-action="Renew" asp-route-ns="@row.Namespace" asp-route-secretName="@row.SecretName">Test</a></td>
     <td><a class="btn btn-primary" asp-action="Renew" asp-route-ns="@row.Namespace" asp-route-secretName="@row.SecretName">Renew</a></td>
-</tr>
-}
-        </tbody>
-    </table>
-</div>
-
-<h2>Challenge Routes</h2>
-
-<form method="post" asp-action="SyncChallengeHosts">
-    <button type="submit" class="btn btn-primary">Sync Hosts</button>
-</form>
-
-<div>
-    <table class="table">
-        <thead>
-            <tr>
-                <th scope="col">Host</th>
-                <th scope="col">Paths</th>
-                <th scope="col">Services</th>
-            </tr>
-        </thead>
-        <tbody>
-            @foreach (var rule in kcertIngress?.Spec?.Rules ?? new Networkingv1beta1IngressRule[0])
-            {
-<tr>
-    <td>@rule.Host</td>
-    <td>@string.Join(", ", rule?.Http?.Paths?.Select(p => p.Path) ?? new string[0])</td>
-    <td>@string.Join(", ", rule?.Http?.Paths?.Select(p => p.Backend.ServiceName) ?? new string[0])</td>
-</tr>}
+</tr>           
+            }
         </tbody>
     </table>
 </div>
