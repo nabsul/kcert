@@ -10,5 +10,6 @@ namespace KCert.Models
         public string[] Hosts { get; set; }
         public DateTime? Created { get; set; }
         public DateTime? Expires { get; set; }
+        public bool HasChallengeEntry { get; set; }
     }
 }

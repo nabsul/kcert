@@ -18,15 +18,13 @@ namespace KCert.Lib
         private readonly K8sClient _kube;
         private readonly RenewalHandler _getCert;
         private readonly KCertConfig _cfg;
-        private readonly NamespaceFilter _filter;
         private readonly ILogger<KCertClient> _log;
 
-        public KCertClient(K8sClient kube, KCertConfig cfg, RenewalHandler getCert, NamespaceFilter filter, ILogger<KCertClient> log)
+        public KCertClient(K8sClient kube, KCertConfig cfg, RenewalHandler getCert, ILogger<KCertClient> log)
         {
             _kube = kube;
             _cfg = cfg;
             _getCert = getCert;
-            _filter = filter;
             _log = log;
         }
 
@@ -39,8 +37,7 @@ namespace KCert.Lib
 
         public async Task<IList<Networkingv1beta1Ingress>> GetAllIngressesAsync()
         {
-            var ingresses = await _kube.GetAllIngressesAsync();
-            return ingresses.Where(_filter.IsManagedIngress).ToList();
+            return await _kube.GetAllIngressesAsync();
         }
 
         public async Task<Networkingv1beta1Ingress> GetIngressAsync(string ns, string name)

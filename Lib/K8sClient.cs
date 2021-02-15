@@ -146,7 +146,7 @@ namespace KCert.Lib
 
         public async Task<IList<Networkingv1beta1Ingress>> GetAllIngressesAsync()
         {
-            var result = await _client.ListIngressForAllNamespaces2Async();
+            var result = await _client.ListIngressForAllNamespaces2Async(labelSelector: $"kcert.dev/label={_cfg.Label}");
             return result.Items;
         }
 

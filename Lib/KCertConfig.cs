@@ -1,7 +1,5 @@
 ﻿using Microsoft.Extensions.Configuration;
 using System;
-using System.Collections.Generic;
-using System.Linq;
 
 namespace KCert.Lib
 {
@@ -16,12 +14,12 @@ namespace KCert.Lib
         }
 
         public string K8sConfigFile => _cfg["Config"];
-        public string KCertNamespace => _cfg.GetValue<string>("KCertNamespace");
+        public string KCertNamespace => _cfg.GetValue<string>("Namespace");
+        public string Label => _cfg.GetValue<string>("Label");
         public string KCertSecretName => _cfg.GetValue<string>("SecretName");
         public string KCertServiceName => _cfg.GetValue<string>("ServiceName");
         public string KCertIngressName => _cfg.GetValue<string>("IngressName");
         public string KCertServicePort => _cfg.GetValue<string>("ServicePort");
-        public List<string> ManagedNamespaces => _cfg.GetValue<string>("Namespaces").Split(',').ToList();
 
         public TimeSpan AcmeWaitTime => TimeSpan.FromSeconds(_cfg.GetValue<int>("AcmeWaitTimeSeconds"));
         public int AcmeNumRetries => _cfg.GetValue<int>("AcmeNumRetries");

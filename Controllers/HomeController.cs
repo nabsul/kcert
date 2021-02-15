@@ -6,6 +6,8 @@ using KCert.Lib;
 using k8s.Models;
 using System.Collections.Generic;
 using System.Linq;
+using Microsoft.Extensions.Logging;
+using System;
 
 namespace KCert.Controllers
 {
@@ -14,17 +16,24 @@ namespace KCert.Controllers
     {
         private readonly KCertClient _kcert;
         private readonly K8sClient _kube;
+        private readonly EmailClient _email;
+        private readonly ILogger<HomeController> _log;
 
-        public HomeController(KCertClient kcert, K8sClient kube)
+        public HomeController(KCertClient kcert, K8sClient kube, ILogger<HomeController> log, EmailClient email)
         {
             _kcert = kcert;
             _kube = kube;
+            _log = log;
+            _email = email;
         }
 
         [HttpGet]
         public async Task<IActionResult> IndexAsync()
         {
             var ingresses = await _kcert.GetAllIngressesAsync();
+            var kcertIngress = await _kcert.GetKCertIngressAsync();
+            var hosts = kcertIngress.Spec.Rules.Select(r => r.Host).ToHashSet();
+            _log.LogInformation($"kcert hosts: {string.Join(";", hosts)}");
             var result = new List<HomeViewModel>();
             
             foreach (var i in ingresses)
@@ -40,25 +49,56 @@ namespace KCert.Controllers
                         Hosts = tls.Hosts.ToArray(),
                         Created = s?.Cert()?.NotBefore,
                         Expires = s?.Cert()?.NotAfter,
+                        HasChallengeEntry = tls.Hosts.All(h => hosts.Contains(h)),
                     });
                 }
             }
 
-            return View(result);
+            return View((result, kcertIngress));
         }
 
-        [HttpGet("challenge")]
-        public async Task<IActionResult> ChallengeAsync()
+        [HttpGet("configuration")]
+        public async Task<IActionResult> ConfigurationAsync(bool sendEmail = false)
         {
-            var ingress = await _kcert.GetKCertIngressAsync();
-            return View(ingress);
+            var p = await _kcert.GetConfigAsync();
+
+            if (sendEmail)
+            {
+                await _email.SendTestEmailAsync(p);
+                return RedirectToAction("Index");
+            }
+
+            return View(p ?? new KCertParams());
+        }
+
+        [HttpPost("configuration")]
+        public async Task<IActionResult> SaveAsync([FromForm] ConfigurationForm form)
+        {
+            var p = await _kcert.GetConfigAsync() ?? new KCertParams();
+
+            p.AcmeDirUrl = new Uri(form.AcmeDir);
+            p.AcmeEmail = form.AcmeEmail;
+            p.EnableAutoRenew = form.EnableAutoRenew;
+            p.AwsRegion = form.AwsRegion;
+            p.AwsKey = form.AwsKey;
+            p.AwsSecret = form.AwsSecret;
+            p.EmailFrom = form.EmailFrom;
+            p.TermsAccepted = form.TermsAccepted;
+
+            if (form.NewKey)
+            {
+                p.AcmeKey = _kcert.GenerateNewKey();
+            }
+
+            await _kcert.SaveConfigAsync(p);
+            return RedirectToAction("Index");
         }
 
         [HttpPost("challenge")]
         public async Task<IActionResult> SyncChallengeHostsAsync()
         {
             await _kcert.SyncHostsAsync();
-            return RedirectToAction("Challenge");
+            return RedirectToAction("Index");
         }
 
         [HttpGet("renew/{ns}/{secretName}")]

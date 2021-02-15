@@ -1,11 +1,11 @@
 ﻿@inject K8sClient _kube
-@model List<HomeViewModel>
-@{
-    ViewData["Title"] = "Ingress";
-}
+@model (List<HomeViewModel>, Networkingv1beta1Ingress)
+@{ ViewData["Title"] = "Ingress";
+                var (ingresses, kcertIngress) = Model; }
+
+<h2>Managed Ingresses</h2>
 
 <div>
-    <h1 class="display-4">Ingress</h1>
     <table class="table">
         <thead>
             <tr>
@@ -15,22 +15,51 @@
                 <th scope="col">Secret Name</th>
                 <th scope="col">Created</th>
                 <th scope="col">Expiration</th>
+                <th scope="col">Challenge</th>
                 <th scope="col">Actions</th>
             </tr>
         </thead>
         <tbody>
-        @foreach (var row in Model)
-        {
+            @foreach (var (idx, row) in ingresses.Select((m, i) => (i, m)))
+            {
+<tr>
+    <td>@row.Namespace</td>
+    <td>@row.IngressName</td>
+    <td>@Html.Raw(string.Join("<br>", row.Hosts.Select(h => $"<a target='_blank' href='https://{h}'>{h}</a>")))</td>
+    <td>@row.SecretName</td>
+    <td>@row.Created?.ToString("s")</td>
+    <td>@row.Expires?.ToString("s")</td>
+    <td><a class="btn btn-@(row.HasChallengeEntry ? "warning" : "danger") " asp-action="Renew" asp-route-ns="@row.Namespace" asp-route-secretName="@row.SecretName">Test</a></td>
+    <td><a class="btn btn-primary" asp-action="Renew" asp-route-ns="@row.Namespace" asp-route-secretName="@row.SecretName">Renew</a></td>
+</tr>
+}
+        </tbody>
+    </table>
+</div>
+
+<h2>Challenge Routes</h2>
+
+<form method="post" asp-action="SyncChallengeHosts">
+    <button type="submit" class="btn btn-primary">Sync Hosts</button>
+</form>
+
+<div>
+    <table class="table">
+        <thead>
             <tr>
-                <td>@row.Namespace</td>
-                <td>@row.IngressName</td>
-                <td>@Html.Raw(string.Join("<br>", row.Hosts.Select(h => $"<a target='_blank' href='https://{h}'>{h}</a>")))</td>
-                <td>@row.SecretName</td>
-                <td>@row.Created?.ToString("s")</td>
-                <td>@row.Expires?.ToString("s")</td>
-                <td><a class="btn btn-primary" asp-action="Renew" asp-route-ns="@row.Namespace" asp-route-secretName="@row.SecretName">Renew</a></td>
+                <th scope="col">Host</th>
+                <th scope="col">Paths</th>
+                <th scope="col">Services</th>
             </tr>
-        }
+        </thead>
+        <tbody>
+            @foreach (var rule in kcertIngress?.Spec?.Rules ?? new Networkingv1beta1IngressRule[0])
+            {
+<tr>
+    <td>@rule.Host</td>
+    <td>@string.Join(", ", rule?.Http?.Paths?.Select(p => p.Path) ?? new string[0])</td>
+    <td>@string.Join(", ", rule?.Http?.Paths?.Select(p => p.Backend.ServiceName) ?? new string[0])</td>
+</tr>}
         </tbody>
     </table>
 </div>
