@@ -70,16 +70,16 @@ namespace KCert.Lib
 
         private static readonly Dictionary<Type, Func<string, object>> GetValLookup = new Dictionary<Type, Func<string, object>>
         {
-            { typeof(string), (s) => s },
-            { typeof(bool), (s) => bool.Parse(s) },
-            { typeof(Uri), (s) => new Uri(s) },
+            { typeof(string), (str) => str },
+            { typeof(bool), (str) => bool.Parse(str) },
+            { typeof(Uri), (str) => new Uri(str) },
         };
 
         private static readonly Dictionary<Type, Func<object, string>> SetValLookup = new Dictionary<Type, Func<object, string>>
         {
-            { typeof(string), (o) => (string)o },
-            { typeof(bool), (o) => ((bool)o).ToString() },
-            { typeof(Uri), (o) => ((Uri)o).AbsoluteUri },
+            { typeof(string), (obj) => (string)obj },
+            { typeof(bool), (obj) => ((bool)obj).ToString() },
+            { typeof(Uri), (obj) => ((Uri)obj).AbsoluteUri },
         };
     }
 }
