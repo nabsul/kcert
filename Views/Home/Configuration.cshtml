@@ -33,7 +33,7 @@
     </div>
     <div class="form-group">
         <label for="AcmeKey">ACME Key</label>
-        <input id="AcmeKeyField" type="text" class="form-control" aria-describedby="AcmeKeyHelp" value="******">
+        <input id="AcmeKeyField" asp-for="AcmeKey" type="text" class="form-control" aria-describedby="AcmeKeyHelp" value="******">
         <small id="AcmeKeyHelp" class="form-text text-muted">Account RSA Key. Leave empty to generate a new one. <a href="#" onclick="showKey()">show</a></small>
     </div>
     <div class="form-group form-check">

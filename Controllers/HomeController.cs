@@ -81,11 +81,13 @@ namespace KCert.Controllers
 
             if (!(form?.AcmeKey?.All(c => c == '*') ?? false))
             {
+                _log.LogInformation("Setting key value from form");
                 p.AcmeKey = form.AcmeKey;
             }
 
             if (string.IsNullOrWhiteSpace(p.AcmeKey))
             {
+                _log.LogInformation("Generating new key");
                 p.AcmeKey = _kcert.GenerateNewKey();
             }
 

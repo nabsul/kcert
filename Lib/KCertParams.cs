@@ -60,11 +60,12 @@ namespace KCert.Lib
                         throw new Exception($"Don't know how to set Property {p.Name} of type {p.PropertyType}");
                     }
 
-                    var stringValue = func(propValue);
-                    value = Encoding.UTF8.GetBytes(stringValue);
+                    value = Encoding.UTF8.GetBytes(func(propValue));
                 }
+
                 result.Add(p.Name, value);
             }
+
             return result;
         }
 
