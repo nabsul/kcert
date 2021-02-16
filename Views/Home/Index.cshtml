@@ -19,7 +19,7 @@
                 <th scope="col">Secret Name</th>
                 <th scope="col">Created</th>
                 <th scope="col">Expiration</th>
-                <th scope="col">Challenge</th>
+                <th scope="col">Challenge Route</th>
                 <th scope="col">Actions</th>
             </tr>
         </thead>
@@ -33,7 +33,7 @@
     <td>@row.SecretName</td>
     <td>@row.Created?.ToString("s")</td>
     <td>@row.Expires?.ToString("s")</td>
-    <td><a class="btn btn-@(row.HasChallengeEntry ? "warning" : "danger") " asp-action="Renew" asp-route-ns="@row.Namespace" asp-route-secretName="@row.SecretName">Test</a></td>
+    <td><a class="btn btn-@(row.HasChallengeEntry ? "success" : "danger")">@(row.HasChallengeEntry ? "configured" : "not configured")</a></td>
     <td><a class="btn btn-primary" asp-action="Renew" asp-route-ns="@row.Namespace" asp-route-secretName="@row.SecretName">Renew</a></td>
 </tr>           
             }
