@@ -46,10 +46,10 @@ namespace KCert.Lib
             _dir = JsonDocument.Parse(await GetContentAsync(resp));
         }
 
-        public async Task<AccountResponse> CreateAccountAsync(ECDsa sign, string email, string nonce)
+        public async Task<AccountResponse> CreateAccountAsync(ECDsa sign, string email, string nonce, bool termsAccepted)
         {
             var contact = new[] { $"mailto:{email}" };
-            var payloadObject = new { contact, termsOfServiceAgreed = true };
+            var payloadObject = new { contact, termsOfServiceAgreed = termsAccepted };
             var uri = GetFromDirectory(DirFieldNewAccount);
             return await PostAsync<AccountResponse>(sign, uri, payloadObject, nonce);
         }

@@ -34,7 +34,7 @@ namespace KCert.Lib
 
             try
             {
-                var (kid, initNonce) = await InitAsync(sign, p.AcmeDirUrl, p.AcmeEmail);
+                var (kid, initNonce) = await InitAsync(sign, p.AcmeDirUrl, p.AcmeEmail, p.TermsAccepted);
                 LogInformation(result, $"Initialized renewal process for secret {ns}/{secretName} - hosts {string.Join(",", hosts)} - kid {kid}");
 
                 var (orderUri, finalizeUri, authorizations, orderNonce) = await CreateOrderAsync(sign, hosts, kid, initNonce);
@@ -71,11 +71,11 @@ namespace KCert.Lib
             result.Logs.Add(message);
         }
 
-        private async Task<(string KID, string Nonce)> InitAsync(ECDsa sign, Uri acmeDir, string email)
+        private async Task<(string KID, string Nonce)> InitAsync(ECDsa sign, Uri acmeDir, string email, bool termsAccepted)
         {
             await _acme.ReadDirectoryAsync(acmeDir);
             var nonce = await _acme.GetNonceAsync();
-            var account = await _acme.CreateAccountAsync(sign, email, nonce);
+            var account = await _acme.CreateAccountAsync(sign, email, nonce, termsAccepted);
             var kid = account.Location;
             nonce = account.Nonce;
             return (kid, nonce);
