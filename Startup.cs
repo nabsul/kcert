@@ -21,9 +21,9 @@ namespace KCert
         // This method gets called by the runtime. Use this method to add services to the container.
         public void ConfigureServices(IServiceCollection services)
         {
-            var types = from t in Assembly.GetExecutingAssembly().GetTypes()
-                        where t.FullName.StartsWith("KCert.Services.") && !t.FullName.Contains("<")
-                        select t;
+            var types = Assembly.GetExecutingAssembly().GetTypes()
+                .Where(t => !t.IsNested && t.Namespace == "KCert.Services")
+                .ToList();
 
             foreach (var type in types)
             {
