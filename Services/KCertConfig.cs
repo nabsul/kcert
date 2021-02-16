@@ -1,9 +1,8 @@
 ﻿using Microsoft.Extensions.Configuration;
 using System;
 
-namespace KCert.Lib
+namespace KCert.Services
 {
-    [Service]
     public class KCertConfig
     {
         private readonly IConfiguration _cfg;

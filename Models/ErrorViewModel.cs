@@ -1,5 +1,3 @@
-using System;
-
 namespace KCert.Models
 {
     public class ErrorViewModel

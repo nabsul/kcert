@@ -1,6 +1,6 @@
-﻿namespace KCert.Lib.AcmeModels
+﻿namespace KCert.Models
 {
-    public class ChallengeResponse : AcmeResponse
+    public class AcmeChallengeResponse : AcmeResponse
     {
         public string Type { get; set; }
         public string Url { get; set; }

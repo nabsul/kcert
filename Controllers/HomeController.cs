@@ -2,12 +2,12 @@
 using Microsoft.AspNetCore.Mvc;
 using KCert.Models;
 using System.Threading.Tasks;
-using KCert.Lib;
 using k8s.Models;
 using System.Collections.Generic;
 using System.Linq;
 using Microsoft.Extensions.Logging;
 using System;
+using KCert.Services;
 
 namespace KCert.Controllers
 {

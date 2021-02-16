@@ -1,13 +1,13 @@
 ﻿using Amazon;
 using Amazon.SimpleEmail;
+using KCert.Models;
 using System;
 using System.Linq;
 using System.Net;
 using System.Threading.Tasks;
 
-namespace KCert.Lib
+namespace KCert.Services
 {
-    [Service]
     public class EmailClient
     {
         private const string CHARSET = "UTF8";

@@ -1,7 +1,7 @@
 ﻿using System;
 using System.Collections.Generic;
 
-namespace KCert.Lib
+namespace KCert.Models
 {
     public class RenewalResult
     {

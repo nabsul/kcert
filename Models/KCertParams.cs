@@ -4,7 +4,7 @@ using System.Collections.Generic;
 using System.Linq;
 using System.Text;
 
-namespace KCert.Lib
+namespace KCert.Models
 {
     public class KCertParams
     {
@@ -38,7 +38,7 @@ namespace KCert.Lib
                     {
                         throw new Exception($"Don't know how to get Property {p.Name} of type {p.PropertyType}");
                     }
-                    
+
                     result = func(Encoding.UTF8.GetString(value));
                 }
 

@@ -7,9 +7,8 @@ using System.Security.Cryptography.X509Certificates;
 using System.Text;
 using System.Text.Json;
 
-namespace KCert.Lib
+namespace KCert.Services
 {
-    [Service]
     public class CertClient
     {
         private const int PEMLineLen = 64;

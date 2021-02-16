@@ -1,13 +1,13 @@
 ﻿using k8s.Models;
+using KCert.Models;
 using Microsoft.Extensions.Logging;
 using Microsoft.Rest;
 using System.Collections.Generic;
 using System.Linq;
 using System.Threading.Tasks;
 
-namespace KCert.Lib
+namespace KCert.Services
 {
-    [Service]
     public class KCertClient
     {
         private readonly K8sClient _kube;

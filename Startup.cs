@@ -1,9 +1,11 @@
-using KCert.Lib;
 using Microsoft.AspNetCore.Builder;
 using Microsoft.AspNetCore.Hosting;
 using Microsoft.Extensions.Configuration;
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Hosting;
+using System;
+using System.Linq;
+using System.Reflection;
 
 namespace KCert
 {
@@ -19,7 +21,15 @@ namespace KCert
         // This method gets called by the runtime. Use this method to add services to the container.
         public void ConfigureServices(IServiceCollection services)
         {
-            services.AddKCertServices();
+            var types = from t in Assembly.GetExecutingAssembly().GetTypes()
+                        where t.FullName.StartsWith("KCert.Services.") && !t.FullName.Contains("<")
+                        select t;
+
+            foreach (var type in types)
+            {
+                services.AddSingleton(type);
+            }
+
             services.AddControllersWithViews();
         }
 

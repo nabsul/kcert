@@ -1,13 +1,12 @@
-﻿using Microsoft.Extensions.Logging;
+﻿using KCert.Models;
+using Microsoft.Extensions.Logging;
 using System;
 using System.Collections.Generic;
 using System.Linq;
-using System.Security.Cryptography;
 using System.Threading.Tasks;
 
-namespace KCert.Lib
+namespace KCert.Services
 {
-    [Service]
     public class RenewalHandler
     {
         private readonly AcmeClient _acme;

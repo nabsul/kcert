@@ -1,6 +1,6 @@
 ﻿using System.Text.Json.Serialization;
 
-namespace KCert.Lib.AcmeModels
+namespace KCert.Models
 {
     public class AcmeResponse
     {

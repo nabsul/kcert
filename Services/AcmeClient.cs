@@ -1,4 +1,4 @@
-﻿using KCert.Lib.AcmeModels;
+﻿using KCert.Models;
 using Microsoft.AspNetCore.Authentication;
 using System;
 using System.Collections.Generic;
@@ -9,9 +9,8 @@ using System.Text;
 using System.Text.Json;
 using System.Threading.Tasks;
 
-namespace KCert.Lib
+namespace KCert.Services
 {
-    [Service]
     public class AcmeClient
     {
         private const string DirFieldNewNonce = "newNonce";
@@ -35,10 +34,10 @@ namespace KCert.Lib
 
         private JsonDocument _dir;
 
-        public Task<AccountResponse> DeactivateAccountAsync(string key, string kid, string nonce) => PostAsync<AccountResponse>(key, new Uri(kid), new { status = "deactivated" }, kid, nonce);
-        public Task<OrderResponse> GetOrderAsync(string key, Uri uri, string kid, string nonce) => PostAsync<OrderResponse>(key, uri, null, kid, nonce);
-        public Task<AuthzResponse> GetAuthzAsync(string key, Uri authzUri, string kid, string nonce) => PostAsync<AuthzResponse>(key, authzUri, null, kid, nonce);
-        public Task<ChallengeResponse> TriggerChallengeAsync(string key, Uri challengeUri, string kid, string nonce) => PostAsync<ChallengeResponse>(key, challengeUri, new { }, kid, nonce);
+        public Task<AcmeAccountResponse> DeactivateAccountAsync(string key, string kid, string nonce) => PostAsync<AcmeAccountResponse>(key, new Uri(kid), new { status = "deactivated" }, kid, nonce);
+        public Task<AcmeOrderResponse> GetOrderAsync(string key, Uri uri, string kid, string nonce) => PostAsync<AcmeOrderResponse>(key, uri, null, kid, nonce);
+        public Task<AcmeAuthzResponse> GetAuthzAsync(string key, Uri authzUri, string kid, string nonce) => PostAsync<AcmeAuthzResponse>(key, authzUri, null, kid, nonce);
+        public Task<AcmeChallengeResponse> TriggerChallengeAsync(string key, Uri challengeUri, string kid, string nonce) => PostAsync<AcmeChallengeResponse>(key, challengeUri, new { }, kid, nonce);
 
         public async Task ReadDirectoryAsync(Uri dirUri)
         {
@@ -46,20 +45,20 @@ namespace KCert.Lib
             _dir = JsonDocument.Parse(await GetContentAsync(resp));
         }
 
-        public async Task<AccountResponse> CreateAccountAsync(string key, string email, string nonce, bool termsAccepted)
+        public async Task<AcmeAccountResponse> CreateAccountAsync(string key, string email, string nonce, bool termsAccepted)
         {
             var contact = new[] { $"mailto:{email}" };
             var payloadObject = new { contact, termsOfServiceAgreed = termsAccepted };
             var uri = GetFromDirectory(DirFieldNewAccount);
-            return await PostAsync<AccountResponse>(key, uri, payloadObject, nonce);
+            return await PostAsync<AcmeAccountResponse>(key, uri, payloadObject, nonce);
         }
 
-        public async Task<OrderResponse> CreateOrderAsync(string key, string kid, IEnumerable<string> hosts, string nonce)
+        public async Task<AcmeOrderResponse> CreateOrderAsync(string key, string kid, IEnumerable<string> hosts, string nonce)
         {
             var identifiers = hosts.Select(h => new { type = "dns", value = h }).ToArray();
             var payload = new { identifiers };
             var uri = GetFromDirectory(DirFieldNewOrder);
-            return await PostAsync<OrderResponse>(key, uri, payload, kid, nonce);
+            return await PostAsync<AcmeOrderResponse>(key, uri, payload, kid, nonce);
         }
 
         public async Task<string> GetCertAsync(string key, Uri certUri, string kid, string nonce)
@@ -70,10 +69,10 @@ namespace KCert.Lib
             return await resp.Content.ReadAsStringAsync();
         }
 
-        public async Task<OrderResponse> FinalizeOrderAsync(string key, Uri uri, string domain, string kid, string nonce)
+        public async Task<AcmeOrderResponse> FinalizeOrderAsync(string key, Uri uri, string domain, string kid, string nonce)
         {
             var csr = _cert.GetCsr(domain);
-            return await PostAsync<OrderResponse>(key, uri, new { csr }, kid, nonce);
+            return await PostAsync<AcmeOrderResponse>(key, uri, new { csr }, kid, nonce);
         }
 
         private async Task<T> PostAsync<T>(string key, Uri uri, object payloadObject, string nonce) where T : AcmeResponse
