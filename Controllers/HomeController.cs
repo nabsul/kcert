@@ -16,15 +16,15 @@ namespace KCert.Controllers
     {
         private readonly KCertClient _kcert;
         private readonly K8sClient _kube;
-        private readonly EmailClient _email;
+        private readonly CertClient _cert;
         private readonly ILogger<HomeController> _log;
 
-        public HomeController(KCertClient kcert, K8sClient kube, ILogger<HomeController> log, EmailClient email)
+        public HomeController(KCertClient kcert, K8sClient kube, ILogger<HomeController> log, CertClient cert)
         {
             _kcert = kcert;
             _kube = kube;
             _log = log;
-            _email = email;
+            _cert = cert;
         }
 
         [HttpGet]
@@ -32,7 +32,7 @@ namespace KCert.Controllers
         {
             var ingresses = await _kcert.GetAllIngressesAsync();
             var kcertIngress = await _kcert.GetKCertIngressAsync();
-            var hosts = kcertIngress.Spec.Rules.Select(r => r.Host).ToHashSet();
+            var hosts = kcertIngress?.Spec?.Rules?.Select(r => r.Host)?.ToHashSet() ?? new HashSet<string>();
             _log.LogInformation($"kcert hosts: {string.Join(";", hosts)}");
 
             var result = new List<HomeViewModel>();
@@ -41,15 +41,16 @@ namespace KCert.Controllers
             {
                 foreach (var tls in i.Spec.Tls)
                 {
-                    var s = tls.SecretName == null ? null : await _kube.GetSecretAsync(i.Namespace(), i.SecretName());
+                    var s = await _kube.GetSecretAsync(i.Namespace(), tls.SecretName);
+                    var cert = s == null ? null : _cert.GetCert(s);
                     result.Add(new HomeViewModel
                     {
                         Namespace = i.Namespace(),
                         IngressName = i.Name(),
                         SecretName = tls.SecretName,
                         Hosts = tls.Hosts.ToArray(),
-                        Created = s?.Cert()?.NotBefore,
-                        Expires = s?.Cert()?.NotAfter,
+                        Created = cert?.NotBefore,
+                        Expires = cert?.NotAfter,
                         HasChallengeEntry = tls.Hosts.All(h => hosts.Contains(h)),
                     });
                 }
@@ -88,7 +89,7 @@ namespace KCert.Controllers
             if (string.IsNullOrWhiteSpace(p.AcmeKey))
             {
                 _log.LogInformation("Generating new key");
-                p.AcmeKey = _kcert.GenerateNewKey();
+                p.AcmeKey = _cert.GenerateNewKey();
             }
 
             await _kcert.SaveConfigAsync(p);

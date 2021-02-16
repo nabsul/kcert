@@ -144,17 +144,17 @@ namespace KCert.Lib
             await _client.CreateNamespacedSecretAsync(secret, ns);
         }
 
-        public async Task<IList<Networkingv1beta1Ingress>> GetAllIngressesAsync()
+        public async Task<IList<V1Ingress>> GetAllIngressesAsync()
         {
-            var result = await _client.ListIngressForAllNamespaces2Async(labelSelector: $"kcert.dev/label={_cfg.Label}");
+            var result = await _client.ListIngressForAllNamespaces1Async(labelSelector: $"kcert.dev/label={_cfg.Label}");
             return result.Items;
         }
 
-        public async Task<Networkingv1beta1Ingress> GetIngressAsync(string ns, string name)
+        public async Task<V1Ingress> GetIngressAsync(string ns, string name)
         {
             try
             {
-                return await _client.ReadNamespacedIngress2Async(name, ns);
+                return await _client.ReadNamespacedIngress1Async(name, ns);
             }
             catch(HttpOperationException ex)
             {
@@ -167,16 +167,16 @@ namespace KCert.Lib
             }
         }
 
-        public async Task UpdateIngressAsync(Networkingv1beta1Ingress ingress)
+        public async Task UpdateIngressAsync(V1Ingress ingress)
         {
             var old = await GetIngressAsync(ingress.Namespace(), ingress.Name());
             if (old == null)
             {
-                await _client.CreateNamespacedIngress2Async(ingress, ingress.Namespace());
+                await _client.CreateNamespacedIngress1Async(ingress, ingress.Namespace());
                 return;
             }
 
-            await _client.ReplaceNamespacedIngress2Async(ingress, ingress.Name(), ingress.Namespace());
+            await _client.ReplaceNamespacedIngress1Async(ingress, ingress.Name(), ingress.Namespace());
         }
 
         public async Task UpdateTlsSecretAsync(string ns, string name, string key, string cert)

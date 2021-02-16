@@ -1,8 +1,6 @@
 # KCert: A Basic Let's Encrypt Cert Manager for Kubernetes
 
-Note: This is very experimental. Testers, feedback and feature requests are welcome, but please do not use in production environments.
-
-The goal of this project is to provide a simple, easy to run, easy to understand alternative to `cert-manager`:
+KCert aims to be the simple, easy to run, easy to understand alternative to [cert-manager](https://github.com/jetstack/cert-manager):
 
 - Instead of a Helm chart or 26000 lines of yaml, `KCert` deploys with less than 100 lines of yaml
 - Instead of custom resources, `KCert` uses the existing standard objects

@@ -1,13 +1,8 @@
 ﻿using k8s.Models;
-using Microsoft.AspNetCore.Authentication;
 using Microsoft.Extensions.Logging;
 using Microsoft.Rest;
-using System;
 using System.Collections.Generic;
 using System.Linq;
-using System.Security.Cryptography;
-using System.Text;
-using System.Text.Json;
 using System.Threading.Tasks;
 
 namespace KCert.Lib
@@ -17,30 +12,25 @@ namespace KCert.Lib
     {
         private readonly K8sClient _kube;
         private readonly RenewalHandler _getCert;
+        private readonly CertClient _cert;
         private readonly KCertConfig _cfg;
         private readonly ILogger<KCertClient> _log;
 
-        public KCertClient(K8sClient kube, KCertConfig cfg, RenewalHandler getCert, ILogger<KCertClient> log)
+        public KCertClient(K8sClient kube, KCertConfig cfg, RenewalHandler getCert, CertClient cert, ILogger<KCertClient> log)
         {
             _kube = kube;
             _cfg = cfg;
             _getCert = getCert;
+            _cert = cert;
             _log = log;
         }
 
-        public string GenerateNewKey()
-        {
-            var sign = ECDsa.Create();
-            sign.KeySize = 256;
-            return Base64UrlTextEncoder.Encode(sign.ExportECPrivateKey());
-        }
-
-        public async Task<IList<Networkingv1beta1Ingress>> GetAllIngressesAsync()
+        public async Task<IList<V1Ingress>> GetAllIngressesAsync()
         {
             return await _kube.GetAllIngressesAsync();
         }
 
-        public async Task<Networkingv1beta1Ingress> GetIngressAsync(string ns, string name)
+        public async Task<V1Ingress> GetIngressAsync(string ns, string name)
         {
             return await _kube.GetIngressAsync(ns, name);
         }
@@ -59,13 +49,7 @@ namespace KCert.Lib
         public async Task<string> GetThumbprintAsync()
         {
             var p = await GetConfigAsync();
-            var sign = GetSigner(p.AcmeKey);
-            var jwk = sign.GetJwk();
-            var jwkJson = JsonSerializer.Serialize(jwk);
-            var jwkBytes = Encoding.UTF8.GetBytes(jwkJson);
-            using var hasher = SHA256.Create();
-            var result = hasher.ComputeHash(jwkBytes);
-            return Base64UrlTextEncoder.Encode(result);
+            return _cert.GetThumbprint(p.AcmeKey);
         }
 
         public async Task<RenewalResult> GetCertAsync(string ns, string secretName)
@@ -74,13 +58,13 @@ namespace KCert.Lib
             var ingresses = await GetAllIngressesAsync();
             var tlsEntries = ingresses.Where(i => i.Namespace() == ns).SelectMany(i => i.Spec.Tls);
             var hosts = tlsEntries.Where(t => t.SecretName == secretName).SelectMany(t => t.Hosts).ToArray();
-            return await _getCert.GetCertAsync(ns, secretName, hosts, p, GetSigner(p.AcmeKey));
+            return await _getCert.GetCertAsync(ns, secretName, hosts, p);
         }
 
         public async Task SyncHostsAsync()
         {
             var ingresses = await GetAllIngressesAsync();
-            var allHosts = ingresses.SelectMany(i => i.Hosts()).Distinct().ToList();
+            var allHosts = ingresses.SelectMany(i => i.Spec.Rules.Select(r => r.Host)).Distinct().ToList();
             if (allHosts.Count == 0)
             {
                 _log.LogWarning("SyncHostsAsync: Nothing to do because there are no ingresses/hosts");
@@ -92,7 +76,7 @@ namespace KCert.Lib
             await _kube.UpdateIngressAsync(kcertIngress);
         }
 
-        public async Task<Networkingv1beta1Ingress> GetKCertIngressAsync()
+        public async Task<V1Ingress> GetKCertIngressAsync()
         {
             try
             {
@@ -109,9 +93,9 @@ namespace KCert.Lib
             }
         }
 
-        private Networkingv1beta1Ingress CreateKCertIngress()
+        private V1Ingress CreateKCertIngress()
         {
-            return new Networkingv1beta1Ingress
+            return new V1Ingress
             {
                 Metadata = new V1ObjectMeta
                 {
@@ -119,40 +103,35 @@ namespace KCert.Lib
                     NamespaceProperty = _cfg.KCertNamespace,
                     Annotations = new Dictionary<string, string> { { "kubernetes.io/ingress.class", "nginx" } },
                 },
-                Spec = new Networkingv1beta1IngressSpec(),
+                Spec = new V1IngressSpec(),
             };
         }
 
-        private Networkingv1beta1IngressRule CreateRule(string host)
+        private V1IngressRule CreateRule(string host)
         {
-            return new Networkingv1beta1IngressRule
+            return new V1IngressRule
             {
                 Host = host,
-                Http = new Networkingv1beta1HTTPIngressRuleValue
+                Http = new V1HTTPIngressRuleValue
                 {
-                    Paths = new List<Networkingv1beta1HTTPIngressPath>()
+                    Paths = new List<V1HTTPIngressPath>()
                     {
-                        new Networkingv1beta1HTTPIngressPath
+                        new V1HTTPIngressPath
                         {
                             Path = "/.well-known/acme-challenge/",
                             PathType = "Prefix",
-                            Backend = new Networkingv1beta1IngressBackend
+                            Backend = new V1IngressBackend
                             {
-                                ServiceName = _cfg.KCertServiceName,
-                                ServicePort = _cfg.KCertServicePort,
+                                Service = new V1IngressServiceBackend
+                                {
+                                    Name = _cfg.KCertServiceName,
+                                    Port = new V1ServiceBackendPort(name: _cfg.KCertServicePort)
+                                },
                             },
                         },
                     },
                 },
             };
-        }
-
-        private static ECDsa GetSigner(string key)
-        {
-            var sign = ECDsa.Create();
-            sign.KeySize = 256;
-            sign.ImportECPrivateKey(Base64UrlTextEncoder.Decode(key), out _);
-            return sign;
         }
     }
 }

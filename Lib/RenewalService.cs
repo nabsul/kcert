@@ -2,6 +2,7 @@
 using Microsoft.Extensions.Hosting;
 using Microsoft.Extensions.Logging;
 using System;
+using System.Linq;
 using System.Threading;
 using System.Threading.Tasks;
 
@@ -16,16 +17,18 @@ namespace KCert.Lib
         private readonly KCertClient _kcert;
         private readonly EmailClient _email;
         private readonly KCertConfig _cfg;
+        private readonly CertClient _cert;
         private readonly ILogger<RenewalService> _log;
         private int _numFailures = 0;
 
-        public RenewalService(ILogger<RenewalService> log, KCertConfig cfg, K8sClient k8s, KCertClient kcert, EmailClient email)
+        public RenewalService(ILogger<RenewalService> log, KCertConfig cfg, K8sClient k8s, KCertClient kcert, EmailClient email, CertClient cert)
         {
             _cfg = cfg;
             _log = log;
             _k8s = k8s;
             _kcert = kcert;
             _email = email;
+            _cert = cert;
         }
 
         public async Task StartAsync(CancellationToken cancellationToken)
@@ -72,16 +75,18 @@ namespace KCert.Lib
             _log.LogInformation("Checking for ingresses that need renewals...");
             foreach (var ingress in await _k8s.GetAllIngressesAsync())
             {
-                tok.ThrowIfCancellationRequested();
-                await TryRenewAsync(p, ingress, tok);
+                foreach  (var tls in ingress.Spec.Tls)
+                {
+                    tok.ThrowIfCancellationRequested();
+                    await TryRenewAsync(p, ingress, tls.SecretName, tok);
+                }
             }
             _log.LogInformation("Renewal check completed.");
         }
 
-        private async Task TryRenewAsync(KCertParams p, Networkingv1beta1Ingress ingress, CancellationToken tok)
+        private async Task TryRenewAsync(KCertParams p, V1Ingress ingress, string secretName, CancellationToken tok)
         {
             var ns = ingress.Namespace();
-            var secretName = ingress.SecretName();
             if (secretName == null)
             {
                 return;
@@ -93,15 +98,16 @@ namespace KCert.Lib
                 return;
             }
 
-            var cert = secret.Cert();
+            var cert = _cert.GetCert(secret);
+            var hosts = ingress.Spec.Rules.Select(r => r.Host);
             if (DateTime.UtcNow < cert.NotAfter - _cfg.RenewalExpirationLimit)
             {
-                _log.LogInformation($"{ingress.Namespace()} / {ingress.Name()} / {string.Join(',', ingress.Hosts())} doesn't need renewal");
+                _log.LogInformation($"{ingress.Namespace()} / {ingress.Name()} / {string.Join(',', hosts)} doesn't need renewal");
                 return;
             }
 
             tok.ThrowIfCancellationRequested();
-            _log.LogInformation($"Renewing: {ingress.Namespace()} / {ingress.Name()} / {string.Join(',', ingress.Hosts())}");
+            _log.LogInformation($"Renewing: {ingress.Namespace()} / {ingress.Name()} / {string.Join(',', hosts)}");
             var result = await _kcert.GetCertAsync(ingress.Namespace(), ingress.Name());
             await _email.NotifyRenewalResultAsync(p, result);
         }

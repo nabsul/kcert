@@ -13,17 +13,19 @@ namespace KCert.Lib
         private readonly AcmeClient _acme;
         private readonly K8sClient _kube;
         private readonly KCertConfig _cfg;
+        private readonly CertClient _cert;
         private readonly ILogger<RenewalHandler> _log;
 
-        public RenewalHandler(ILogger<RenewalHandler> log, AcmeClient acme, K8sClient kube, KCertConfig cfg)
+        public RenewalHandler(ILogger<RenewalHandler> log, AcmeClient acme, K8sClient kube, KCertConfig cfg, CertClient cert)
         {
             _log = log;
             _acme = acme;
             _kube = kube;
             _cfg = cfg;
+            _cert = cert;
         }
 
-        public async Task<RenewalResult> GetCertAsync(string ns, string secretName, string[] hosts, KCertParams p, ECDsa sign)
+        public async Task<RenewalResult> GetCertAsync(string ns, string secretName, string[] hosts, KCertParams p)
         {
             if (hosts.Length != 1)
             {
@@ -34,23 +36,22 @@ namespace KCert.Lib
 
             try
             {
-                var (kid, initNonce) = await InitAsync(sign, p.AcmeDirUrl, p.AcmeEmail, p.TermsAccepted);
+                var (kid, initNonce) = await InitAsync(p.AcmeKey, p.AcmeDirUrl, p.AcmeEmail, p.TermsAccepted);
                 LogInformation(result, $"Initialized renewal process for secret {ns}/{secretName} - hosts {string.Join(",", hosts)} - kid {kid}");
 
-                var (orderUri, finalizeUri, authorizations, orderNonce) = await CreateOrderAsync(sign, hosts, kid, initNonce);
+                var (orderUri, finalizeUri, authorizations, orderNonce) = await CreateOrderAsync(p.AcmeKey, hosts, kid, initNonce);
                 LogInformation(result, $"Order {orderUri} created with finalizeUri {finalizeUri}");
 
                 var validateNonce = orderNonce;
                 foreach (var authUrl in authorizations)
                 {
-                    validateNonce = await ValidateAuthorizationAsync(sign, kid, orderNonce, authUrl);
+                    validateNonce = await ValidateAuthorizationAsync(p.AcmeKey, kid, orderNonce, authUrl);
                     LogInformation(result, $"Validated auth: {authUrl}");
                 }
 
-                var rsa = RSA.Create(2048);
-                var (certUri, finalizeNonce) = await FinalizeOrderAsync(sign, rsa, orderUri, finalizeUri, hosts.First(), kid, validateNonce);
+                var (certUri, finalizeNonce) = await FinalizeOrderAsync(p.AcmeKey, orderUri, finalizeUri, hosts.First(), kid, validateNonce);
                 LogInformation(result, $"Finalized order and received cert URI: {certUri}");
-                await SaveCertAsync(sign, ns, secretName, rsa, certUri, kid, finalizeNonce);
+                await SaveCertAsync(p.AcmeKey, ns, secretName, certUri, kid, finalizeNonce);
                 LogInformation(result, $"Saved cert");
 
                 result.Success = true;
@@ -71,40 +72,40 @@ namespace KCert.Lib
             result.Logs.Add(message);
         }
 
-        private async Task<(string KID, string Nonce)> InitAsync(ECDsa sign, Uri acmeDir, string email, bool termsAccepted)
+        private async Task<(string KID, string Nonce)> InitAsync(string key, Uri acmeDir, string email, bool termsAccepted)
         {
             await _acme.ReadDirectoryAsync(acmeDir);
             var nonce = await _acme.GetNonceAsync();
-            var account = await _acme.CreateAccountAsync(sign, email, nonce, termsAccepted);
+            var account = await _acme.CreateAccountAsync(key, email, nonce, termsAccepted);
             var kid = account.Location;
             nonce = account.Nonce;
             return (kid, nonce);
         }
 
-        private async Task<(Uri OrderUri, Uri FinalizeUri, List<Uri> Authorizations, string Nonce)> CreateOrderAsync(ECDsa sign, string[] hosts, string kid, string nonce)
+        private async Task<(Uri OrderUri, Uri FinalizeUri, List<Uri> Authorizations, string Nonce)> CreateOrderAsync(string key, string[] hosts, string kid, string nonce)
         {
-            var order = await _acme.CreateOrderAsync(sign, kid, hosts, nonce);
+            var order = await _acme.CreateOrderAsync(key, kid, hosts, nonce);
             _log.LogInformation($"Created order: {order.Status}");
             var urls = order.Authorizations.Select(a => new Uri(a)).ToList();
             return (new Uri(order.Location), new Uri(order.Finalize), urls, order.Nonce);
         }
 
-        private async Task<string> ValidateAuthorizationAsync(ECDsa sign, string kid, string nonce, Uri authUri)
+        private async Task<string> ValidateAuthorizationAsync(string key, string kid, string nonce, Uri authUri)
         {
             var (waitTime, numRetries) = (_cfg.AcmeWaitTime, _cfg.AcmeNumRetries);
-            var auth = await _acme.GetAuthzAsync(sign, authUri, kid, nonce);
+            var auth = await _acme.GetAuthzAsync(key, authUri, kid, nonce);
             nonce = auth.Nonce;
             _log.LogInformation($"Get Auth {authUri}: {auth.Status}");
 
             var challengeUri = new Uri(auth.Challenges.FirstOrDefault(c => c.Type == "http-01")?.Url);
-            var chall = await _acme.TriggerChallengeAsync(sign, challengeUri, kid, nonce);
+            var chall = await _acme.TriggerChallengeAsync(key, challengeUri, kid, nonce);
             nonce = chall.Nonce;
             _log.LogInformation($"TriggerChallenge {challengeUri}: {chall.Status}");
 
             do
             {
                 await Task.Delay(waitTime);
-                auth = await _acme.GetAuthzAsync(sign, authUri, kid, nonce);
+                auth = await _acme.GetAuthzAsync(key, authUri, kid, nonce);
                 nonce = auth.Nonce;
                 _log.LogInformation($"Get Auth {authUri}: {auth.Status}");
             } while (numRetries-- > 0 && !auth.Challenges.Any(c => c.Status == "valid"));
@@ -117,17 +118,17 @@ namespace KCert.Lib
             return nonce;
         }
 
-        private async Task<(Uri CertUri, string Nonce)> FinalizeOrderAsync(ECDsa sign, RSA rsa, Uri orderUri, Uri finalizeUri,
+        private async Task<(Uri CertUri, string Nonce)> FinalizeOrderAsync(string key, Uri orderUri, Uri finalizeUri,
             string domain, string kid, string nonce)
         {
             var (waitTime, numRetries) = (_cfg.AcmeWaitTime, _cfg.AcmeNumRetries);
-            var finalize = await _acme.FinalizeOrderAsync(rsa, sign, finalizeUri, domain, kid, nonce);
+            var finalize = await _acme.FinalizeOrderAsync(key, finalizeUri, domain, kid, nonce);
             _log.LogInformation($"Finalize {finalizeUri}: {finalize.Status}");
 
             while(numRetries-- >= 0 && finalize.Status != "valid")
             {
                 await Task.Delay(waitTime);
-                finalize = await _acme.GetOrderAsync(sign, orderUri, kid, finalize.Nonce);
+                finalize = await _acme.GetOrderAsync(key, orderUri, kid, finalize.Nonce);
                 _log.LogInformation($"Check Order {orderUri}: {finalize.Status}");
             }
 
@@ -139,11 +140,11 @@ namespace KCert.Lib
             return (new Uri(finalize.Certificate), finalize.Nonce);
         }
 
-        private async Task SaveCertAsync(ECDsa sign, string ns, string secretName, RSA rsa, Uri certUri, string kid, string nonce)
+        private async Task SaveCertAsync(string key, string ns, string secretName, Uri certUri, string kid, string nonce)
         {
-            var cert = await _acme.GetCertAsync(sign, certUri, kid, nonce);
-            var key = rsa.GetPemKey();
-            await _kube.UpdateTlsSecretAsync(ns, secretName, key, cert);
+            var cert = await _acme.GetCertAsync(key, certUri, kid, nonce);
+            var pem = _cert.GetPemKey();
+            await _kube.UpdateTlsSecretAsync(ns, secretName, pem, cert);
         }
     }
 }

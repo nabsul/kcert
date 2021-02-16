@@ -1,5 +1,5 @@
 ﻿@inject K8sClient _kube
-@model (List<HomeViewModel>, Networkingv1beta1Ingress)
+@model (List<HomeViewModel>, V1Ingress)
 @{ ViewData["Title"] = "Ingress";
     var (ingresses, kcertIngress) = Model; }
 
