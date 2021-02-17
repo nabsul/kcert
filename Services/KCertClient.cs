@@ -125,7 +125,7 @@ namespace KCert.Services
                                 Service = new V1IngressServiceBackend
                                 {
                                     Name = _cfg.KCertServiceName,
-                                    Port = new V1ServiceBackendPort(name: _cfg.KCertServicePort)
+                                    Port = new V1ServiceBackendPort(number: _cfg.KCertServicePort)
                                 },
                             },
                         },

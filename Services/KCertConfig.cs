@@ -18,13 +18,12 @@ namespace KCert.Services
         public string KCertSecretName => _cfg.GetValue<string>("SecretName");
         public string KCertServiceName => _cfg.GetValue<string>("ServiceName");
         public string KCertIngressName => _cfg.GetValue<string>("IngressName");
-        public string KCertServicePort => _cfg.GetValue<string>("ServicePort");
+        public int KCertServicePort => _cfg.GetValue<int>("ServicePort");
 
         public TimeSpan AcmeWaitTime => TimeSpan.FromSeconds(_cfg.GetValue<int>("AcmeWaitTimeSeconds"));
         public int AcmeNumRetries => _cfg.GetValue<int>("AcmeNumRetries");
 
         public TimeSpan RenewalTimeBetweenChekcs => TimeSpan.FromHours(_cfg.GetValue<int>("RenewalCheckTimeHours"));
         public TimeSpan RenewalExpirationLimit => TimeSpan.FromDays(_cfg.GetValue<int>("RenewalExpirationRenewalDays"));
-        public TimeSpan IngressUpdateWaitTime => TimeSpan.FromSeconds(_cfg.GetValue<int>("IngressUpdateWaitSeconds"));
     }
 }

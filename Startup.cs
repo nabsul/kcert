@@ -23,7 +23,7 @@ namespace KCert
         {
             foreach (var type in GetServiceTypes())
             {
-                services.AddSingleton(type);
+                services.AddScoped(type);
             }
 
             services.AddControllersWithViews();
@@ -47,7 +47,7 @@ namespace KCert
             app.UseEndpoints(endpoints => endpoints.MapControllers());
         }
 
-        private IEnumerable<Type> GetServiceTypes()
+        private static IEnumerable<Type> GetServiceTypes()
         {
             return Assembly.GetExecutingAssembly().GetTypes()
                 .Where(t => !t.IsNested && t.Namespace == "KCert.Services");
