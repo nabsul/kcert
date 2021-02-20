@@ -1,7 +1,5 @@
 ﻿@model RenewalException
-@{
-    ViewData["Title"] = $"Cert Creation - {Model.SecretNamespace}/{Model.SecretName}";
-}
+@{ ViewData["Title"] = $"Cert Creation - {Model.SecretNamespace}/{Model.SecretName}"; }
 
 <h1>Certificate Renewal Results: @Model.SecretNamespace/@Model.SecretName</h1>
 
@@ -13,10 +11,16 @@
 <ul>
     @foreach (var line in Model.Logs)
     {
-        <li>@line</li>            
-    }
+<li>@line</li>
+}
 </ul>
 
-<pre>@Model.InnerException.GetType().Name</pre>
+<h2>Exception</h2>
+<pre>@Model.GetType().Name</pre>
 <pre>@Model.Message</pre>
 <pre>@Model.StackTrace</pre>
+
+<h2>Inner Exception</h2>
+<pre>@Model.InnerException.GetType().Name</pre>
+<pre>@Model.InnerException.Message</pre>
+<pre>@Model.InnerException.StackTrace</pre>
