@@ -106,8 +106,15 @@ namespace KCert.Controllers
         [HttpGet("renew/{ns}/{secretName}")]
         public async Task<IActionResult> RenewAsync(string ns, string secretName)
         {
-            var result = await _kcert.GetCertAsync(ns, secretName);
-            return View(result);
+            try
+            {
+                await _kcert.GetCertAsync(ns, secretName);
+                return RedirectToAction("Index");
+            }
+            catch (RenewalException ex)
+            {
+                return View("RenewError", ex);
+            }
         }
 
         [Route("error")]

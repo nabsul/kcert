@@ -24,51 +24,51 @@ namespace KCert.Services
             _cert = cert;
         }
 
-        public async Task<RenewalResult> GetCertAsync(string ns, string secretName, string[] hosts, KCertParams p)
+        public async Task GetCertAsync(string ns, string secretName, string[] hosts, KCertParams p)
         {
             if (hosts.Length != 1)
             {
                 throw new Exception($"Secret {ns}:{secretName} does must have one and only one host configured in ingresses. Found {hosts.Length}: {string.Join(",", hosts)}");
             }
 
-            var result = new RenewalResult { SecretNamespace = ns, SecretName = secretName };
+            var logs = new List<string>();
 
             try
             {
                 var (kid, initNonce) = await InitAsync(p.AcmeKey, p.AcmeDirUrl, p.AcmeEmail, p.TermsAccepted);
-                LogInformation(result, $"Initialized renewal process for secret {ns}/{secretName} - hosts {string.Join(",", hosts)} - kid {kid}");
+                LogInformation(logs, $"Initialized renewal process for secret {ns}/{secretName} - hosts {string.Join(",", hosts)} - kid {kid}");
 
                 var (orderUri, finalizeUri, authorizations, orderNonce) = await CreateOrderAsync(p.AcmeKey, hosts, kid, initNonce);
-                LogInformation(result, $"Order {orderUri} created with finalizeUri {finalizeUri}");
+                LogInformation(logs, $"Order {orderUri} created with finalizeUri {finalizeUri}");
 
                 var validateNonce = orderNonce;
                 foreach (var authUrl in authorizations)
                 {
                     validateNonce = await ValidateAuthorizationAsync(p.AcmeKey, kid, orderNonce, authUrl);
-                    LogInformation(result, $"Validated auth: {authUrl}");
+                    LogInformation(logs, $"Validated auth: {authUrl}");
                 }
 
                 var (certUri, finalizeNonce) = await FinalizeOrderAsync(p.AcmeKey, orderUri, finalizeUri, hosts.First(), kid, validateNonce);
-                LogInformation(result, $"Finalized order and received cert URI: {certUri}");
+                LogInformation(logs, $"Finalized order and received cert URI: {certUri}");
                 await SaveCertAsync(p.AcmeKey, ns, secretName, certUri, kid, finalizeNonce);
-                LogInformation(result, $"Saved cert");
-
-                result.Success = true;
+                LogInformation(logs, $"Saved cert");
             }
             catch (Exception ex)
             {
-                _log.LogError(ex, "Renew failed");
-                result.Success = false;
-                result.Error = ex;
+                _log.LogError(ex, ex.Message);
+                throw new RenewalException(ex.Message, ex)
+                {
+                    SecretNamespace = ns,
+                    SecretName = secretName,
+                    Logs = logs,
+                };
             }
-
-            return result;
         }
 
-        private void LogInformation(RenewalResult result, string message)
+        private void LogInformation(List<string> logs, string message)
         {
             _log.LogInformation(message);
-            result.Logs.Add(message);
+            logs.Add($"[INFORMATION {DateTime.UtcNow:s}] {message}");
         }
 
         private async Task<(string KID, string Nonce)> InitAsync(string key, Uri acmeDir, string email, bool termsAccepted)

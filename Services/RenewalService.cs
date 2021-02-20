@@ -108,8 +108,16 @@ namespace KCert.Services
 
             tok.ThrowIfCancellationRequested();
             _log.LogInformation($"Renewing: {ingress.Namespace()} / {ingress.Name()} / {string.Join(',', hosts)}");
-            var result = await _kcert.GetCertAsync(ingress.Namespace(), ingress.Name());
-            await _email.NotifyRenewalResultAsync(p, result);
+
+            try
+            {
+                await _kcert.GetCertAsync(ingress.Namespace(), ingress.Name());
+                await _email.NotifyRenewalResultAsync(p, ingress.Namespace(), ingress.Name(), null);
+            }
+            catch (RenewalException ex)
+            {
+                await _email.NotifyRenewalResultAsync(p, ingress.Namespace(), ingress.Name(), ex);
+            }
         }
     }
 }
