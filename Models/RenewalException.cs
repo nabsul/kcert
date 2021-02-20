@@ -3,12 +3,12 @@ using System.Collections.Generic;
 
 namespace KCert.Models
 {
-    public class RenewalResult
+    public class RenewalException : Exception
     {
         public string SecretNamespace { get; set; }
         public string SecretName { get; set; }
-        public bool Success { get; set; }
-        public List<string> Logs { get; set; } = new List<string>();
-        public Exception Error { get; set; }
+        public List<string> Logs { get; set; }
+
+        public RenewalException(string message, Exception inner) : base(message, inner) { }
     }
 }

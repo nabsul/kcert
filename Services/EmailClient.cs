@@ -2,6 +2,7 @@
 using Amazon.SimpleEmail;
 using KCert.Models;
 using System;
+using System.Collections.Generic;
 using System.Linq;
 using System.Net;
 using System.Threading.Tasks;
@@ -19,9 +20,9 @@ namespace KCert.Services
             await SendAsync(p, TestSubject, TestMessage);
         }
 
-        public async Task NotifyRenewalResultAsync(KCertParams p, RenewalResult result)
+        public async Task NotifyRenewalResultAsync(KCertParams p, string secretNamespace, string secretName, RenewalException ex)
         {
-            await SendAsync(p, RenewalSubject(result), RenewalMessage(result));
+            await SendAsync(p, RenewalSubject(secretNamespace, secretName, ex), RenewalMessage(secretNamespace, secretName, ex));
         }
 
         private static async Task SendAsync(KCertParams p, string subject, string text)
@@ -56,21 +57,23 @@ namespace KCert.Services
             return !allFields.Any(string.IsNullOrWhiteSpace);
         }
 
-        private static string RenewalSubject(RenewalResult result)
+        private static string RenewalSubject(string secretNamespace, string secretName, RenewalException ex = null)
         {
-            var status = result.Success ? "succeeded" : "failed";
-            return $"KCert Renewal of secret [{result.SecretName}] {status}";
+            var isSuccess = ex == null;
+            var status = isSuccess ? "succeeded" : "failed";
+            return $"KCert Renewal of secret [{secretNamespace}:{secretName}] {status}";
         }
 
-        private static string RenewalMessage(RenewalResult result)
+        private static string RenewalMessage(string secretNamespace, string secretName, RenewalException ex = null)
         {
-            var lines = new[]
+            var isSuccess = ex == null;
+            var lines = new List<string>() { $"Renewal of secret [{secretNamespace}:{secretName}] completed with status: " + (isSuccess ? "Success" : "Failure") };
+            if (!isSuccess)
             {
-                $"Renewal of secret [{result.SecretNamespace}] [{result.SecretName}] completed with status: " + (result.Success ? "Success" : "Failure"),
-                "\nLogs:\n",
-                string.Join('\n', result.Logs),
-                result.Error == null ? "" : $"Error:\n\n{result.Error.Message}\n\n{result.Error.StackTrace}"
-            };
+                lines.Add("\nLogs:\n");
+                lines.Add(string.Join('\n', ex.Logs));
+                lines.Add($"Error:\n\n{ex.Message}\n\n{ex.StackTrace}");
+            }
 
             return string.Join('\n', lines);
         }
