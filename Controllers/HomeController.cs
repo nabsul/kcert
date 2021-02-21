@@ -30,9 +30,7 @@ namespace KCert.Controllers
         {
             var secrets = await _kube.GetAllSecretsAsync();
             var ingress = await _kcert.GetKCertIngressAsync();
-            var configuredHosts = ingress.Spec.Rules.Select(r => r.Host).ToHashSet();
-            var entries = secrets.Select(s => new HomeViewModel(s, configuredHosts, _cert)).ToArray();
-            return View(entries);
+            return View((secrets, ingress));
         }
 
         [HttpGet("configuration")]

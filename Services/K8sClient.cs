@@ -3,6 +3,7 @@ using k8s.Models;
 using Microsoft.Rest;
 using System;
 using System.Collections.Generic;
+using System.Linq;
 using System.Net;
 using System.Text;
 using System.Threading.Tasks;
@@ -27,10 +28,10 @@ namespace KCert.Services
             _client = new Kubernetes(k8sCfg);
         }
 
-        public async Task<IList<V1Secret>> GetAllSecretsAsync()
+        public async Task<List<V1Secret>> GetAllSecretsAsync()
         {
-            var result = await _client.ListSecretForAllNamespacesAsync(fieldSelector: "type=kubernetes.io/tls");
-            return result.Items;
+            var result = await _client.ListSecretForAllNamespacesAsync(fieldSelector: "type=kubernetes.io/tls", labelSelector: $"kcert.dev/label={_cfg.Label}");
+            return result.Items.ToList();
         }
 
         public async Task<V1Secret> GetSecretAsync(string ns, string name)

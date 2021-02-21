@@ -1,10 +1,12 @@
-﻿@inject K8sClient _kube
-@model HomeViewModel[]
+﻿@inject CertClient _cert
+@model (List<V1Secret>, V1Ingress)
 @{ 
     ViewData["Title"] = "Ingress";
+    var (secrets, ingress) = Model;
+    var configuredHosts = ingress.Spec.Rules.Select(r => r.Host).ToHashSet();
 }
 
-<h2>Cluster TLS Secrets</h2>
+<h2>Managed TLS Secrets</h2>
 
 <div>
     <table class="table">
@@ -20,16 +22,19 @@
             </tr>
         </thead>
         <tbody>
-            @foreach (var row in Model)
+            @foreach (var row in secrets)
             {
+                var cert = _cert.GetCert(row);
+                var hosts = _cert.GetHosts(cert);
+                var isConfigured = hosts.All(h => configuredHosts.Contains(h));
             <tr>
-                <td>@row.Namespace</td>
-                <td>@row.SecretName</td>
-                <td>@Html.Raw(string.Join("<br>", row.Hosts.Select(h => $"<a target='_blank' href='https://{h}'>{h}</a>")))</td>
-                <td>@row.Created?.ToString("s")</td>
-                <td>@row.Expires?.ToString("s")</td>
-                <td><a class="btn btn-@(row.HasChallengeEntry ? "success" : "danger")">@(row.HasChallengeEntry ? "configured" : "unconfigured")</a></td>
-                <td><a class="btn btn-primary" asp-action="Renew" asp-route-ns="@row.Namespace" asp-route-secretName="@row.SecretName">Renew</a></td>
+                <td>@row.Namespace()</td>
+                <td>@row.Name()</td>
+                <td>@Html.Raw(string.Join("<br>", hosts.Select(h => $"<a target='_blank' href='https://{h}'>{h}</a>")))</td>
+                <td>@cert?.NotBefore.ToString("s")</td>
+                <td>@cert?.NotAfter.ToString("s")</td>
+                <td><a class="btn btn-@(isConfigured ? "success" : "danger")">@(isConfigured ? "configured" : "unconfigured")</a></td>
+                <td><a class="btn btn-primary" asp-action="Renew" asp-route-ns="@row.Namespace()" asp-route-secretName="@row.Name()">Renew</a></td>
             </tr>           
             }
         </tbody>

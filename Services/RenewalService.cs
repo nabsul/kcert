@@ -1,6 +1,5 @@
 ﻿using k8s.Models;
 using KCert.Models;
-using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Hosting;
 using Microsoft.Extensions.Logging;
 using System;
@@ -13,127 +12,120 @@ namespace KCert.Services
     public class RenewalService : IHostedService
     {
         private const int MaxServiceFailures = 5;
-        private readonly IServiceProvider _services;
 
-        public RenewalService(IServiceProvider services)
+        private readonly ILogger<RenewalService> _log;
+        private readonly KCertClient _kcert;
+        private readonly KCertConfig _cfg;
+        private readonly K8sClient _k8s;
+        private readonly CertClient _cert;
+        private readonly EmailClient _email;
+
+        public RenewalService(ILogger<RenewalService> log, KCertClient kcert, KCertConfig cfg, K8sClient k8s, CertClient cert, EmailClient email)
         {
-            _services = services;
+            _log = log;
+            _kcert = kcert;
+            _cfg = cfg;
+            _k8s = k8s;
+            _cert = cert;
+            _email = email;
         }
 
         public Task StopAsync(CancellationToken cancellationToken) => Task.CompletedTask;
 
         public async Task StartAsync(CancellationToken cancellationToken)
         {
-            // The IHosted service is created as a singleton, but all other services are scoped
-            // For this reason, we have to create a scope and manually fetch the services
-            using var scope = _services.CreateScope();
-            var log = scope.ServiceProvider.GetService<ILogger<RenewalService>>();
-
             int numFailures = 0;
             while (numFailures < MaxServiceFailures && !cancellationToken.IsCancellationRequested)
             {
-                log.LogInformation("Starting up renewal service.");
+                _log.LogInformation("Starting up renewal service.");
                 try
                 {
-                    await RunLoopAsync(scope, cancellationToken);
+                    await RunLoopAsync(cancellationToken);
                 }
                 catch (TaskCanceledException ex)
                 {
-                    log.LogError(ex, "Renewal loop cancelled.");
+                    _log.LogError(ex, "Renewal loop cancelled.");
                     break;
                 }
                 catch (Exception ex)
                 {
                     numFailures++;
-                    log.LogError(ex, $"Renewal Service encountered error {numFailures} of max {MaxServiceFailures}");
+                    _log.LogError(ex, $"Renewal Service encountered error {numFailures} of max {MaxServiceFailures}");
                 }
             }
         }
 
-        private async Task RunLoopAsync(IServiceScope scope, CancellationToken tok)
+        private async Task RunLoopAsync(CancellationToken tok)
         {
-            var cfg = scope.ServiceProvider.GetService<KCertConfig>();
-
             while (true)
             {
                 tok.ThrowIfCancellationRequested();
-                await StartRenewalJobAsync(scope, tok);
-                await Task.Delay(cfg.RenewalTimeBetweenChekcs, tok);
+                await StartRenewalJobAsync(tok);
+                await Task.Delay(_cfg.RenewalTimeBetweenChekcs, tok);
             }
         }
 
-        private async Task StartRenewalJobAsync(IServiceScope scope, CancellationToken tok)
+        private async Task StartRenewalJobAsync(CancellationToken tok)
         {
-            var log = scope.ServiceProvider.GetService<ILogger<RenewalService>>();
-            var k8s = scope.ServiceProvider.GetService<K8sClient>();
-            var kcert = scope.ServiceProvider.GetService<KCertClient>();
-
-            var p = await kcert.GetConfigAsync();
+            var p = await _kcert.GetConfigAsync();
             if (!(p?.EnableAutoRenew ?? false))
             {
                 return;
             }
 
-            log.LogInformation("Checking for ingresses that need renewals...");
-            foreach (var ingress in await k8s.GetAllIngressesAsync())
+            _log.LogInformation("Checking for ingresses that need renewals...");
+            foreach (var ingress in await _k8s.GetAllIngressesAsync())
             {
                 foreach (var tls in ingress.Spec.Tls)
                 {
                     tok.ThrowIfCancellationRequested();
-                    await TryRenewAsync(scope, p, ingress, tls.SecretName, tok);
+                    await TryRenewAsync(p, ingress, tls.SecretName, tok);
                 }
             }
-            log.LogInformation("Renewal check completed.");
+            
+            _log.LogInformation("Renewal check completed.");
         }
 
-        private async Task TryRenewAsync(IServiceScope scope, KCertParams p, V1Ingress ingress, string secretName, CancellationToken tok)
+        private async Task TryRenewAsync(KCertParams p, V1Ingress ingress, string secretName, CancellationToken tok)
         {
-            var log = scope.ServiceProvider.GetService<ILogger<RenewalService>>();
-            var kcert = scope.ServiceProvider.GetService<KCertClient>();
-            var email = scope.ServiceProvider.GetService<EmailClient>();
-
             var hosts = ingress.Spec.Rules.Select(r => r.Host);
 
-            if (!await NeedsRenewalAsync(scope, ingress, secretName))
+            if (!await NeedsRenewalAsync(ingress, secretName))
             {
-                log.LogInformation($"{ingress.Namespace()} / {ingress.Name()} / {string.Join(',', hosts)} doesn't need renewal");
+                _log.LogInformation($"{ingress.Namespace()} / {ingress.Name()} / {string.Join(',', hosts)} doesn't need renewal");
                 return;
             }
 
             tok.ThrowIfCancellationRequested();
-            log.LogInformation($"Renewing: {ingress.Namespace()} / {ingress.Name()} / {string.Join(',', hosts)}");
+            _log.LogInformation($"Renewing: {ingress.Namespace()} / {ingress.Name()} / {string.Join(',', hosts)}");
 
             try
             {
-                await kcert.GetCertAsync(ingress.Namespace(), ingress.Name());
-                await email.NotifyRenewalResultAsync(p, ingress.Namespace(), ingress.Name(), null);
+                await _kcert.GetCertAsync(ingress.Namespace(), ingress.Name());
+                await _email.NotifyRenewalResultAsync(p, ingress.Namespace(), ingress.Name(), null);
             }
             catch (RenewalException ex)
             {
-                await email.NotifyRenewalResultAsync(p, ingress.Namespace(), ingress.Name(), ex);
+                await _email.NotifyRenewalResultAsync(p, ingress.Namespace(), ingress.Name(), ex);
             }
         }
 
-        private async Task<bool> NeedsRenewalAsync(IServiceScope scope, V1Ingress ingress, string secretName)
+        private async Task<bool> NeedsRenewalAsync(V1Ingress ingress, string secretName)
         {
-            var k8s = scope.ServiceProvider.GetService<K8sClient>();
-            var cert = scope.ServiceProvider.GetService<CertClient>();
-            var cfg = scope.ServiceProvider.GetService<KCertConfig>();
-
             var ns = ingress.Namespace();
             if (secretName == null)
             {
                 return false;
             }
 
-            var secret = await k8s.GetSecretAsync(ns, secretName);
+            var secret = await _k8s.GetSecretAsync(ns, secretName);
             if (secret == null)
             {
                 return false;
             }
 
-            var c = cert.GetCert(secret);
-            if (DateTime.UtcNow < c.NotAfter - cfg.RenewalExpirationLimit)
+            var c = _cert.GetCert(secret);
+            if (DateTime.UtcNow < c.NotAfter - _cfg.RenewalExpirationLimit)
             {
                 return false;
             }
