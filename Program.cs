@@ -15,7 +15,7 @@ namespace KCert
             Host.CreateDefaultBuilder(args)
              .ConfigureAppConfiguration((ctx, cfg) => cfg.AddEnvironmentVariables(prefix: EnvironmentPrefix))
              .ConfigureWebHostDefaults(webBuilder => webBuilder.UseStartup<Startup>())
-             .ConfigureServices(services => services.AddHostedService<RenewalServiceWrapper>())
+             .ConfigureServices(services => services.AddHostedService<RenewalService>())
              .Build().Run();
         }
     }

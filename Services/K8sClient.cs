@@ -27,6 +27,12 @@ namespace KCert.Services
             _client = new Kubernetes(k8sCfg);
         }
 
+        public async Task<IList<V1Secret>> GetAllSecretsAsync()
+        {
+            var result = await _client.ListSecretForAllNamespacesAsync(fieldSelector: "type=kubernetes.io/tls");
+            return result.Items;
+        }
+
         public async Task<V1Secret> GetSecretAsync(string ns, string name)
         {
             try

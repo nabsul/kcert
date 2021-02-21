@@ -2,8 +2,6 @@
 using Microsoft.AspNetCore.Mvc;
 using KCert.Models;
 using System.Threading.Tasks;
-using k8s.Models;
-using System.Collections.Generic;
 using System.Linq;
 using Microsoft.Extensions.Logging;
 using System;
@@ -30,33 +28,11 @@ namespace KCert.Controllers
         [HttpGet]
         public async Task<IActionResult> IndexAsync()
         {
-            var ingresses = await _kcert.GetAllIngressesAsync();
-            var kcertIngress = await _kcert.GetKCertIngressAsync();
-            var hosts = kcertIngress?.Spec?.Rules?.Select(r => r.Host)?.ToHashSet() ?? new HashSet<string>();
-            _log.LogInformation($"kcert hosts: {string.Join(";", hosts)}");
-
-            var result = new List<HomeViewModel>();
-            
-            foreach (var i in ingresses)
-            {
-                foreach (var tls in i.Spec.Tls)
-                {
-                    var s = await _kube.GetSecretAsync(i.Namespace(), tls.SecretName);
-                    var cert = s == null ? null : _cert.GetCert(s);
-                    result.Add(new HomeViewModel
-                    {
-                        Namespace = i.Namespace(),
-                        IngressName = i.Name(),
-                        SecretName = tls.SecretName,
-                        Hosts = tls.Hosts.ToArray(),
-                        Created = cert?.NotBefore,
-                        Expires = cert?.NotAfter,
-                        HasChallengeEntry = tls.Hosts.All(h => hosts.Contains(h)),
-                    });
-                }
-            }
-
-            return View((result, kcertIngress));
+            var secrets = await _kube.GetAllSecretsAsync();
+            var ingress = await _kcert.GetKCertIngressAsync();
+            var configuredHosts = ingress.Spec.Rules.Select(r => r.Host).ToHashSet();
+            var entries = secrets.Select(s => new HomeViewModel(s, configuredHosts, _cert)).ToArray();
+            return View(entries);
         }
 
         [HttpGet("configuration")]

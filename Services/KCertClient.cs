@@ -25,6 +25,7 @@ namespace KCert.Services
             _log = log;
         }
 
+
         public async Task<IList<V1Ingress>> GetAllIngressesAsync()
         {
             return await _kube.GetAllIngressesAsync();
@@ -64,7 +65,7 @@ namespace KCert.Services
         public async Task SyncHostsAsync()
         {
             var ingresses = await GetAllIngressesAsync();
-            var allHosts = ingresses.SelectMany(i => i.Spec.Rules.Select(r => r.Host)).Distinct().ToList();
+            var allHosts = ingresses.SelectMany(i => i.Spec.Tls.SelectMany(r => r.Hosts)).Distinct().ToList();
             if (allHosts.Count == 0)
             {
                 _log.LogWarning("SyncHostsAsync: Nothing to do because there are no ingresses/hosts");

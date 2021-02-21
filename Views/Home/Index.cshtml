@@ -1,22 +1,18 @@
 ﻿@inject K8sClient _kube
-@model (List<HomeViewModel>, V1Ingress)
-@{ ViewData["Title"] = "Ingress";
-    var (ingresses, kcertIngress) = Model; }
+@model HomeViewModel[]
+@{ 
+    ViewData["Title"] = "Ingress";
+}
 
-<h2>Managed Ingresses</h2>
-
-<form method="post" asp-action="SyncChallengeHosts">
-    <button type="submit" class="btn btn-primary">Sync Challenge Routes</button>
-</form>
+<h2>Cluster TLS Secrets</h2>
 
 <div>
     <table class="table">
         <thead>
             <tr>
                 <th scope="col">Namespace</th>
-                <th scope="col">Name</th>
+                <th scope="col">Secret</th>
                 <th scope="col">Hosts</th>
-                <th scope="col">Secret Name</th>
                 <th scope="col">Created</th>
                 <th scope="col">Expiration</th>
                 <th scope="col">Challenge Route</th>
@@ -24,18 +20,17 @@
             </tr>
         </thead>
         <tbody>
-            @foreach (var (idx, row) in ingresses.Select((m, i) => (i, m)))
+            @foreach (var row in Model)
             {
-<tr>
-    <td>@row.Namespace</td>
-    <td>@row.IngressName</td>
-    <td>@Html.Raw(string.Join("<br>", row.Hosts.Select(h => $"<a target='_blank' href='https://{h}'>{h}</a>")))</td>
-    <td>@row.SecretName</td>
-    <td>@row.Created?.ToString("s")</td>
-    <td>@row.Expires?.ToString("s")</td>
-    <td><a class="btn btn-@(row.HasChallengeEntry ? "success" : "danger")">@(row.HasChallengeEntry ? "configured" : "not configured")</a></td>
-    <td><a class="btn btn-primary" asp-action="Renew" asp-route-ns="@row.Namespace" asp-route-secretName="@row.SecretName">Renew</a></td>
-</tr>           
+            <tr>
+                <td>@row.Namespace</td>
+                <td>@row.SecretName</td>
+                <td>@Html.Raw(string.Join("<br>", row.Hosts.Select(h => $"<a target='_blank' href='https://{h}'>{h}</a>")))</td>
+                <td>@row.Created?.ToString("s")</td>
+                <td>@row.Expires?.ToString("s")</td>
+                <td><a class="btn btn-@(row.HasChallengeEntry ? "success" : "danger")">@(row.HasChallengeEntry ? "configured" : "unconfigured")</a></td>
+                <td><a class="btn btn-primary" asp-action="Renew" asp-route-ns="@row.Namespace" asp-route-secretName="@row.SecretName">Renew</a></td>
+            </tr>           
             }
         </tbody>
     </table>
