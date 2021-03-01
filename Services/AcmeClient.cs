@@ -69,9 +69,9 @@ namespace KCert.Services
             return await resp.Content.ReadAsStringAsync();
         }
 
-        public async Task<AcmeOrderResponse> FinalizeOrderAsync(string key, Uri uri, string domain, string kid, string nonce)
+        public async Task<AcmeOrderResponse> FinalizeOrderAsync(string key, Uri uri, IEnumerable<string> hosts, string kid, string nonce)
         {
-            var csr = _cert.GetCsr(domain);
+            var csr = _cert.GetCsr(hosts);
             return await PostAsync<AcmeOrderResponse>(key, uri, new { csr }, kid, nonce);
         }
 

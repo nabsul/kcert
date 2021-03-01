@@ -26,11 +26,6 @@ namespace KCert.Services
 
         public async Task GetCertAsync(string ns, string secretName, string[] hosts, KCertParams p)
         {
-            if (hosts.Length != 1)
-            {
-                throw new Exception($"Secret {ns}:{secretName} does must have one and only one host configured in ingresses. Found {hosts.Length}: {string.Join(",", hosts)}");
-            }
-
             var logs = new List<string>();
 
             try
@@ -44,11 +39,11 @@ namespace KCert.Services
                 var validateNonce = orderNonce;
                 foreach (var authUrl in authorizations)
                 {
-                    validateNonce = await ValidateAuthorizationAsync(p.AcmeKey, kid, orderNonce, authUrl);
+                    validateNonce = await ValidateAuthorizationAsync(p.AcmeKey, kid, validateNonce, authUrl);
                     LogInformation(logs, $"Validated auth: {authUrl}");
                 }
 
-                var (certUri, finalizeNonce) = await FinalizeOrderAsync(p.AcmeKey, orderUri, finalizeUri, hosts.First(), kid, validateNonce);
+                var (certUri, finalizeNonce) = await FinalizeOrderAsync(p.AcmeKey, orderUri, finalizeUri, hosts, kid, validateNonce);
                 LogInformation(logs, $"Finalized order and received cert URI: {certUri}");
                 await SaveCertAsync(p.AcmeKey, ns, secretName, certUri, kid, finalizeNonce);
                 LogInformation(logs, $"Saved cert");
@@ -118,10 +113,10 @@ namespace KCert.Services
         }
 
         private async Task<(Uri CertUri, string Nonce)> FinalizeOrderAsync(string key, Uri orderUri, Uri finalizeUri,
-            string domain, string kid, string nonce)
+            IEnumerable<string> hosts, string kid, string nonce)
         {
             var (waitTime, numRetries) = (_cfg.AcmeWaitTime, _cfg.AcmeNumRetries);
-            var finalize = await _acme.FinalizeOrderAsync(key, finalizeUri, domain, kid, nonce);
+            var finalize = await _acme.FinalizeOrderAsync(key, finalizeUri, hosts, kid, nonce);
             _log.LogInformation($"Finalize {finalizeUri}: {finalize.Status}");
 
             while(numRetries-- >= 0 && finalize.Status != "valid")

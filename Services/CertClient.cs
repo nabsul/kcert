@@ -2,6 +2,7 @@
 using Microsoft.AspNetCore.Authentication;
 using System;
 using System.Collections.Generic;
+using System.Linq;
 using System.Security.Cryptography;
 using System.Security.Cryptography.X509Certificates;
 using System.Text;
@@ -16,11 +17,6 @@ namespace KCert.Services
         private const string PEMEnd = "-----END PRIVATE KEY-----";
 
         private readonly RSA _rsa = RSA.Create(2048);
-
-        public CertificateRequest GetCertRequest(string domain)
-        {
-            return new CertificateRequest($"CN={domain}", _rsa, HashAlgorithmName.SHA256, RSASignaturePadding.Pkcs1);
-        }
 
         public X509Certificate2 GetCert(V1Secret secret) => new X509Certificate2(secret.Data["tls.crt"]);
 
@@ -68,9 +64,15 @@ namespace KCert.Services
             return sign.SignData(data, HashAlgorithmName.SHA256);
         }
 
-        public string GetCsr(string domain)
+        public string GetCsr(IEnumerable<string> hosts)
         {
-            var req = GetCertRequest(domain);
+            var domain = hosts.First();
+            var req = new CertificateRequest($"CN={domain}", _rsa, HashAlgorithmName.SHA256, RSASignaturePadding.Pkcs1);
+
+            var sanBuilder = new SubjectAlternativeNameBuilder();
+            hosts.ToList().ForEach(sanBuilder.AddDnsName);
+            req.CertificateExtensions.Add(sanBuilder.Build());
+
             var signed = req.CreateSigningRequest();
             return Base64UrlTextEncoder.Encode(signed);
         }
