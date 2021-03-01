@@ -15,6 +15,7 @@ namespace KCert.Services
         private const int PEMLineLen = 64;
         private const string PEMStart = "-----BEGIN PRIVATE KEY-----";
         private const string PEMEnd = "-----END PRIVATE KEY-----";
+        private const string SanOid = "2.5.29.17";
 
         private readonly RSA _rsa = RSA.Create(2048);
 
@@ -22,13 +23,12 @@ namespace KCert.Services
 
         public List<string> GetHosts(X509Certificate2 cert)
         {
-            var result = new List<string>();
-            if (cert?.Subject.StartsWith("CN=") ?? false)
-            {
-                result.Add(cert.Subject[3..]);
-            }
+            var cn = new[] { cert.GetNameInfo(X509NameType.SimpleName, false) };
+            var sans = cert.Extensions.Cast<X509Extension>()
+                .Where(e => e.Oid.Value == SanOid)
+                .SelectMany(ext => ext.Format(false).Split(", ").Select(p => p.Split("=")[1]));
 
-            return result;
+            return cn.Concat(sans).Distinct().ToList();
         }
 
         public object GetJwk(ECDsa sign)
