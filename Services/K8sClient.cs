@@ -13,6 +13,8 @@ namespace KCert.Services
     public class K8sClient
     {
         private const string TlsSecretType = "kubernetes.io/tls";
+        private const string LabelKey = "kcert.dev/label";
+        private const string TlsTypeSelector = "type=kubernetes.io/tls";
 
         private readonly KCertConfig _cfg;
         private readonly Kubernetes _client;
@@ -28,10 +30,32 @@ namespace KCert.Services
             _client = new Kubernetes(k8sCfg);
         }
 
-        public async Task<List<V1Secret>> GetAllSecretsAsync()
+        public async Task<List<V1Secret>> GetManagedSecretsAsync()
         {
-            var result = await _client.ListSecretForAllNamespacesAsync(fieldSelector: "type=kubernetes.io/tls", labelSelector: $"kcert.dev/label={_cfg.Label}");
+            var result = await _client.ListSecretForAllNamespacesAsync(fieldSelector: TlsTypeSelector, labelSelector: $"{LabelKey}={_cfg.Label}");
             return result.Items.ToList();
+        }
+
+        public async Task<List<V1Secret>> GetUnmanagedSecretsAsync()
+        {
+            var result = await _client.ListSecretForAllNamespacesAsync(fieldSelector: TlsTypeSelector, labelSelector: $"!{LabelKey}");
+            return result.Items.ToList();
+        }
+
+        public async Task ManageSecretAsync(string ns, string name)
+        {
+            var secret = await _client.ReadNamespacedSecretAsync(name, ns);
+            secret.Metadata.Labels = secret.Metadata.Labels ?? new Dictionary<string, string>();
+            secret.Metadata.Labels[LabelKey] = _cfg.Label;
+            await _client.ReplaceNamespacedSecretAsync(secret, name, ns);
+        }
+
+        public async Task UnmanageSecretAsync(string ns, string name)
+        {
+            var secret = await _client.ReadNamespacedSecretAsync(name, ns);
+            secret.Metadata.Labels = secret.Metadata.Labels ?? new Dictionary<string, string>();
+            secret.Metadata.Labels.Remove(LabelKey);
+            await _client.ReplaceNamespacedSecretAsync(secret, name, ns);
         }
 
         public async Task<V1Secret> GetSecretAsync(string ns, string name)

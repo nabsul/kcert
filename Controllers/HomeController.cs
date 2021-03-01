@@ -26,11 +26,42 @@ namespace KCert.Controllers
         }
 
         [HttpGet]
-        public async Task<IActionResult> IndexAsync()
+        public async Task<IActionResult> IndexAsync(string op, string ns, string name)
         {
-            var secrets = await _kube.GetAllSecretsAsync();
-            var ingress = await _kcert.GetKCertIngressAsync();
-            return View((secrets, ingress));
+            if (op == "unmanage")
+            {
+                await _kube.UnmanageSecretAsync(ns, name);
+                return RedirectToAction();
+            }
+
+            if (op == "renew")
+            {
+                try
+                {
+                    await _kcert.GetCertAsync(ns, name);
+                    return RedirectToAction("Index");
+                }
+                catch (RenewalException ex)
+                {
+                    return View("RenewError", ex);
+                }
+            }
+
+            var secrets = await _kube.GetManagedSecretsAsync();
+            return View(secrets);
+        }
+
+        [HttpGet("manage")]
+        public async Task<IActionResult> ManageSecretsAsync(string op, string ns, string name)
+        {
+            if (op == "manage")
+            {
+                await _kube.ManageSecretAsync(ns, name);
+                return RedirectToAction();
+            }
+
+            var secrets = await _kube.GetUnmanagedSecretsAsync();
+            return View(secrets);
         }
 
         [HttpGet("configuration")]
@@ -75,20 +106,6 @@ namespace KCert.Controllers
         {
             await _kcert.SyncHostsAsync();
             return RedirectToAction("Index");
-        }
-
-        [HttpGet("renew/{ns}/{secretName}")]
-        public async Task<IActionResult> RenewAsync(string ns, string secretName)
-        {
-            try
-            {
-                await _kcert.GetCertAsync(ns, secretName);
-                return RedirectToAction("Index");
-            }
-            catch (RenewalException ex)
-            {
-                return View("RenewError", ex);
-            }
         }
 
         [Route("error")]
