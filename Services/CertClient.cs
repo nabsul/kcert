@@ -20,6 +20,17 @@ namespace KCert.Services
 
         public X509Certificate2 GetCert(V1Secret secret) => new X509Certificate2(secret.Data["tls.crt"]);
 
+        public List<string> GetHosts(X509Certificate2 cert)
+        {
+            var result = new List<string>();
+            if (cert?.Subject.StartsWith("CN=") ?? false)
+            {
+                result.Add(cert.Subject[3..]);
+            }
+
+            return result;
+        }
+
         public object GetJwk(ECDsa sign)
         {
             var p = sign.ExportParameters(false);
