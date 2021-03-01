@@ -70,10 +70,7 @@ namespace KCert.Services
             var req = new CertificateRequest($"CN={domain}", _rsa, HashAlgorithmName.SHA256, RSASignaturePadding.Pkcs1);
 
             var sanBuilder = new SubjectAlternativeNameBuilder();
-            foreach (var host in hosts)
-            {
-                sanBuilder.AddDnsName(host);
-            }
+            hosts.ToList().ForEach(sanBuilder.AddDnsName);
             req.CertificateExtensions.Add(sanBuilder.Build());
 
             var signed = req.CreateSigningRequest();
