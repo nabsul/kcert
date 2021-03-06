@@ -20,7 +20,7 @@
     <p><a class="btn btn-info" asp-route-sendEmail="true">Send Test Email</a></p>
 }
 
-<form method="post" asp-action="Save">
+<form method="post" asp-action="SaveConfig">
     <div class="form-group">
         <label for="AcmeDir">ACME Directory URL</label>
         <select id="AcmeDir" name="AcmeDir" class="form-control" asp-for="AcmeDirUrl" asp-items="directories"></select>

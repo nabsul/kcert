@@ -1,0 +1,19 @@
+﻿@model V1Secret
+@{ 
+    ViewData["Title"] = "Edit Cert";
+}
+
+<h2>Edit Cert: @Model.Namespace() - @Model.Name()</h2>
+
+<p>
+    <a class="btn btn-info" asp-route-op="unmanage" asp-route-ns="@Model.Namespace()" asp-route-name="@Model.Name()">UnManage</a>
+</p>
+
+<form method="post" asp-action="EditCert">
+    <div>
+        <button type="submit" class="btn btn-primary">Save</button>
+    </div>
+</form>
+
+@section Scripts {
+}

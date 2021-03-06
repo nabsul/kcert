@@ -101,7 +101,7 @@ namespace KCert.Services
 
             try
             {
-                await _kcert.GetCertAsync(ingress.Namespace(), ingress.Name());
+                await _kcert.RenewCertAsync(ingress.Namespace(), ingress.Name());
                 await _email.NotifyRenewalResultAsync(p, ingress.Namespace(), ingress.Name(), null);
             }
             catch (RenewalException ex)

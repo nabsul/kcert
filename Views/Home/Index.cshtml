@@ -5,7 +5,7 @@
     var secrets = Model;
 }
 
-<h2>Managed TLS Secrets</h2>
+<h2>Managed Certificates</h2>
 
 <div>
     <table class="table">
@@ -31,8 +31,8 @@
                 <td>@cert?.NotBefore.ToString("s")</td>
                 <td>@cert?.NotAfter.ToString("s")</td>
                 <td>
-                    <a class="btn btn-primary" asp-route-op="unmanage" asp-route-ns="@row.Namespace()" asp-route-name="@row.Name()">Unmanage</a>
                     <a class="btn btn-primary" asp-route-op="renew" asp-route-ns="@row.Namespace()" asp-route-name="@row.Name()">Renew</a>
+                    <a class="btn btn-warning" asp-action="EditCert" asp-route-ns="@row.Namespace()" asp-route-name="@row.Name()">Edit</a>
                 </td>
             </tr>           
             }

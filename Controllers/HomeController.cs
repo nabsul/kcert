@@ -28,17 +28,12 @@ namespace KCert.Controllers
         [HttpGet]
         public async Task<IActionResult> IndexAsync(string op, string ns, string name)
         {
-            if (op == "unmanage")
-            {
-                await _kube.UnmanageSecretAsync(ns, name);
-                return RedirectToAction();
-            }
 
             if (op == "renew")
             {
                 try
                 {
-                    await _kcert.GetCertAsync(ns, name);
+                    await _kcert.RenewCertAsync(ns, name);
                     return RedirectToAction("Index");
                 }
                 catch (RenewalException ex)
@@ -49,6 +44,32 @@ namespace KCert.Controllers
 
             var secrets = await _kube.GetManagedSecretsAsync();
             return View(secrets);
+        }
+
+        [HttpGet("edit/{ns}/{name}")]
+        public async Task<IActionResult> EditCertAsync(string ns, string name, string op)
+        {
+            if (op == "unmanage")
+            {
+                await _kube.UnmanageSecretAsync(ns, name);
+                return RedirectToAction("Index");
+            }
+
+            var cert = await _kube.GetSecretAsync(ns, name);
+            return View(cert);
+        }
+
+        [HttpGet("challenge")]
+        public async Task<IActionResult> ChallengeIngressAsync(string op)
+        {
+            if (op == "refresh")
+            {
+                await _kcert.SyncHostsAsync();
+                return RedirectToAction();
+            }
+
+            var ingress = await _kcert.GetKCertIngressAsync();
+            return View(ingress);
         }
 
         [HttpGet("manage")]
@@ -72,7 +93,7 @@ namespace KCert.Controllers
         }
 
         [HttpPost("configuration")]
-        public async Task<IActionResult> SaveAsync([FromForm] ConfigurationForm form)
+        public async Task<IActionResult> SaveConfigAsync([FromForm] ConfigurationForm form)
         {
             var p = await _kcert.GetConfigAsync() ?? new KCertParams();
 

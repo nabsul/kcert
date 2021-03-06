@@ -1,0 +1,18 @@
+﻿@model V1Ingress
+@{ 
+    ViewData["Title"] = "Challenge Routes";
+    var options = new JsonSerializerOptions { WriteIndented = true };
+    var data = Model.Spec.Rules
+        .Select(r => new { 
+            Host = r.Host, 
+            Paths = r.Http.Paths.Select(p => p.Path) 
+        });
+}
+
+<h2>Ingress: @Model.Namespace() - @Model.Name()</h2>
+
+<p><a class="btn btn-primary" asp-route-op="refresh">Refresh</a></p>
+
+<pre>
+@Html.Raw(JsonSerializer.Serialize(data, options))
+</pre>

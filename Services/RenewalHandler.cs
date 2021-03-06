@@ -24,7 +24,7 @@ namespace KCert.Services
             _cert = cert;
         }
 
-        public async Task GetCertAsync(string ns, string secretName, string[] hosts, KCertParams p)
+        public async Task RenewCertAsync(string ns, string secretName, string[] hosts, KCertParams p)
         {
             var logs = new List<string>();
 
