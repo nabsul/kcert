@@ -6,6 +6,7 @@ using System.Linq;
 using Microsoft.Extensions.Logging;
 using System;
 using KCert.Services;
+using System.Text.Json;
 
 namespace KCert.Controllers
 {
@@ -48,6 +49,13 @@ namespace KCert.Controllers
 
         [HttpGet("new")]
         public IActionResult NewCertAsync() => View("EditCert");
+
+        [HttpPost("new")]
+        public IActionResult CreateCertAsync(string ns, string name, string[] hosts)
+        {
+            _log.LogInformation(JsonSerializer.Serialize(new { ns, name, hosts }));
+            return RedirectToAction("Index");
+        }
 
         [HttpGet("edit/{ns}/{name}")]
         public async Task<IActionResult> EditCertAsync(string ns, string name, string op)

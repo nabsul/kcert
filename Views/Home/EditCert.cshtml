@@ -3,7 +3,7 @@
 @{ 
     ViewData["Title"] = "Edit Cert";
     var header = Model == null ? "New Cert" : $"Edit Cert: {Model.Namespace()} - {Model.Name()}";
-    var hosts = Model == null ? new List<string>() : _cert.GetHosts(_cert.GetCert(Model));
+    var hosts = Model == null ? new List<string>{""} : _cert.GetHosts(_cert.GetCert(Model));
 }
 
 <h2>@header</h2>
@@ -16,12 +16,26 @@
 
 <div id="HostForm" style="display: none;">
     <form method="post" asp-action="EditCert">
-        <div class="form-group input-group" v-for="(h, i) in hosts">
-            <input type="text" class="form-control" name="hosts[]" v-model="hosts[i]">
-            <button type="button" class="btn btn-danger" @@click="Delete(i)">Delete</button>
+        @if(Model == null)
+        { 
+        <div class="form-group">
+            <label>Certificate Namespace</label>
+            <input type="text" class="form-control" name="ns" />
+        </div>
+        <div class="form-group">
+            <label>Certificate Name</label>
+            <input type="text" class="form-control" name="name" />
+        </div>
+        }
+        <div class="form-group" v-for="(h, i) in hosts">
+            <label>Host {{ i+1 }}:</label>
+            <div class="input-group">
+                <input type="text" :aria-label="`Host Number ${i}`" class="form-control" name="hosts[]" v-model="h">
+                <button type="button" class="btn btn-danger" @@click="deleteHost(i)">Delete</button>
+            </div>
         </div>
         <div>
-            <button type="button" class="btn btn-success" @@click="Add()">Add</button>
+            <button type="button" class="btn btn-success" @@click="addHost()">Add</button>
             <button type="submit" class="btn btn-primary">Save</button>
         </div>
     </form>
@@ -30,16 +44,24 @@
 @section Scripts {
 <script src="https://unpkg.com/vue@next"></script>
 <script>
-    Vue.createApp({
+    const hosts = @Html.Raw(JsonSerializer.Serialize(hosts));
+    const app = {
         mounted() {
             document.getElementById('HostForm').style.display = 'block'
         },
-        data() { return { hosts: @Html.Raw(JsonSerializer.Serialize(hosts)) } },
+        data() {
+            return { hosts: hosts }
+        },
         methods: {
-            Add() { this.hosts.push('') },
-            Delete(idx) { this.hosts.splice(idx, 1) }
+            addHost() {
+                this.hosts.push('')
+            },
+            deleteHost(idx) {
+                this.hosts.splice(idx, 1)
+            }
         }
-    }).mount('#HostForm')
+    }
 
+    Vue.createApp(app).mount('#HostForm')
 </script>
 }
