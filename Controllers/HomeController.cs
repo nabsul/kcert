@@ -46,6 +46,9 @@ namespace KCert.Controllers
             return View(secrets);
         }
 
+        [HttpGet("new")]
+        public IActionResult NewCertAsync() => View("EditCert");
+
         [HttpGet("edit/{ns}/{name}")]
         public async Task<IActionResult> EditCertAsync(string ns, string name, string op)
         {
