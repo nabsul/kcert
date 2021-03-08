@@ -2,6 +2,7 @@
 using KCert.Models;
 using Microsoft.Extensions.Logging;
 using Microsoft.Rest;
+using System;
 using System.Collections.Generic;
 using System.Linq;
 using System.Threading.Tasks;
@@ -53,12 +54,21 @@ namespace KCert.Services
             return _cert.GetThumbprint(p.AcmeKey);
         }
 
-        public async Task RenewCertAsync(string ns, string secretName)
+        public async Task RenewCertAsync(string ns, string secretName, string[] hosts = null)
         {
+            if (hosts == null)
+            {
+                var secret = await _kube.GetSecretAsync(ns, secretName);
+                if (secret == null)
+                {
+                    throw new Exception($"Secret not found: {ns} - {secretName}");
+                }
+
+                var cert = _cert.GetCert(secret);
+                hosts = _cert.GetHosts(cert).ToArray();
+            }
+
             var p = await GetConfigAsync();
-            var ingresses = await GetAllIngressesAsync();
-            var tlsEntries = ingresses.Where(i => i.Namespace() == ns).SelectMany(i => i.Spec.Tls);
-            var hosts = tlsEntries.Where(t => t.SecretName == secretName).SelectMany(t => t.Hosts).ToArray();
             await _getCert.RenewCertAsync(ns, secretName, hosts, p);
         }
 

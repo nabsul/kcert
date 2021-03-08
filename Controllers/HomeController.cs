@@ -29,18 +29,16 @@ namespace KCert.Controllers
         [HttpGet]
         public async Task<IActionResult> IndexAsync(string op, string ns, string name)
         {
-
             if (op == "renew")
             {
-                try
-                {
-                    await _kcert.RenewCertAsync(ns, name);
-                    return RedirectToAction("Index");
-                }
-                catch (RenewalException ex)
-                {
-                    return View("RenewError", ex);
-                }
+                await _kcert.RenewCertAsync(ns, name);
+                return RedirectToAction("Index");
+            }
+
+            if (op == "delete")
+            {
+                await _kube.DeleteSecretAsync(ns, name);
+                return RedirectToAction("Index");
             }
 
             var secrets = await _kube.GetManagedSecretsAsync();
@@ -51,9 +49,10 @@ namespace KCert.Controllers
         public IActionResult NewCertAsync() => View("EditCert");
 
         [HttpPost("new")]
-        public IActionResult CreateCertAsync(string ns, string name, string[] hosts)
+        public async Task<IActionResult> CreateCertAsync(string ns, string name, string[] hosts)
         {
             _log.LogInformation(JsonSerializer.Serialize(new { ns, name, hosts }));
+            await _kcert.RenewCertAsync(ns, name, hosts);
             return RedirectToAction("Index");
         }
 

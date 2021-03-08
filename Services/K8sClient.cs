@@ -45,7 +45,7 @@ namespace KCert.Services
         public async Task ManageSecretAsync(string ns, string name)
         {
             var secret = await _client.ReadNamespacedSecretAsync(name, ns);
-            secret.Metadata.Labels = secret.Metadata.Labels ?? new Dictionary<string, string>();
+            secret.Metadata.Labels ??= new Dictionary<string, string>();
             secret.Metadata.Labels[LabelKey] = _cfg.Label;
             await _client.ReplaceNamespacedSecretAsync(secret, name, ns);
         }
@@ -85,6 +85,11 @@ namespace KCert.Services
             }
 
             await UpdateSecretAsync(ns, name, secret, data);
+        }
+
+        public async Task DeleteSecretAsync(string ns, string name)
+        {
+            await _client.DeleteNamespacedSecretAsync(name, ns);
         }
 
         private async Task UpdateSecretAsync(string ns, string name, V1Secret secret, IDictionary<string, byte[]> data)
@@ -158,6 +163,8 @@ namespace KCert.Services
                 throw new Exception($"Secret {ns}:{name} is not a TLS secret type");
             }
 
+            secret.Metadata.Labels ??= new Dictionary<string, string>();
+            secret.Metadata.Labels[LabelKey] = _cfg.Label;
             secret.Data["tls.key"] = Encoding.UTF8.GetBytes(key);
             secret.Data["tls.crt"] = Encoding.UTF8.GetBytes(cert);
             var task = create ? _client.CreateNamespacedSecretAsync(secret, ns) : _client.ReplaceNamespacedSecretAsync(secret, name, ns);
