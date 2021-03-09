@@ -69,6 +69,22 @@ namespace KCert.Controllers
             return View(cert);
         }
 
+        [HttpPost("edit/{ns}/{name}")]
+        public async Task<IActionResult> UpdateCertAsync(string ns, string name, string[] hosts)
+        {
+            var secret = await _kube.GetSecretAsync(ns, name);
+            var cert = _cert.GetCert(secret);
+            var currentHosts = _cert.GetHosts(cert);
+            
+            // If there's a change, renew the cert
+            if (hosts.Length != currentHosts.Count || hosts.Intersect(currentHosts).Count() != hosts.Length)
+            {
+                await _kcert.RenewCertAsync(ns, name, hosts);
+            }
+
+            return RedirectToAction("Index");
+        }
+
         [HttpGet("challenge")]
         public async Task<IActionResult> ChallengeIngressAsync(string op)
         {
