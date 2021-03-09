@@ -16,14 +16,16 @@ namespace KCert.Controllers
         private readonly KCertClient _kcert;
         private readonly K8sClient _kube;
         private readonly CertClient _cert;
+        private readonly EmailClient _email;
         private readonly ILogger<HomeController> _log;
 
-        public HomeController(KCertClient kcert, K8sClient kube, ILogger<HomeController> log, CertClient cert)
+        public HomeController(KCertClient kcert, K8sClient kube, ILogger<HomeController> log, CertClient cert, EmailClient email)
         {
             _kcert = kcert;
             _kube = kube;
             _log = log;
             _cert = cert;
+            _email = email;
         }
 
         [HttpGet]
@@ -112,9 +114,16 @@ namespace KCert.Controllers
         }
 
         [HttpGet("configuration")]
-        public async Task<IActionResult> ConfigurationAsync()
+        public async Task<IActionResult> ConfigurationAsync(bool sendEmail = false)
         {
             var p = await _kcert.GetConfigAsync();
+
+            if (sendEmail)
+            {
+                await _email.SendTestEmailAsync(p);
+                return RedirectToAction("Configuration");
+            }
+
             return View(p ?? new KCertParams());
         }
 
@@ -126,9 +135,10 @@ namespace KCert.Controllers
             p.AcmeDirUrl = new Uri(form.AcmeDir);
             p.AcmeEmail = form.AcmeEmail;
             p.EnableAutoRenew = form.EnableAutoRenew;
-            p.AwsRegion = form.AwsRegion;
-            p.AwsKey = form.AwsKey;
-            p.AwsSecret = form.AwsSecret;
+            p.SmtpHost = form.SmtpHost;
+            p.SmtpPort = form.SmtpPort;
+            p.SmtpUser = form.SmtpUser;
+            p.SmtpPass = form.SmtpPass;
             p.EmailFrom = form.EmailFrom;
             p.TermsAccepted = form.TermsAccepted;
 

@@ -14,10 +14,11 @@ namespace KCert.Models
         public string AcmeKey { get; set; }
 
         public bool EnableAutoRenew { get; set; }
-        public string AwsKey { get; set; }
-        public string AwsRegion { get; set; }
-        public string AwsSecret { get; set; }
         public string EmailFrom { get; set; }
+        public string SmtpHost { get; set; }
+        public int SmtpPort { get; set; }
+        public string SmtpUser { get; set; }
+        public string SmtpPass { get; set; }
 
         public KCertParams() { }
 
@@ -74,6 +75,7 @@ namespace KCert.Models
             { typeof(string), (str) => str },
             { typeof(bool), (str) => bool.Parse(str) },
             { typeof(Uri), (str) => new Uri(str) },
+            { typeof(int), (str) => int.Parse(str) },
         };
 
         private static readonly Dictionary<Type, Func<object, string>> SetValLookup = new Dictionary<Type, Func<object, string>>
@@ -81,6 +83,7 @@ namespace KCert.Models
             { typeof(string), (obj) => (string)obj },
             { typeof(bool), (obj) => ((bool)obj).ToString() },
             { typeof(Uri), (obj) => ((Uri)obj).AbsoluteUri },
+            { typeof(int), (obj) => obj.ToString() },
         };
     }
 }
