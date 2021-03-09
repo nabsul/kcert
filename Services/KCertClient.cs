@@ -26,17 +26,6 @@ namespace KCert.Services
             _log = log;
         }
 
-
-        public async Task<IList<V1Ingress>> GetAllIngressesAsync()
-        {
-            return await _kube.GetAllIngressesAsync();
-        }
-
-        public async Task<V1Ingress> GetIngressAsync(string ns, string name)
-        {
-            return await _kube.GetIngressAsync(ns, name);
-        }
-
         public async Task<KCertParams> GetConfigAsync()
         {
             var s = await _kube.GetSecretAsync(_cfg.KCertNamespace, _cfg.KCertSecretName);
@@ -46,12 +35,6 @@ namespace KCert.Services
         public async Task SaveConfigAsync(KCertParams p)
         {
             await _kube.SaveSecretDataAsync(_cfg.KCertNamespace, _cfg.KCertSecretName, p.Export());
-        }
-
-        public async Task<string> GetThumbprintAsync()
-        {
-            var p = await GetConfigAsync();
-            return _cert.GetThumbprint(p.AcmeKey);
         }
 
         public async Task RenewCertAsync(string ns, string secretName, string[] hosts = null)
@@ -95,7 +78,7 @@ namespace KCert.Services
         {
             try
             {
-                return await GetIngressAsync(_cfg.KCertNamespace, _cfg.KCertIngressName);
+                return await _kube.GetIngressAsync(_cfg.KCertNamespace, _cfg.KCertIngressName);
             }
             catch (HttpOperationException ex)
             {

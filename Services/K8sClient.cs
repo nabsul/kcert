@@ -113,12 +113,6 @@ namespace KCert.Services
             await _client.CreateNamespacedSecretAsync(secret, ns);
         }
 
-        public async Task<IList<V1Ingress>> GetAllIngressesAsync()
-        {
-            var result = await _client.ListIngressForAllNamespaces1Async(labelSelector: $"kcert.dev/label={_cfg.Label}");
-            return result.Items;
-        }
-
         public async Task<V1Ingress> GetIngressAsync(string ns, string name)
         {
             try
