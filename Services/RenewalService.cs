@@ -13,27 +13,29 @@ namespace KCert.Services
     {
         private const int MaxServiceFailures = 5;
 
-        private readonly K8sClient _k8s;
-        private readonly KCertClient _kcert;
-        private readonly EmailClient _email;
-        private readonly KCertConfig _cfg;
-        private readonly CertClient _cert;
         private readonly ILogger<RenewalService> _log;
-        private int _numFailures = 0;
+        private readonly KCertClient _kcert;
+        private readonly KCertConfig _cfg;
+        private readonly K8sClient _k8s;
+        private readonly CertClient _cert;
+        private readonly EmailClient _email;
 
-        public RenewalService(ILogger<RenewalService> log, KCertConfig cfg, K8sClient k8s, KCertClient kcert, EmailClient email, CertClient cert)
+        public RenewalService(ILogger<RenewalService> log, KCertClient kcert, KCertConfig cfg, K8sClient k8s, CertClient cert, EmailClient email)
         {
-            _cfg = cfg;
             _log = log;
-            _k8s = k8s;
             _kcert = kcert;
-            _email = email;
+            _cfg = cfg;
+            _k8s = k8s;
             _cert = cert;
+            _email = email;
         }
+
+        public Task StopAsync(CancellationToken cancellationToken) => Task.CompletedTask;
 
         public async Task StartAsync(CancellationToken cancellationToken)
         {
-            while (_numFailures < MaxServiceFailures && !cancellationToken.IsCancellationRequested)
+            int numFailures = 0;
+            while (numFailures < MaxServiceFailures && !cancellationToken.IsCancellationRequested)
             {
                 _log.LogInformation("Starting up renewal service.");
                 try
@@ -47,77 +49,63 @@ namespace KCert.Services
                 }
                 catch (Exception ex)
                 {
-                    _numFailures++;
-                    _log.LogError(ex, $"Renewal Service encountered error {_numFailures} of max {MaxServiceFailures}");
+                    numFailures++;
+                    _log.LogError(ex, $"Renewal Service encountered error {numFailures} of max {MaxServiceFailures}");
                 }
             }
         }
 
-        public Task StopAsync(CancellationToken cancellationToken) => Task.CompletedTask;
-
         private async Task RunLoopAsync(CancellationToken tok)
         {
-            while(true)
+            while (true)
             {
                 tok.ThrowIfCancellationRequested();
-                var p = await _kcert.GetConfigAsync();
-                if (p?.EnableAutoRenew ?? false)
-                {
-                    await StartRenewalJobAsync(p, tok);
-                }
-
+                await StartRenewalJobAsync(tok);
                 await Task.Delay(_cfg.RenewalTimeBetweenChekcs, tok);
             }
         }
 
-        private async Task StartRenewalJobAsync(KCertParams p, CancellationToken tok)
+        private async Task StartRenewalJobAsync(CancellationToken tok)
         {
-            _log.LogInformation("Checking for ingresses that need renewals...");
-            foreach (var ingress in await _k8s.GetAllIngressesAsync())
+            var p = await _kcert.GetConfigAsync();
+            if (!(p?.EnableAutoRenew ?? false))
             {
-                foreach  (var tls in ingress.Spec.Tls)
-                {
-                    tok.ThrowIfCancellationRequested();
-                    await TryRenewAsync(p, ingress, tls.SecretName, tok);
-                }
+                return;
             }
+
+            _log.LogInformation("Checking for certs that need renewals...");
+            foreach (var secret in await _k8s.GetManagedSecretsAsync())
+            {
+                tok.ThrowIfCancellationRequested();
+                await TryRenewAsync(p, secret, tok);
+            }
+            
             _log.LogInformation("Renewal check completed.");
         }
 
-        private async Task TryRenewAsync(KCertParams p, V1Ingress ingress, string secretName, CancellationToken tok)
+        private async Task TryRenewAsync(KCertParams p, V1Secret secret, CancellationToken tok)
         {
-            var ns = ingress.Namespace();
-            if (secretName == null)
-            {
-                return;
-            }
-
-            var secret = await _k8s.GetSecretAsync(ns, secretName);
-            if (secret == null)
-            {
-                return;
-            }
-
             var cert = _cert.GetCert(secret);
-            var hosts = ingress.Spec.Rules.Select(r => r.Host);
+            var hosts = _cert.GetHosts(cert);
+
             if (DateTime.UtcNow < cert.NotAfter - _cfg.RenewalExpirationLimit)
             {
-                _log.LogInformation($"{ingress.Namespace()} / {ingress.Name()} / {string.Join(',', hosts)} doesn't need renewal");
+                _log.LogInformation($"{secret.Namespace()} / {secret.Name()} / {string.Join(',', hosts)} doesn't need renewal");
                 return;
             }
 
             tok.ThrowIfCancellationRequested();
-            _log.LogInformation($"Renewing: {ingress.Namespace()} / {ingress.Name()} / {string.Join(',', hosts)}");
+            _log.LogInformation($"Renewing: {secret.Namespace()} / {secret.Name()} / {string.Join(',', hosts)}");
 
             try
             {
-                await _kcert.GetCertAsync(ingress.Namespace(), ingress.Name());
-                await _email.NotifyRenewalResultAsync(p, ingress.Namespace(), ingress.Name(), null);
+                await _kcert.RenewCertAsync(secret.Namespace(), secret.Name());
+                await _email.NotifyRenewalResultAsync(p, secret.Namespace(), secret.Name(), null);
             }
             catch (RenewalException ex)
             {
-                await _email.NotifyRenewalResultAsync(p, ingress.Namespace(), ingress.Name(), ex);
+                await _email.NotifyRenewalResultAsync(p, secret.Namespace(), secret.Name(), ex);
             }
         }
-    }
+        }
 }

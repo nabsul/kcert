@@ -1,0 +1,67 @@
+﻿@inject CertClient _cert
+@model V1Secret
+@{ 
+    ViewData["Title"] = "Edit Cert";
+    var header = Model == null ? "New Cert" : $"Edit Cert: {Model.Namespace()} - {Model.Name()}";
+    var hosts = Model == null ? new List<string>{""} : _cert.GetHosts(_cert.GetCert(Model));
+}
+
+<h2>@header</h2>
+
+@if (Model != null)
+{
+<p>
+    <a class="btn btn-info" asp-route-op="unmanage" asp-route-ns="@Model.Namespace()" asp-route-name="@Model.Name()">UnManage</a>
+</p>}
+
+<div id="HostForm" style="display: none;">
+    <form method="post" asp-action="EditCert">
+        @if(Model == null)
+        { 
+        <div class="form-group">
+            <label>Certificate Namespace</label>
+            <input type="text" class="form-control" name="ns" />
+        </div>
+        <div class="form-group">
+            <label>Certificate Name</label>
+            <input type="text" class="form-control" name="name" />
+        </div>
+        }
+        <div class="form-group" v-for="(h, i) in hosts">
+            <label>Host {{ i+1 }}:</label>
+            <div class="input-group">
+                <input type="text" :aria-label="`Host Number ${i}`" class="form-control" name="hosts[]" v-model="h">
+                <button type="button" class="btn btn-danger" @@click="deleteHost(i)">Delete</button>
+            </div>
+        </div>
+        <div>
+            <button type="button" class="btn btn-success" @@click="addHost()">Add Host</button>
+            <button type="submit" class="btn btn-primary">Save</button>
+        </div>
+    </form>
+</div>
+
+@section Scripts {
+<script src="https://unpkg.com/vue@next"></script>
+<script>
+    const hosts = @Html.Raw(JsonSerializer.Serialize(hosts));
+    const app = {
+        mounted() {
+            document.getElementById('HostForm').style.display = 'block'
+        },
+        data() {
+            return { hosts: hosts }
+        },
+        methods: {
+            addHost() {
+                this.hosts.push('')
+            },
+            deleteHost(idx) {
+                this.hosts.splice(idx, 1)
+            }
+        }
+    }
+
+    Vue.createApp(app).mount('#HostForm')
+</script>
+}

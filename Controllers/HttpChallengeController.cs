@@ -9,19 +9,22 @@ namespace KCert.Controllers
     public class HttpChallengeController : ControllerBase
     {
         private readonly KCertClient _kcert;
+        private readonly CertClient _cert;
         private readonly ILogger<HttpChallengeController> _log;
 
-        public HttpChallengeController(ILogger<HttpChallengeController> log, KCertClient kcert)
+        public HttpChallengeController(ILogger<HttpChallengeController> log, KCertClient kcert, CertClient cert)
         {
             _log = log;
             _kcert = kcert;
+            _cert = cert;
         }
 
         [HttpGet("{key}")]
         public async Task<IActionResult> GetChallengeResultsAsync(string key)
         {
             _log.LogInformation($"Received ACME Challenge: {key}");
-            var thumb = await _kcert.GetThumbprintAsync();
+            var p = await _kcert.GetConfigAsync();
+            var thumb = _cert.GetThumbprint(p.AcmeKey);
             return Ok($"{key}.{thumb}");
         }
     }

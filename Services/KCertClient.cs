@@ -2,6 +2,7 @@
 using KCert.Models;
 using Microsoft.Extensions.Logging;
 using Microsoft.Rest;
+using System;
 using System.Collections.Generic;
 using System.Linq;
 using System.Threading.Tasks;
@@ -25,16 +26,6 @@ namespace KCert.Services
             _log = log;
         }
 
-        public async Task<IList<V1Ingress>> GetAllIngressesAsync()
-        {
-            return await _kube.GetAllIngressesAsync();
-        }
-
-        public async Task<V1Ingress> GetIngressAsync(string ns, string name)
-        {
-            return await _kube.GetIngressAsync(ns, name);
-        }
-
         public async Task<KCertParams> GetConfigAsync()
         {
             var s = await _kube.GetSecretAsync(_cfg.KCertNamespace, _cfg.KCertSecretName);
@@ -46,25 +37,32 @@ namespace KCert.Services
             await _kube.SaveSecretDataAsync(_cfg.KCertNamespace, _cfg.KCertSecretName, p.Export());
         }
 
-        public async Task<string> GetThumbprintAsync()
+        public async Task RenewCertAsync(string ns, string secretName, string[] hosts = null)
         {
-            var p = await GetConfigAsync();
-            return _cert.GetThumbprint(p.AcmeKey);
-        }
+            if (hosts == null)
+            {
+                var secret = await _kube.GetSecretAsync(ns, secretName);
+                if (secret == null)
+                {
+                    throw new Exception($"Secret not found: {ns} - {secretName}");
+                }
 
-        public async Task GetCertAsync(string ns, string secretName)
-        {
+                var cert = _cert.GetCert(secret);
+                hosts = _cert.GetHosts(cert).ToArray();
+            }
+
             var p = await GetConfigAsync();
-            var ingresses = await GetAllIngressesAsync();
-            var tlsEntries = ingresses.Where(i => i.Namespace() == ns).SelectMany(i => i.Spec.Tls);
-            var hosts = tlsEntries.Where(t => t.SecretName == secretName).SelectMany(t => t.Hosts).ToArray();
-            await _getCert.GetCertAsync(ns, secretName, hosts, p);
+            await _getCert.RenewCertAsync(ns, secretName, hosts, p);
         }
 
         public async Task SyncHostsAsync()
         {
-            var ingresses = await GetAllIngressesAsync();
-            var allHosts = ingresses.SelectMany(i => i.Spec.Rules.Select(r => r.Host)).Distinct().ToList();
+            var secrets = await _kube.GetManagedSecretsAsync();
+            var allHosts = secrets
+                .Select(_cert.GetCert)
+                .SelectMany(_cert.GetHosts)
+                .Distinct().ToList();
+
             if (allHosts.Count == 0)
             {
                 _log.LogWarning("SyncHostsAsync: Nothing to do because there are no ingresses/hosts");
@@ -80,7 +78,7 @@ namespace KCert.Services
         {
             try
             {
-                return await GetIngressAsync(_cfg.KCertNamespace, _cfg.KCertIngressName);
+                return await _kube.GetIngressAsync(_cfg.KCertNamespace, _cfg.KCertIngressName);
             }
             catch (HttpOperationException ex)
             {

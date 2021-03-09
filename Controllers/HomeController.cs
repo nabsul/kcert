@@ -2,12 +2,11 @@
 using Microsoft.AspNetCore.Mvc;
 using KCert.Models;
 using System.Threading.Tasks;
-using k8s.Models;
-using System.Collections.Generic;
 using System.Linq;
 using Microsoft.Extensions.Logging;
 using System;
 using KCert.Services;
+using System.Text.Json;
 
 namespace KCert.Controllers
 {
@@ -28,35 +27,88 @@ namespace KCert.Controllers
         }
 
         [HttpGet]
-        public async Task<IActionResult> IndexAsync()
+        public async Task<IActionResult> IndexAsync(string op, string ns, string name)
         {
-            var ingresses = await _kcert.GetAllIngressesAsync();
-            var kcertIngress = await _kcert.GetKCertIngressAsync();
-            var hosts = kcertIngress?.Spec?.Rules?.Select(r => r.Host)?.ToHashSet() ?? new HashSet<string>();
-            _log.LogInformation($"kcert hosts: {string.Join(";", hosts)}");
-
-            var result = new List<HomeViewModel>();
-            
-            foreach (var i in ingresses)
+            if (op == "renew")
             {
-                foreach (var tls in i.Spec.Tls)
-                {
-                    var s = await _kube.GetSecretAsync(i.Namespace(), tls.SecretName);
-                    var cert = s == null ? null : _cert.GetCert(s);
-                    result.Add(new HomeViewModel
-                    {
-                        Namespace = i.Namespace(),
-                        IngressName = i.Name(),
-                        SecretName = tls.SecretName,
-                        Hosts = tls.Hosts.ToArray(),
-                        Created = cert?.NotBefore,
-                        Expires = cert?.NotAfter,
-                        HasChallengeEntry = tls.Hosts.All(h => hosts.Contains(h)),
-                    });
-                }
+                await _kcert.RenewCertAsync(ns, name);
+                return RedirectToAction("Index");
             }
 
-            return View((result, kcertIngress));
+            if (op == "delete")
+            {
+                await _kube.DeleteSecretAsync(ns, name);
+                return RedirectToAction("Index");
+            }
+
+            var secrets = await _kube.GetManagedSecretsAsync();
+            return View(secrets);
+        }
+
+        [HttpGet("new")]
+        public IActionResult NewCertAsync() => View("EditCert");
+
+        [HttpPost("new")]
+        public async Task<IActionResult> CreateCertAsync(string ns, string name, string[] hosts)
+        {
+            _log.LogInformation(JsonSerializer.Serialize(new { ns, name, hosts }));
+            await _kcert.RenewCertAsync(ns, name, hosts);
+            return RedirectToAction("Index");
+        }
+
+        [HttpGet("edit/{ns}/{name}")]
+        public async Task<IActionResult> EditCertAsync(string ns, string name, string op)
+        {
+            if (op == "unmanage")
+            {
+                await _kube.UnmanageSecretAsync(ns, name);
+                return RedirectToAction("Index");
+            }
+
+            var cert = await _kube.GetSecretAsync(ns, name);
+            return View(cert);
+        }
+
+        [HttpPost("edit/{ns}/{name}")]
+        public async Task<IActionResult> UpdateCertAsync(string ns, string name, string[] hosts)
+        {
+            var secret = await _kube.GetSecretAsync(ns, name);
+            var cert = _cert.GetCert(secret);
+            var currentHosts = _cert.GetHosts(cert);
+            
+            // If there's a change, renew the cert
+            if (hosts.Length != currentHosts.Count || hosts.Intersect(currentHosts).Count() != hosts.Length)
+            {
+                await _kcert.RenewCertAsync(ns, name, hosts);
+            }
+
+            return RedirectToAction("Index");
+        }
+
+        [HttpGet("challenge")]
+        public async Task<IActionResult> ChallengeIngressAsync(string op)
+        {
+            if (op == "refresh")
+            {
+                await _kcert.SyncHostsAsync();
+                return RedirectToAction();
+            }
+
+            var ingress = await _kcert.GetKCertIngressAsync();
+            return View(ingress);
+        }
+
+        [HttpGet("manage")]
+        public async Task<IActionResult> ManageSecretsAsync(string op, string ns, string name)
+        {
+            if (op == "manage")
+            {
+                await _kube.ManageSecretAsync(ns, name);
+                return RedirectToAction();
+            }
+
+            var secrets = await _kube.GetUnmanagedSecretsAsync();
+            return View(secrets);
         }
 
         [HttpGet("configuration")]
@@ -67,7 +119,7 @@ namespace KCert.Controllers
         }
 
         [HttpPost("configuration")]
-        public async Task<IActionResult> SaveAsync([FromForm] ConfigurationForm form)
+        public async Task<IActionResult> SaveConfigAsync([FromForm] ConfigurationForm form)
         {
             var p = await _kcert.GetConfigAsync() ?? new KCertParams();
 
@@ -101,20 +153,6 @@ namespace KCert.Controllers
         {
             await _kcert.SyncHostsAsync();
             return RedirectToAction("Index");
-        }
-
-        [HttpGet("renew/{ns}/{secretName}")]
-        public async Task<IActionResult> RenewAsync(string ns, string secretName)
-        {
-            try
-            {
-                await _kcert.GetCertAsync(ns, secretName);
-                return RedirectToAction("Index");
-            }
-            catch (RenewalException ex)
-            {
-                return View("RenewError", ex);
-            }
         }
 
         [Route("error")]
