@@ -8,9 +8,10 @@
         public bool TermsAccepted { get; set; }
         
         public bool EnableAutoRenew { get; set; }
-        public string AwsRegion { get; set; }
-        public string AwsKey { get; set; }
-        public string AwsSecret { get; set; }
         public string EmailFrom { get; set; }
+        public string SmtpHost { get; set; }
+        public int SmtpPort { get; set; }
+        public string SmtpUser { get; set; }
+        public string SmtpPass { get; set; }
     }
 }

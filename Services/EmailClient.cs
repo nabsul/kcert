@@ -1,22 +1,28 @@
-﻿using Amazon;
-using Amazon.SimpleEmail;
-using KCert.Models;
-using System;
+﻿using KCert.Models;
+using Microsoft.Extensions.Logging;
 using System.Collections.Generic;
 using System.Linq;
 using System.Net;
+using System.Net.Mail;
 using System.Threading.Tasks;
 
 namespace KCert.Services
 {
     public class EmailClient
     {
-        private const string CHARSET = "UTF8";
         private const string TestSubject = "KCert Test Email";
         private const string TestMessage = "If you received this, then KCert is able to send emails!";
 
+        private readonly ILogger<EmailClient> _log;
+
+        public EmailClient(ILogger<EmailClient> log)
+        {
+            _log = log;
+        }
+
         public async Task SendTestEmailAsync(KCertParams p)
         {
+            _log.LogInformation("Attempting to send a test email.");
             await SendAsync(p, TestSubject, TestMessage);
         }
 
@@ -25,35 +31,28 @@ namespace KCert.Services
             await SendAsync(p, RenewalSubject(secretNamespace, secretName, ex), RenewalMessage(secretNamespace, secretName, ex));
         }
 
-        private static async Task SendAsync(KCertParams p, string subject, string text)
+        private async Task SendAsync(KCertParams p, string subject, string text)
         {
             if (!CanSendEmails(p))
             {
+                _log.LogInformation("Cannot send email email because it's not configured correctly");
                 return;
             }
 
-            var region = RegionEndpoint.GetBySystemName(p.AwsRegion);
-            var client = new AmazonSimpleEmailServiceClient(p.AwsKey, p.AwsSecret, region);
-            var result = await client.SendEmailAsync(new()
+            var client = new SmtpClient(p.SmtpHost, p.SmtpPort)
             {
-                Source = p.EmailFrom,
-                Destination = new() { ToAddresses = new() { p.AcmeEmail } },
-                Message = new()
-                {
-                    Subject = new() { Charset = CHARSET, Data = subject },
-                    Body = new() { Text = new() { Charset = CHARSET, Data = text } }
-                },
-            });
+                EnableSsl = true,
+                Credentials = new NetworkCredential(p.SmtpUser, p.SmtpPass),
+            };
 
-            if (result.HttpStatusCode != HttpStatusCode.OK)
-            {
-                throw new Exception("Error!");
-            }
+            var message = new MailMessage(p.EmailFrom, p.AcmeEmail, subject, text);
+
+            await client.SendMailAsync(message);
         }
 
         private static bool CanSendEmails(KCertParams p)
         {
-            var allFields = new[] { p.AwsKey, p.AwsSecret, p.AwsRegion, p.EmailFrom, p.AcmeEmail };
+            var allFields = new[] { p.SmtpHost, p.SmtpUser, p.SmtpPass, p.EmailFrom, p.AcmeEmail };
             return !allFields.Any(string.IsNullOrWhiteSpace);
         }
 

@@ -7,15 +7,11 @@
         new SelectListItem{ Value = "https://acme-staging-v02.api.letsencrypt.org/directory", Text = "Staging"},
         new SelectListItem{ Value = "https://acme-v02.api.letsencrypt.org/directory", Text = "Production"},
     };
-
-    var regions = Amazon.RegionEndpoint.EnumerableAllRegions
-        .Select(r => new SelectListItem { Value = r.SystemName, Text = r.DisplayName })
-        .ToList();
 }
 
 <h2>KCert Configuration Settings</h2>
 
-@if (!string.IsNullOrWhiteSpace(Model.AwsKey))
+@if (!string.IsNullOrWhiteSpace(Model.SmtpHost))
 {
     <p><a class="btn btn-info" asp-route-sendEmail="true">Send Test Email</a></p>
 }
@@ -45,27 +41,33 @@
     </div>
 
     <hr />
-    <h4>AWS Email Settings <small>(optional)</small></h4>
+    
+    <h4>Email Settings <small>(optional)</small></h4>
 
-    <div class="form-group">
-        <label for="AwsRegion">AWS Region</label>
-        <select id="AwsRegion" name="AwsRegion" class="form-control" asp-for="AwsRegion" asp-items="regions"></select>
-        <small id="AcmeDirHelp" class="form-text text-muted">The mail URL for the ACME server.</small>
-    </div>
-    <div class="form-group">
-        <label for="AwsKey">AWS Key</label>
-        <input asp-for="AwsKey" type="text" class="form-control" id="AwsKey" name="AwsKey" aria-describedby="AwsKeyHelp">
-        <small id="AwsKeyHelp" class="form-text text-muted">AWS Key for sending emails.</small>
-    </div>
-    <div class="form-group">
-        <label for="SendGridKey">AWS Key</label>
-        <input asp-for="AwsSecret" type="text" class="form-control" id="AwsSecret" name="AwsSecret" aria-describedby="AwsSecretHelp">
-        <small id="AwsSecretHelp" class="form-text text-muted">AWS Secret for .</small>
-    </div>
     <div class="form-group">
         <label for="EmailFrom">From Address</label>
         <input asp-for="EmailFrom" type="email" class="form-control" id="EmailFrom" name="EmailFrom" aria-describedby="EmailFromHelp">
         <small id="EmailFromHelp" class="form-text text-muted">The email address from which emails are coming from.</small>
+    </div>
+    <div class="form-group">
+        <label for="SmtpHost">SMTP Host</label>
+        <input asp-for="SmtpHost" type="text" class="form-control" id="SmtpHost" name="SmtpHost" aria-describedby="SmtpHostHelp">
+        <small id="SmtpHostHelp" class="form-text text-muted">The host name of the SMTP server.</small>
+    </div>
+    <div class="form-group">
+        <label for="SmtpPort">SMTP Port</label>
+        <input asp-for="SmtpPort" type="number" class="form-control" id="SmtpPort" name="SmtpPort" aria-describedby="SmtpPortHelp">
+        <small id="SmtpPortHelp" class="form-text text-muted">The port of the SMTP server.</small>
+    </div>
+    <div class="form-group">
+        <label for="SmtpUser">SMTP User Name</label>
+        <input asp-for="SmtpUser" type="text" class="form-control" id="SmtpUser" name="SmtpUser" aria-describedby="SmtpUserHelp">
+        <small id="SmtpUserHelp" class="form-text text-muted">The SMTP user name.</small>
+    </div>
+    <div class="form-group">
+        <label for="SmtpPass">SMTP Password</label>
+        <input asp-for="SmtpPass" type="password" class="form-control" id="SmtpPass" name="SmtpPass" aria-describedby="SmtpPassHelp" value="@Model.SmtpPass">
+        <small id="SmtpPassHelp" class="form-text text-muted">The SMTP user password.</small>
     </div>
     <div>
         <button type="submit" class="btn btn-primary">Save</button>
