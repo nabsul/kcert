@@ -1,0 +1,13 @@
+version: "3"
+services:
+  kcert:
+    build: .
+    ports:
+      - "8081:80"
+    environment:
+      - ASPNETCORE_ENVIRONMENT=development
+      - KCERT_CONFIG=/kubeconfig/kubeconfig.yaml
+      - KCERT_LABEL=kcert-dev
+      - KCERT_NAMESPACE=kcert-dev
+    volumes:
+      - ./kubeconfig:/kubeconfig

@@ -2,11 +2,7 @@
 @{ 
     ViewData["Title"] = "Challenge Routes";
     var options = new JsonSerializerOptions { WriteIndented = true };
-    var data = Model.Spec.Rules
-        .Select(r => new { 
-            Host = r.Host, 
-            Paths = r.Http.Paths.Select(p => p.Path) 
-        });
+    var data = Model?.Spec?.Rules?.Select(r => new { r.Host, Paths = r.Http.Paths.Select(p => p.Path) });
 }
 
 <h2>Ingress: @Model.Namespace() - @Model.Name()</h2>
