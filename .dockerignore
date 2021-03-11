@@ -4,4 +4,3 @@ obj
 *.user
 net5.0
 kubeconfig
-appsettings.local.json

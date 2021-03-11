@@ -12,7 +12,10 @@
       "commandName": "IISExpress",
       "launchBrowser": true,
       "environmentVariables": {
-        "ASPNETCORE_ENVIRONMENT": "Development"
+        "ASPNETCORE_ENVIRONMENT": "Development",
+        "KCERT_CONFIG": "kubeconfig/kubeconfig.yaml",
+        "KCERT_NAMESPACE": "kcert-dev",
+        "KCERT_LABEL": "kcert-dev"
       }
     },
     "KCert": {
@@ -20,7 +23,10 @@
       "launchBrowser": true,
       "applicationUrl": "http://localhost:5000",
       "environmentVariables": {
-        "ASPNETCORE_ENVIRONMENT": "Development"
+        "ASPNETCORE_ENVIRONMENT": "Development",
+        "KCERT_CONFIG": "kubeconfig/kubeconfig.yaml",
+        "KCERT_NAMESPACE": "kcert-dev",
+        "KCERT_LABEL": "kcert-dev"
       }
     }
   }
