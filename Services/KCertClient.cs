@@ -58,51 +58,18 @@ namespace KCert.Services
         public async Task SyncHostsAsync()
         {
             var secrets = await _kube.GetManagedSecretsAsync();
-            var allHosts = secrets
+            var rules = secrets
                 .Select(_cert.GetCert)
                 .SelectMany(_cert.GetHosts)
-                .Distinct().ToList();
-
-            if (allHosts.Count == 0)
-            {
-                _log.LogWarning("SyncHostsAsync: Nothing to do because there are no ingresses/hosts");
-                return;
-            }
-
-            var kcertIngress = await GetKCertIngressAsync() ?? CreateKCertIngress();
-            kcertIngress.Spec.Rules = allHosts.Select(CreateRule).ToList();
-            await _kube.UpdateIngressAsync(kcertIngress);
-        }
-
-        public async Task<V1Ingress> GetKCertIngressAsync()
-        {
+                .Distinct().Select(CreateRule).ToList();
             try
             {
-                return await _kube.GetIngressAsync(_cfg.KCertNamespace, _cfg.KCertIngressName);
+                await _kube.UpsertIngressAsync(_cfg.KCertNamespace, _cfg.KCertIngressName, i => i.Spec.Rules = rules);
             }
-            catch (HttpOperationException ex)
+            catch (Exception ex)
             {
-                if (ex.Response.StatusCode == System.Net.HttpStatusCode.NotFound)
-                {
-                    return null;
-                }
-
-                throw;
+                _log.LogError(ex, "err");
             }
-        }
-
-        private V1Ingress CreateKCertIngress()
-        {
-            return new V1Ingress
-            {
-                Metadata = new V1ObjectMeta
-                {
-                    Name = _cfg.KCertIngressName,
-                    NamespaceProperty = _cfg.KCertNamespace,
-                    Annotations = new Dictionary<string, string> { { "kubernetes.io/ingress.class", "nginx" } },
-                },
-                Spec = new V1IngressSpec(),
-            };
         }
 
         private V1IngressRule CreateRule(string host)

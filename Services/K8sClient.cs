@@ -1,4 +1,5 @@
 ﻿using k8s;
+using k8s.Exceptions;
 using k8s.Models;
 using Microsoft.Rest;
 using System;
@@ -22,12 +23,7 @@ namespace KCert.Services
         public K8sClient(KCertConfig cfg)
         {
             _cfg = cfg;
-
-            var file = cfg.K8sConfigFile;
-            var k8sCfg = string.IsNullOrWhiteSpace(file)
-                ? KubernetesClientConfiguration.InClusterConfig()
-                : KubernetesClientConfiguration.BuildConfigFromConfigFile(file);
-            _client = new Kubernetes(k8sCfg);
+            _client = new Kubernetes(GetConfig());
         }
 
         public async Task<List<V1Secret>> GetManagedSecretsAsync()
@@ -130,16 +126,34 @@ namespace KCert.Services
             }
         }
 
-        public async Task UpdateIngressAsync(V1Ingress ingress)
+        public async Task UpsertIngressAsync(string ns, string name, Action<V1Ingress> setValues)
         {
-            var old = await GetIngressAsync(ingress.Namespace(), ingress.Name());
-            if (old == null)
+            var ingress = await GetIngressAsync(ns, name);
+            if (ingress == null)
             {
-                await _client.CreateNamespacedIngress1Async(ingress, ingress.Namespace());
+                await CreateIngressAsync(ns, name, setValues);
                 return;
             }
 
-            await _client.ReplaceNamespacedIngress1Async(ingress, ingress.Name(), ingress.Namespace());
+            setValues(ingress);
+            await _client.ReplaceNamespacedIngress1Async(ingress, name, ns);
+        }
+
+        private async Task CreateIngressAsync(string ns, string name, Action<V1Ingress> setValues)
+        {
+            var ingress = new V1Ingress
+            {
+                Metadata = new V1ObjectMeta
+                {
+                    Name = name,
+                    NamespaceProperty = ns,
+                    Annotations = new Dictionary<string, string> { { "kubernetes.io/ingress.class", "nginx" } },
+                },
+                Spec = new V1IngressSpec(),
+            };
+
+            setValues(ingress);
+            await _client.CreateNamespacedIngress1Async(ingress, ns);
         }
 
         public async Task UpdateTlsSecretAsync(string ns, string name, string key, string cert)
@@ -178,6 +192,18 @@ namespace KCert.Services
                     Name = name
                 }
             };
+        }
+
+        private KubernetesClientConfiguration GetConfig()
+        {
+            try
+            {
+                return KubernetesClientConfiguration.InClusterConfig();
+            }
+            catch (KubeConfigException)
+            {
+                return KubernetesClientConfiguration.BuildConfigFromConfigFile(_cfg.K8sConfigFile);
+            }
         }
     }
 }

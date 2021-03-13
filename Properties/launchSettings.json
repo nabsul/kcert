@@ -3,8 +3,7 @@
     "windowsAuthentication": false,
     "anonymousAuthentication": true,
     "iisExpress": {
-      "applicationUrl": "http://localhost:63876",
-      "sslPort": 44369
+      "applicationUrl": "http://localhost:63876"
     }
   },
   "profiles": {
@@ -13,7 +12,6 @@
       "launchBrowser": true,
       "environmentVariables": {
         "ASPNETCORE_ENVIRONMENT": "Development",
-        "KCERT_CONFIG": "kubeconfig/kubeconfig.yaml",
         "KCERT_NAMESPACE": "kcert-dev",
         "KCERT_LABEL": "kcert-dev"
       }
@@ -24,7 +22,6 @@
       "applicationUrl": "http://localhost:5000",
       "environmentVariables": {
         "ASPNETCORE_ENVIRONMENT": "Development",
-        "KCERT_CONFIG": "kubeconfig/kubeconfig.yaml",
         "KCERT_NAMESPACE": "kcert-dev",
         "KCERT_LABEL": "kcert-dev"
       }

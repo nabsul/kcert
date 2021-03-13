@@ -17,15 +17,17 @@ namespace KCert.Controllers
         private readonly K8sClient _kube;
         private readonly CertClient _cert;
         private readonly EmailClient _email;
+        private readonly KCertConfig _cfg;
         private readonly ILogger<HomeController> _log;
 
-        public HomeController(KCertClient kcert, K8sClient kube, ILogger<HomeController> log, CertClient cert, EmailClient email)
+        public HomeController(KCertClient kcert, K8sClient kube, ILogger<HomeController> log, CertClient cert, EmailClient email, KCertConfig cfg)
         {
             _kcert = kcert;
             _kube = kube;
             _log = log;
             _cert = cert;
             _email = email;
+            _cfg = cfg;
         }
 
         [HttpGet]
@@ -34,12 +36,6 @@ namespace KCert.Controllers
             if (op == "renew")
             {
                 await _kcert.RenewCertAsync(ns, name);
-                return RedirectToAction("Index");
-            }
-
-            if (op == "delete")
-            {
-                await _kube.DeleteSecretAsync(ns, name);
                 return RedirectToAction("Index");
             }
 
@@ -67,6 +63,12 @@ namespace KCert.Controllers
                 return RedirectToAction("Index");
             }
 
+            if (op == "delete")
+            {
+                await _kube.DeleteSecretAsync(ns, name);
+                return RedirectToAction("Index");
+            }
+            
             var cert = await _kube.GetSecretAsync(ns, name);
             return View(cert);
         }
@@ -96,7 +98,7 @@ namespace KCert.Controllers
                 return RedirectToAction();
             }
 
-            var ingress = await _kcert.GetKCertIngressAsync();
+            var ingress = await _kube.GetIngressAsync(_cfg.KCertNamespace, _cfg.KCertIngressName);
             return View(ingress);
         }
 
