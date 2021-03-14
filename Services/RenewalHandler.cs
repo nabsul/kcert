@@ -13,9 +13,9 @@ namespace KCert.Services
         private readonly K8sClient _kube;
         private readonly KCertConfig _cfg;
         private readonly CertClient _cert;
-        private readonly ILogger<RenewalHandler> _log;
+        private readonly BufferedLogger<RenewalHandler> _log;
 
-        public RenewalHandler(ILogger<RenewalHandler> log, AcmeClient acme, K8sClient kube, KCertConfig cfg, CertClient cert)
+        public RenewalHandler(BufferedLogger<RenewalHandler> log, AcmeClient acme, K8sClient kube, KCertConfig cfg, CertClient cert)
         {
             _log = log;
             _acme = acme;
@@ -26,27 +26,27 @@ namespace KCert.Services
 
         public async Task RenewCertAsync(string ns, string secretName, string[] hosts, KCertParams p)
         {
-            var logs = new List<string>();
+            _log.Clear();
 
             try
             {
                 var (kid, initNonce) = await InitAsync(p.AcmeKey, p.AcmeDirUrl, p.AcmeEmail, p.TermsAccepted);
-                LogInformation(logs, $"Initialized renewal process for secret {ns}/{secretName} - hosts {string.Join(",", hosts)} - kid {kid}");
+                _log.LogInformation($"Initialized renewal process for secret {ns}/{secretName} - hosts {string.Join(",", hosts)} - kid {kid}");
 
                 var (orderUri, finalizeUri, authorizations, orderNonce) = await CreateOrderAsync(p.AcmeKey, hosts, kid, initNonce);
-                LogInformation(logs, $"Order {orderUri} created with finalizeUri {finalizeUri}");
+                _log.LogInformation($"Order {orderUri} created with finalizeUri {finalizeUri}");
 
                 var validateNonce = orderNonce;
                 foreach (var authUrl in authorizations)
                 {
                     validateNonce = await ValidateAuthorizationAsync(p.AcmeKey, kid, validateNonce, authUrl);
-                    LogInformation(logs, $"Validated auth: {authUrl}");
+                    _log.LogInformation($"Validated auth: {authUrl}");
                 }
 
                 var (certUri, finalizeNonce) = await FinalizeOrderAsync(p.AcmeKey, orderUri, finalizeUri, hosts, kid, validateNonce);
-                LogInformation(logs, $"Finalized order and received cert URI: {certUri}");
+                _log.LogInformation($"Finalized order and received cert URI: {certUri}");
                 await SaveCertAsync(p.AcmeKey, ns, secretName, certUri, kid, finalizeNonce);
-                LogInformation(logs, $"Saved cert");
+                _log.LogInformation($"Saved cert");
             }
             catch (Exception ex)
             {
@@ -55,15 +55,9 @@ namespace KCert.Services
                 {
                     SecretNamespace = ns,
                     SecretName = secretName,
-                    Logs = logs,
+                    Logs = _log.Dump(),
                 };
             }
-        }
-
-        private void LogInformation(List<string> logs, string message)
-        {
-            _log.LogInformation(message);
-            logs.Add($"[INFORMATION {DateTime.UtcNow:s}] {message}");
         }
 
         private async Task<(string KID, string Nonce)> InitAsync(string key, Uri acmeDir, string email, bool termsAccepted)
