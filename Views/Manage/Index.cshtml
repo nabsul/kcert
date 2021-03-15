@@ -30,7 +30,7 @@
                 <td>@Html.Raw(string.Join("<br>", hosts.Select(h => $"<a target='_blank' href='https://{h}'>{h}</a>")))</td>
                 <td>@cert?.NotBefore.ToString("s")</td>
                 <td>@cert?.NotAfter.ToString("s")</td>
-                <td><a class="btn btn-primary" asp-route-op="manage" asp-route-ns="@row.Namespace()" asp-route-name="@row.Name()">Manage</a></td>
+                <td><a class="btn btn-primary" asp-action="Manage" asp-route-ns="@row.Namespace()" asp-route-name="@row.Name()">Manage</a></td>
             </tr>           
             }
         </tbody>

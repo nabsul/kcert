@@ -5,9 +5,9 @@
     var data = Model?.Spec?.Rules?.Select(r => new { r.Host, Paths = r.Http.Paths.Select(p => p.Path) });
 }
 
-<h2>Ingress: @Model.Namespace() - @Model.Name()</h2>
+<h2>Ingress: @Model?.Namespace() - @Model?.Name()</h2>
 
-<p><a class="btn btn-primary" asp-route-op="refresh">Refresh</a></p>
+<p><a class="btn btn-primary" asp-action="Refresh">Refresh</a></p>
 
 <pre>
 @Html.Raw(JsonSerializer.Serialize(data, options))

@@ -11,13 +11,12 @@
 @if (Model != null)
 {
 <p>
-    <a class="btn btn-info" asp-route-op="unmanage" asp-route-ns="@Model.Namespace()" asp-route-name="@Model.Name()">UnManage</a>
-    <a class="btn btn-danger" asp-route-op="delete" asp-route-ns="@Model.Namespace()" asp-route-name="@Model.Name()">Delete</a>
+    <a class="btn btn-danger" asp-action="Delete" asp-route-ns="@Model.Namespace()" asp-route-name="@Model.Name()">Delete</a>
 </p>
 }
 
 <div id="HostForm" style="display: none;">
-    <form method="post" asp-action="EditCert">
+    <form method="post" asp-action="Save">
         @if(Model == null)
         { 
         <div class="form-group">

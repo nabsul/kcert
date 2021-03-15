@@ -6,7 +6,7 @@
 
 <h2>Managed Certificates</h2>
 
-<p><a class="btn btn-primary" asp-action="NewCert">New Cert</a></p>
+<p><a class="btn btn-primary" asp-controller="Certificate" asp-action="New">New Cert</a></p>
 
 <div>
     <table class="table">
@@ -32,8 +32,9 @@
                 <td>@cert?.NotBefore.ToString("s")</td>
                 <td>@cert?.NotAfter.ToString("s")</td>
                 <td>
-                    <a class="btn btn-primary" asp-route-op="renew" asp-route-ns="@row.Namespace()" asp-route-name="@row.Name()">Renew</a>
-                    <a class="btn btn-warning" asp-action="EditCert" asp-route-ns="@row.Namespace()" asp-route-name="@row.Name()">Edit</a>
+                    <a class="btn btn-primary" asp-action="Renew" asp-route-ns="@row.Namespace()" asp-route-name="@row.Name()">Renew</a>
+                    <a class="btn btn-warning" asp-controller="Certificate" asp-action="Edit" asp-route-ns="@row.Namespace()" asp-route-name="@row.Name()">Edit</a>
+                    <a class="btn btn-info" asp-controller="Manage" asp-action="Unmanage" asp-route-ns="@row.Namespace()" asp-route-name="@row.Name()">Unmanage</a>
                 </td>
             </tr>
             }
