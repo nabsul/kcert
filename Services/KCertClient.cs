@@ -55,20 +55,29 @@ namespace KCert.Services
             await _getCert.RenewCertAsync(ns, secretName, hosts, p);
         }
 
-        public async Task SyncHostsAsync()
+        public async Task<bool> SyncHostsAsync()
         {
+            var kcertIngress = await _kube.GetIngressAsync(_cfg.KCertNamespace, _cfg.KCertIngressName);
+            var configuredHosts = kcertIngress.Spec.Rules.Select(r => r.Host).Distinct().ToArray();
+
             var secrets = await _kube.GetManagedSecretsAsync();
-            var rules = secrets
-                .Select(_cert.GetCert)
-                .SelectMany(_cert.GetHosts)
-                .Distinct().Select(CreateRule).ToList();
+            var allHosts = secrets.Select(_cert.GetCert).SelectMany(_cert.GetHosts).Distinct().ToArray();
+
+            if (configuredHosts.Length == allHosts.Length && configuredHosts.Intersect(allHosts).Count() == allHosts.Length)
+            {
+                return false;
+            }
+
             try
             {
+                var rules = allHosts.Select(CreateRule).ToList();
                 await _kube.UpsertIngressAsync(_cfg.KCertNamespace, _cfg.KCertIngressName, i => i.Spec.Rules = rules);
+                return true;
             }
             catch (Exception ex)
             {
                 _log.LogError(ex, "err");
+                throw;
             }
         }
 

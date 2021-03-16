@@ -74,6 +74,12 @@ namespace KCert.Services
                 return;
             }
 
+            if (await _kcert.SyncHostsAsync())
+            {
+                _log.LogInformation("Challenge ingress was updated. Give it time to propagate...");
+                await Task.Delay(TimeSpan.FromSeconds(10));
+            }
+
             _log.LogInformation("Checking for certs that need renewals...");
             foreach (var secret in await _k8s.GetManagedSecretsAsync())
             {
