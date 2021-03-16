@@ -23,8 +23,7 @@
       "environmentVariables": {
         "ASPNETCORE_ENVIRONMENT": "Development",
         "KCERT_NAMESPACE": "kcert-dev",
-        "KCERT_LABEL": "kcert-dev",
-        "RenewalExpirationRenewalDays": "82"
+        "KCERT_LABEL": "kcert-dev"
       }
     }
   }

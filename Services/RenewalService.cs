@@ -3,7 +3,6 @@ using KCert.Models;
 using Microsoft.Extensions.Hosting;
 using Microsoft.Extensions.Logging;
 using System;
-using System.Linq;
 using System.Threading;
 using System.Threading.Tasks;
 
@@ -61,6 +60,7 @@ namespace KCert.Services
             {
                 tok.ThrowIfCancellationRequested();
                 await StartRenewalJobAsync(tok);
+                _log.LogInformation($"Sleeping for {_cfg.RenewalTimeBetweenChekcs}");
                 await Task.Delay(_cfg.RenewalTimeBetweenChekcs, tok);
             }
         }
@@ -68,7 +68,8 @@ namespace KCert.Services
         private async Task StartRenewalJobAsync(CancellationToken tok)
         {
             var p = await _kcert.GetConfigAsync();
-            if (!(p?.EnableAutoRenew ?? false))
+            var autoRenewalEnabled = p?.EnableAutoRenew ?? false;
+            if (!autoRenewalEnabled)
             {
                 return;
             }
@@ -79,7 +80,7 @@ namespace KCert.Services
                 tok.ThrowIfCancellationRequested();
                 await TryRenewAsync(p, secret, tok);
             }
-            
+
             _log.LogInformation("Renewal check completed.");
         }
 
@@ -107,5 +108,5 @@ namespace KCert.Services
                 await _email.NotifyRenewalResultAsync(p, secret.Namespace(), secret.Name(), ex);
             }
         }
-        }
+    }
 }

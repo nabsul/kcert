@@ -28,8 +28,14 @@
         <small id="AcmeKeyHelp" class="form-text text-muted">Account RSA Key. Leave empty to generate a new one. <a href="#" onclick="showKey()">show</a></small>
     </div>
     <div class="form-group form-check">
-        <input asp-for="TermsAccepted" type="checkbox" class="form-check-input" id="TermsAccepted" name="TermsAccepted">
-        <label class="form-check-label" for="TermsAccepted">Accept ACME Terms</label>
+        <div>
+            <input asp-for="TermsAccepted" type="checkbox" class="form-check-input" id="TermsAccepted" name="TermsAccepted">
+            <label class="form-check-label" for="TermsAccepted">Accept ACME Terms</label>
+        </div>
+        <div>
+            <input asp-for="EnableAutoRenew" type="checkbox" class="form-check-input" id="EnableAutoRenew" name="EnableAutoRenew">
+            <label class="form-check-label" for="EnableAutoRenew">Automatically Renew Certs</label>
+        </div>
     </div>
     <div>
         <button type="submit" class="btn btn-primary">Save</button>
