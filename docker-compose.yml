@@ -6,7 +6,7 @@ services:
       - "8081:80"
     environment:
       - ASPNETCORE_ENVIRONMENT=development
-      - KCERT_CONFIG=/kubeconfig/kubeconfig.yaml
+      - KCERT_CONFIG=/kubeconfig/config
       - KCERT_LABEL=kcert-dev
       - KCERT_NAMESPACE=kcert-dev
     volumes:

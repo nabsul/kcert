@@ -1,11 +1,13 @@
 ﻿FROM mcr.microsoft.com/dotnet/sdk:5.0-alpine AS build
 WORKDIR /build
+COPY KCert.csproj .
+RUN dotnet restore
 COPY . .
-RUN dotnet build "KCert.csproj" -c Release -o /build/app
+RUN dotnet publish "KCert.csproj" --no-restore -c Release -o /app
 
 FROM mcr.microsoft.com/dotnet/aspnet:5.0-alpine AS final
 WORKDIR /app
-COPY --from=build /build/app .
-COPY wwwroot ./wwwroot
+COPY --from=build /app .
+# COPY wwwroot ./wwwroot
 EXPOSE 80
 ENTRYPOINT ["dotnet", "KCert.dll"]
