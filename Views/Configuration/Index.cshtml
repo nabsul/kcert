@@ -30,7 +30,7 @@
     <div class="form-group form-check">
         <div>
             <input asp-for="TermsAccepted" type="checkbox" class="form-check-input" id="TermsAccepted" name="TermsAccepted">
-            <label class="form-check-label" for="TermsAccepted">Accept ACME Terms</label>
+            <label class="form-check-label" for="TermsAccepted">Accept <a href="@ViewBag.TermsOfService" target="_blank">ACME Terms of Service</a></label>
         </div>
         <div>
             <input asp-for="EnableAutoRenew" type="checkbox" class="form-check-input" id="EnableAutoRenew" name="EnableAutoRenew">

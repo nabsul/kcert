@@ -13,10 +13,6 @@ namespace KCert.Services
 {
     public class AcmeClient
     {
-        private const string DirFieldNewNonce = "newNonce";
-        private const string DirFieldNewAccount = "newAccount";
-        private const string DirFieldNewOrder = "newOrder";
-
         private const string HeaderReplayNonce = "Replay-Nonce";
         private const string HeaderLocation = "Location";
         private const string ContentType = "application/jose+json";
@@ -32,7 +28,7 @@ namespace KCert.Services
             _cert = cert;
         }
 
-        private JsonDocument _dir;
+        private AcmeDirectoryResponse _dir;
 
         public Task<AcmeAccountResponse> DeactivateAccountAsync(string key, string kid, string nonce) => PostAsync<AcmeAccountResponse>(key, new Uri(kid), new { status = "deactivated" }, kid, nonce);
         public Task<AcmeOrderResponse> GetOrderAsync(string key, Uri uri, string kid, string nonce) => PostAsync<AcmeOrderResponse>(key, uri, null, kid, nonce);
@@ -42,14 +38,28 @@ namespace KCert.Services
         public async Task ReadDirectoryAsync(Uri dirUri)
         {
             using var resp = await _http.GetAsync(dirUri);
-            _dir = JsonDocument.Parse(await GetContentAsync(resp));
+            if (!resp.IsSuccessStatusCode)
+            {
+                var result = await resp.Content.ReadAsStringAsync();
+                var message = $"Failed to read ACME directory with error response code {resp.StatusCode} and message: {result}";
+                throw new Exception(message);
+            }
+
+            using var stream = await resp.Content.ReadAsStreamAsync();
+            _dir = await JsonSerializer.DeserializeAsync<AcmeDirectoryResponse>(stream, options);
+        }
+
+        public async Task<string> GetTermsOfServiceUrlAsync()
+        {
+            await ReadDirectoryAsync(new Uri("https://acme-v02.api.letsencrypt.org/directory"));
+            return _dir.Meta.TermsOfService;
         }
 
         public async Task<AcmeAccountResponse> CreateAccountAsync(string key, string email, string nonce, bool termsAccepted)
         {
             var contact = new[] { $"mailto:{email}" };
             var payloadObject = new { contact, termsOfServiceAgreed = termsAccepted };
-            var uri = GetFromDirectory(DirFieldNewAccount);
+            var uri = new Uri(_dir.NewAccount);
             return await PostAsync<AcmeAccountResponse>(key, uri, payloadObject, nonce);
         }
 
@@ -57,7 +67,7 @@ namespace KCert.Services
         {
             var identifiers = hosts.Select(h => new { type = "dns", value = h }).ToArray();
             var payload = new { identifiers };
-            var uri = GetFromDirectory(DirFieldNewOrder);
+            var uri = new Uri(_dir.NewOrder);
             return await PostAsync<AcmeOrderResponse>(key, uri, payload, kid, nonce);
         }
 
@@ -121,7 +131,7 @@ namespace KCert.Services
 
         public async Task<string> GetNonceAsync()
         {
-            var uri = GetFromDirectory(DirFieldNewNonce);
+            var uri = new Uri(_dir.NewNonce);
             using var message = new HttpRequestMessage(HttpMethod.Head, uri);
             using var resp = await _http.SendAsync(message);
 
@@ -132,16 +142,6 @@ namespace KCert.Services
             }
 
             return GetHeader(resp, HeaderReplayNonce);
-        }
-
-        private Uri GetFromDirectory(string field)
-        {
-            if (_dir != null && _dir.RootElement.TryGetProperty(field, out var val))
-            {
-                return new Uri(val.GetString());
-            }
-
-            throw new KeyNotFoundException($"AcmeClient::GetFromDirectory: Key not found: {field}");
         }
 
         private static async Task<string> GetContentAsync(HttpResponseMessage resp)

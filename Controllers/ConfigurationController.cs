@@ -14,19 +14,29 @@ namespace KCert.Controllers
         private readonly KCertClient _kcert;
         private readonly EmailClient _email;
         private readonly CertClient _cert;
+        private readonly AcmeClient _acme;
         private readonly ILogger<ConfigurationController> _log;
 
-        public ConfigurationController(KCertClient kcert, EmailClient email, CertClient cert, ILogger<ConfigurationController> log)
+        private static string TermsOfServiceUrl;
+
+        public ConfigurationController(KCertClient kcert, EmailClient email, CertClient cert, ILogger<ConfigurationController> log, AcmeClient acme)
         {
             _kcert = kcert;
             _email = email;
             _cert = cert;
             _log = log;
+            _acme = acme;
         }
 
         [HttpGet]
         public async Task<IActionResult> IndexAsync(bool sendEmail = false)
         {
+            if (TermsOfServiceUrl == null)
+            {
+                TermsOfServiceUrl = await _acme.GetTermsOfServiceUrlAsync();
+            }
+
+            ViewBag.TermsOfService = TermsOfServiceUrl;
             var p = await _kcert.GetConfigAsync();
             return View(p ?? new KCertParams());
         }
