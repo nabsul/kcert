@@ -57,10 +57,15 @@ spec:
       serviceAccountName: kcert
       containers:
       - name: kcert
-        image: nabsul/kcert:v1.0
+        image: nabsul/kcert:v0.9.1
         ports:
         - containerPort: 80
           name: http
+        env:
+        - name: ASPNETCORE_ENVIRONMENT
+          value: Development
+        - name: KCERT_NAMESPACE
+          value: kcert
 ---
 apiVersion: v1
 kind: Service

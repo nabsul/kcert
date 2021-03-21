@@ -58,7 +58,7 @@ namespace KCert.Services
         public async Task<bool> SyncHostsAsync()
         {
             var kcertIngress = await _kube.GetIngressAsync(_cfg.KCertNamespace, _cfg.KCertIngressName);
-            var configuredHosts = kcertIngress.Spec.Rules.Select(r => r.Host).Distinct().ToArray();
+            var configuredHosts = kcertIngress?.Spec.Rules.Select(r => r.Host).Distinct().ToArray() ?? Array.Empty<string>();
 
             var secrets = await _kube.GetManagedSecretsAsync();
             var allHosts = secrets.Select(_cert.GetCert).SelectMany(_cert.GetHosts).Distinct().ToArray();
