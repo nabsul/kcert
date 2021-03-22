@@ -30,6 +30,7 @@ namespace KCert.Controllers
         public async Task<IActionResult> CreateAsync(string ns, string name, string[] hosts)
         {
             _log.LogInformation(JsonSerializer.Serialize(new { ns, name, hosts }));
+            await _kcert.SyncHostsAsync(hosts);
             await _kcert.RenewCertAsync(ns, name, hosts);
             return RedirectToAction("Index", "Home");
         }
