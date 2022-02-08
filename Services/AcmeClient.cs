@@ -11,6 +11,7 @@ using System.Threading.Tasks;
 
 namespace KCert.Services;
 
+[Service]
 public class AcmeClient
 {
     private const string HeaderReplayNonce = "Replay-Nonce";

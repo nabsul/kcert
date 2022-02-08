@@ -9,6 +9,7 @@ using System.Threading.Tasks;
 
 namespace KCert.Services;
 
+[Service]
 public class KCertClient
 {
     private readonly K8sClient _kube;

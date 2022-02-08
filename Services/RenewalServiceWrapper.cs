@@ -6,6 +6,7 @@ using System.Threading.Tasks;
 
 namespace KCert.Services;
 
+[Service]
 public class RenewalServiceWrapper : IHostedService
 {
     private readonly IServiceProvider _services;

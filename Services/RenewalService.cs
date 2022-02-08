@@ -8,6 +8,7 @@ using System.Threading.Tasks;
 
 namespace KCert.Services;
 
+[Service]
 public class RenewalService : IHostedService
 {
     private const int MaxServiceFailures = 5;

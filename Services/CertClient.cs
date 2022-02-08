@@ -11,6 +11,7 @@ using System.Text.Json;
 
 namespace KCert.Services;
 
+[Service]
 public class CertClient
 {
     private const int PEMLineLen = 64;

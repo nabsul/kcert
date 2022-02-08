@@ -3,6 +3,7 @@ using System;
 
 namespace KCert.Services;
 
+[Service]
 public class KCertConfig
 {
     private readonly IConfiguration _cfg;

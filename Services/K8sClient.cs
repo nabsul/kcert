@@ -11,6 +11,7 @@ using System.Threading.Tasks;
 
 namespace KCert.Services;
 
+[Service]
 public class K8sClient
 {
     private const string TlsSecretType = "kubernetes.io/tls";

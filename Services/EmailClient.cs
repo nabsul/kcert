@@ -8,6 +8,7 @@ using System.Threading.Tasks;
 
 namespace KCert.Services;
 
+[Service]
 public class EmailClient
 {
     private const string TestSubject = "KCert Test Email";

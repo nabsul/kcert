@@ -7,6 +7,7 @@ using System.Threading.Tasks;
 
 namespace KCert.Services;
 
+[Service]
 public class RenewalHandler
 {
     private readonly AcmeClient _acme;
