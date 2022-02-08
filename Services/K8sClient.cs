@@ -9,201 +9,200 @@ using System.Net;
 using System.Text;
 using System.Threading.Tasks;
 
-namespace KCert.Services
+namespace KCert.Services;
+
+public class K8sClient
 {
-    public class K8sClient
+    private const string TlsSecretType = "kubernetes.io/tls";
+    private const string LabelKey = "kcert.dev/label";
+    private const string TlsTypeSelector = "type=kubernetes.io/tls";
+
+    private readonly KCertConfig _cfg;
+    private readonly Kubernetes _client;
+
+    public K8sClient(KCertConfig cfg)
     {
-        private const string TlsSecretType = "kubernetes.io/tls";
-        private const string LabelKey = "kcert.dev/label";
-        private const string TlsTypeSelector = "type=kubernetes.io/tls";
+        _cfg = cfg;
+        _client = new Kubernetes(GetConfig());
+    }
 
-        private readonly KCertConfig _cfg;
-        private readonly Kubernetes _client;
+    public async Task<List<V1Secret>> GetManagedSecretsAsync()
+    {
+        var result = await _client.ListSecretForAllNamespacesAsync(fieldSelector: TlsTypeSelector, labelSelector: $"{LabelKey}={_cfg.Label}");
+        return result.Items.ToList();
+    }
 
-        public K8sClient(KCertConfig cfg)
+    public async Task<List<V1Secret>> GetUnmanagedSecretsAsync()
+    {
+        var result = await _client.ListSecretForAllNamespacesAsync(fieldSelector: TlsTypeSelector, labelSelector: $"!{LabelKey}");
+        return result.Items.ToList();
+    }
+
+    public async Task ManageSecretAsync(string ns, string name)
+    {
+        var secret = await _client.ReadNamespacedSecretAsync(name, ns);
+        secret.Metadata.Labels ??= new Dictionary<string, string>();
+        secret.Metadata.Labels[LabelKey] = _cfg.Label;
+        await _client.ReplaceNamespacedSecretAsync(secret, name, ns);
+    }
+
+    public async Task UnmanageSecretAsync(string ns, string name)
+    {
+        var secret = await _client.ReadNamespacedSecretAsync(name, ns);
+        secret.Metadata.Labels = secret.Metadata.Labels ?? new Dictionary<string, string>();
+        secret.Metadata.Labels.Remove(LabelKey);
+        await _client.ReplaceNamespacedSecretAsync(secret, name, ns);
+    }
+
+    public async Task<V1Secret> GetSecretAsync(string ns, string name)
+    {
+        try
         {
-            _cfg = cfg;
-            _client = new Kubernetes(GetConfig());
+            return await _client.ReadNamespacedSecretAsync(name, ns);
         }
-
-        public async Task<List<V1Secret>> GetManagedSecretsAsync()
+        catch (HttpOperationException ex)
         {
-            var result = await _client.ListSecretForAllNamespacesAsync(fieldSelector: TlsTypeSelector, labelSelector: $"{LabelKey}={_cfg.Label}");
-            return result.Items.ToList();
-        }
-
-        public async Task<List<V1Secret>> GetUnmanagedSecretsAsync()
-        {
-            var result = await _client.ListSecretForAllNamespacesAsync(fieldSelector: TlsTypeSelector, labelSelector: $"!{LabelKey}");
-            return result.Items.ToList();
-        }
-
-        public async Task ManageSecretAsync(string ns, string name)
-        {
-            var secret = await _client.ReadNamespacedSecretAsync(name, ns);
-            secret.Metadata.Labels ??= new Dictionary<string, string>();
-            secret.Metadata.Labels[LabelKey] = _cfg.Label;
-            await _client.ReplaceNamespacedSecretAsync(secret, name, ns);
-        }
-
-        public async Task UnmanageSecretAsync(string ns, string name)
-        {
-            var secret = await _client.ReadNamespacedSecretAsync(name, ns);
-            secret.Metadata.Labels = secret.Metadata.Labels ?? new Dictionary<string, string>();
-            secret.Metadata.Labels.Remove(LabelKey);
-            await _client.ReplaceNamespacedSecretAsync(secret, name, ns);
-        }
-
-        public async Task<V1Secret> GetSecretAsync(string ns, string name)
-        {
-            try
+            if (ex.Response.StatusCode == HttpStatusCode.NotFound)
             {
-                return await _client.ReadNamespacedSecretAsync(name, ns);
-            }
-            catch (HttpOperationException ex)
-            {
-                if (ex.Response.StatusCode == HttpStatusCode.NotFound)
-                {
-                    return null;
-                }
-
-                throw;
-            }
-        }
-
-        public async Task SaveSecretDataAsync(string ns, string name, IDictionary<string, byte[]> data)
-        {
-            var secret = await GetSecretAsync(ns, name);
-            if (secret == null)
-            {
-                await CreateSecretAsync(ns, name, data);
-                return;
+                return null;
             }
 
-            await UpdateSecretAsync(ns, name, secret, data);
+            throw;
+        }
+    }
+
+    public async Task SaveSecretDataAsync(string ns, string name, IDictionary<string, byte[]> data)
+    {
+        var secret = await GetSecretAsync(ns, name);
+        if (secret == null)
+        {
+            await CreateSecretAsync(ns, name, data);
+            return;
         }
 
-        public async Task DeleteSecretAsync(string ns, string name)
-        {
-            await _client.DeleteNamespacedSecretAsync(name, ns);
-        }
+        await UpdateSecretAsync(ns, name, secret, data);
+    }
 
-        private async Task UpdateSecretAsync(string ns, string name, V1Secret secret, IDictionary<string, byte[]> data)
-        {
-            secret.Data = data;
-            await _client.ReplaceNamespacedSecretAsync(secret, name, ns);
-        }
+    public async Task DeleteSecretAsync(string ns, string name)
+    {
+        await _client.DeleteNamespacedSecretAsync(name, ns);
+    }
 
-        private async Task CreateSecretAsync(string ns, string name, IDictionary<string, byte[]> data)
+    private async Task UpdateSecretAsync(string ns, string name, V1Secret secret, IDictionary<string, byte[]> data)
+    {
+        secret.Data = data;
+        await _client.ReplaceNamespacedSecretAsync(secret, name, ns);
+    }
+
+    private async Task CreateSecretAsync(string ns, string name, IDictionary<string, byte[]> data)
+    {
+        var secret = new V1Secret
         {
-            var secret = new V1Secret
+            Metadata = new V1ObjectMeta
             {
-                Metadata = new V1ObjectMeta
-                {
-                    Name = name,
-                },
-                Type = "Opaque",
-                Data = data,
-            };
+                Name = name,
+            },
+            Type = "Opaque",
+            Data = data,
+        };
 
-            await _client.CreateNamespacedSecretAsync(secret, ns);
-        }
+        await _client.CreateNamespacedSecretAsync(secret, ns);
+    }
 
-        public async Task<V1Ingress> GetIngressAsync(string ns, string name)
+    public async Task<V1Ingress> GetIngressAsync(string ns, string name)
+    {
+        try
         {
-            try
-            {
-                return await _client.ReadNamespacedIngress1Async(name, ns);
-            }
-            catch(HttpOperationException ex)
-            {
-                if (ex.Response.StatusCode == HttpStatusCode.NotFound)
-                {
-                    return null;
-                }
-
-                throw;
-            }
+            return await _client.ReadNamespacedIngressAsync(name, ns);
         }
-
-        public async Task UpsertIngressAsync(string ns, string name, Action<V1Ingress> setValues)
+        catch (HttpOperationException ex)
         {
-            var ingress = await GetIngressAsync(ns, name);
-            if (ingress == null)
+            if (ex.Response.StatusCode == HttpStatusCode.NotFound)
             {
-                await CreateIngressAsync(ns, name, setValues);
-                return;
-            }
-
-            setValues(ingress);
-            await _client.ReplaceNamespacedIngress1Async(ingress, name, ns);
-        }
-
-        private async Task CreateIngressAsync(string ns, string name, Action<V1Ingress> setValues)
-        {
-            var ingress = new V1Ingress
-            {
-                Metadata = new V1ObjectMeta
-                {
-                    Name = name,
-                    NamespaceProperty = ns,
-                    Annotations = new Dictionary<string, string> { { "kubernetes.io/ingress.class", "nginx" } },
-                },
-                Spec = new V1IngressSpec(),
-            };
-
-            setValues(ingress);
-            await _client.CreateNamespacedIngress1Async(ingress, ns);
-        }
-
-        public async Task UpdateTlsSecretAsync(string ns, string name, string key, string cert)
-        {
-            bool create = false;
-            var secret = await GetSecretAsync(ns, name);
-            if (secret == null)
-            {
-                secret = InitSecret(name);
-                create = true;
+                return null;
             }
 
-            if (secret.Type != TlsSecretType)
-            {
-                throw new Exception($"Secret {ns}:{name} is not a TLS secret type");
-            }
+            throw;
+        }
+    }
 
-            secret.Metadata.Labels ??= new Dictionary<string, string>();
-            secret.Metadata.Labels[LabelKey] = _cfg.Label;
-            secret.Data["tls.key"] = Encoding.UTF8.GetBytes(key);
-            secret.Data["tls.crt"] = Encoding.UTF8.GetBytes(cert);
-            var task = create ? _client.CreateNamespacedSecretAsync(secret, ns) : _client.ReplaceNamespacedSecretAsync(secret, name, ns);
-            await task;
+    public async Task UpsertIngressAsync(string ns, string name, Action<V1Ingress> setValues)
+    {
+        var ingress = await GetIngressAsync(ns, name);
+        if (ingress == null)
+        {
+            await CreateIngressAsync(ns, name, setValues);
+            return;
         }
 
-        private static V1Secret InitSecret(string name)
+        setValues(ingress);
+        await _client.ReplaceNamespacedIngressAsync(ingress, name, ns);
+    }
+
+    private async Task CreateIngressAsync(string ns, string name, Action<V1Ingress> setValues)
+    {
+        var ingress = new V1Ingress
         {
-            return new V1Secret
+            Metadata = new V1ObjectMeta
             {
-                ApiVersion = "v1",
-                Kind = "Secret",
-                Type = TlsSecretType,
-                Data = new Dictionary<string, byte[]>(),
-                Metadata = new V1ObjectMeta
-                {
-                    Name = name
-                }
-            };
+                Name = name,
+                NamespaceProperty = ns,
+                Annotations = new Dictionary<string, string> { { "kubernetes.io/ingress.class", "nginx" } },
+            },
+            Spec = new V1IngressSpec(),
+        };
+
+        setValues(ingress);
+        await _client.CreateNamespacedIngressAsync(ingress, ns);
+    }
+
+    public async Task UpdateTlsSecretAsync(string ns, string name, string key, string cert)
+    {
+        bool create = false;
+        var secret = await GetSecretAsync(ns, name);
+        if (secret == null)
+        {
+            secret = InitSecret(name);
+            create = true;
         }
 
-        private KubernetesClientConfiguration GetConfig()
+        if (secret.Type != TlsSecretType)
         {
-            try
+            throw new Exception($"Secret {ns}:{name} is not a TLS secret type");
+        }
+
+        secret.Metadata.Labels ??= new Dictionary<string, string>();
+        secret.Metadata.Labels[LabelKey] = _cfg.Label;
+        secret.Data["tls.key"] = Encoding.UTF8.GetBytes(key);
+        secret.Data["tls.crt"] = Encoding.UTF8.GetBytes(cert);
+        var task = create ? _client.CreateNamespacedSecretAsync(secret, ns) : _client.ReplaceNamespacedSecretAsync(secret, name, ns);
+        await task;
+    }
+
+    private static V1Secret InitSecret(string name)
+    {
+        return new V1Secret
+        {
+            ApiVersion = "v1",
+            Kind = "Secret",
+            Type = TlsSecretType,
+            Data = new Dictionary<string, byte[]>(),
+            Metadata = new V1ObjectMeta
             {
-                return KubernetesClientConfiguration.InClusterConfig();
+                Name = name
             }
-            catch (KubeConfigException)
-            {
-                return KubernetesClientConfiguration.BuildConfigFromConfigFile(_cfg.K8sConfigFile);
-            }
+        };
+    }
+
+    private KubernetesClientConfiguration GetConfig()
+    {
+        try
+        {
+            return KubernetesClientConfiguration.InClusterConfig();
+        }
+        catch (KubeConfigException)
+        {
+            return KubernetesClientConfiguration.BuildConfigFromConfigFile(_cfg.K8sConfigFile);
         }
     }
 }

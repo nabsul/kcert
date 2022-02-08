@@ -3,31 +3,30 @@ using System;
 using System.Collections.Generic;
 using System.Linq;
 
-namespace KCert.Services
+namespace KCert.Services;
+
+public class BufferedLogger<TT> : ILogger<TT>
 {
-    public class BufferedLogger<TT> : ILogger<TT>
+    private readonly ILogger<TT> _inner;
+    private readonly Queue<string> _buff = new Queue<string>();
+
+    public BufferedLogger(ILogger<TT> inner)
     {
-        private readonly ILogger<TT> _inner;
-        private readonly Queue<string> _buff = new Queue<string>();
-
-        public BufferedLogger(ILogger<TT> inner)
-        {
-            _inner = inner;
-        }
-
-        public IDisposable BeginScope<TState>(TState state) => _inner.BeginScope(state);
-
-        public bool IsEnabled(LogLevel logLevel) => _inner.IsEnabled(logLevel);
-
-        public void Log<TState>(LogLevel logLevel, EventId eventId, TState state, Exception exception, Func<TState, Exception, string> formatter)
-        {
-            var message = $"[{logLevel}]: {state}";
-            _buff.Enqueue(message);
-            _inner.Log(logLevel, eventId, state, exception, formatter);
-        }
-
-        public void Clear() => _buff.Clear();
-
-        public List<string> Dump() => _buff.ToList();
+        _inner = inner;
     }
+
+    public IDisposable BeginScope<TState>(TState state) => _inner.BeginScope(state);
+
+    public bool IsEnabled(LogLevel logLevel) => _inner.IsEnabled(logLevel);
+
+    public void Log<TState>(LogLevel logLevel, EventId eventId, TState state, Exception exception, Func<TState, Exception, string> formatter)
+    {
+        var message = $"[{logLevel}]: {state}";
+        _buff.Enqueue(message);
+        _inner.Log(logLevel, eventId, state, exception, formatter);
+    }
+
+    public void Clear() => _buff.Clear();
+
+    public List<string> Dump() => _buff.ToList();
 }

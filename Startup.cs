@@ -8,49 +8,48 @@ using System.Collections.Generic;
 using System.Linq;
 using System.Reflection;
 
-namespace KCert
+namespace KCert;
+
+public class Startup
 {
-    public class Startup
+    public Startup(IConfiguration configuration)
     {
-        public Startup(IConfiguration configuration)
+        Configuration = configuration;
+    }
+
+    public IConfiguration Configuration { get; }
+
+    public void ConfigureServices(IServiceCollection services)
+    {
+        foreach (var type in GetServiceTypes())
         {
-            Configuration = configuration;
+            services.AddScoped(type);
         }
 
-        public IConfiguration Configuration { get; }
+        services.AddControllersWithViews();
+    }
 
-        public void ConfigureServices(IServiceCollection services)
+    public void Configure(IApplicationBuilder app, IWebHostEnvironment env)
+    {
+        if (env.IsDevelopment())
         {
-            foreach (var type in GetServiceTypes())
-            {
-                services.AddScoped(type);
-            }
-
-            services.AddControllersWithViews();
+            app.UseDeveloperExceptionPage();
+        }
+        else
+        {
+            app.UseExceptionHandler("/error");
+            // The default HSTS value is 30 days. You may want to change this for production scenarios, see https://aka.ms/aspnetcore-hsts.
+            app.UseHsts();
         }
 
-        public void Configure(IApplicationBuilder app, IWebHostEnvironment env)
-        {
-            if (env.IsDevelopment())
-            {
-                app.UseDeveloperExceptionPage();
-            }
-            else
-            {
-                app.UseExceptionHandler("/error");
-                // The default HSTS value is 30 days. You may want to change this for production scenarios, see https://aka.ms/aspnetcore-hsts.
-                app.UseHsts();
-            }
+        app.UseStaticFiles();
+        app.UseRouting();
+        app.UseEndpoints(endpoints => endpoints.MapControllers());
+    }
 
-            app.UseStaticFiles();
-            app.UseRouting();
-            app.UseEndpoints(endpoints => endpoints.MapControllers());
-        }
-
-        private static IEnumerable<Type> GetServiceTypes()
-        {
-            return Assembly.GetExecutingAssembly().GetTypes()
-                .Where(t => !t.IsNested && t.Namespace == "KCert.Services");
-        }
+    private static IEnumerable<Type> GetServiceTypes()
+    {
+        return Assembly.GetExecutingAssembly().GetTypes()
+            .Where(t => !t.IsNested && t.Namespace == "KCert.Services");
     }
 }
