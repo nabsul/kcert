@@ -34,11 +34,7 @@ public class Startup
     private static void AddKCertServices(IServiceCollection services)
     {
         var serviceTypes = Assembly.GetExecutingAssembly().GetTypes()
-            .Where(t => t.GetCustomAttribute<ServiceAttribute>() != null);
-
-        foreach (var type in serviceTypes)
-        {
-            services.AddScoped(type);
-        }
+            .Where(t => t.GetCustomAttribute<ServiceAttribute>() != null)
+            .Select(t => services.AddScoped(t));
     }
 }
