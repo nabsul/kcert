@@ -55,11 +55,12 @@ public class CertClient
         };
     }
 
-    public string GenerateNewKey()
+    public static string GenerateNewKey()
     {
         var sign = ECDsa.Create();
         sign.KeySize = 256;
-        return Base64UrlTextEncoder.Encode(sign.ExportECPrivateKey());
+        var key = sign.ExportECPrivateKey();
+        return Base64UrlTextEncoder.Encode(key);
     }
 
     public string GetThumbprint(string key)

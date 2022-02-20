@@ -1,4 +1,5 @@
-﻿using k8s.Models;
+﻿using k8s;
+using k8s.Models;
 using KCert.Models;
 using Microsoft.Extensions.Hosting;
 using Microsoft.Extensions.Logging;
@@ -40,6 +41,7 @@ public class RenewalService : IHostedService
             _log.LogInformation("Starting up renewal service.");
             try
             {
+                _ = WatchIngressesAsync(cancellationToken);
                 await RunLoopAsync(cancellationToken);
             }
             catch (TaskCanceledException ex)
@@ -53,6 +55,28 @@ public class RenewalService : IHostedService
                 _log.LogError(ex, "Renewal Service encountered error {numFailures} of max {MaxServiceFailures}", numFailures, MaxServiceFailures);
             }
         }
+    }
+
+    private async Task WatchIngressesAsync(CancellationToken tok)
+    {
+        try
+        {
+            await _k8s.WatchIngressesAsync(HandleIngressEvent, tok);
+        }
+        catch (Exception ex)
+        {
+            _log.LogError(ex, "Ingress watcher failed");
+        }
+    }
+
+    private void HandleIngressEvent(WatchEventType type, V1Ingress ingress)
+    {
+        if (type != WatchEventType.Added && type != WatchEventType.Modified)
+        {
+            return;
+        }
+
+        _log.LogInformation($"Event {type} recieved for ingress {ingress.Namespace()}:{ingress.Name()}");
     }
 
     private async Task RunLoopAsync(CancellationToken tok)

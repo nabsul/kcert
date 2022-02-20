@@ -1,6 +1,7 @@
+.git
+.github
 .vs
 bin
 obj
 *.user
-net5.0
 kubeconfig

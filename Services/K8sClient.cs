@@ -7,6 +7,7 @@ using System.Collections.Generic;
 using System.Linq;
 using System.Net;
 using System.Text;
+using System.Threading;
 using System.Threading.Tasks;
 
 namespace KCert.Services;
@@ -25,6 +26,15 @@ public class K8sClient
     {
         _cfg = cfg;
         _client = new Kubernetes(GetConfig());
+    }
+
+    public async Task WatchIngressesAsync(Action<WatchEventType, V1Ingress> callback, CancellationToken tok)
+    {
+        var message = _client.ListIngressForAllNamespacesWithHttpMessagesAsync(watch: true, cancellationToken: tok);
+        await foreach (var (type, item) in message.WatchAsync<V1Ingress, V1IngressList>())
+        {
+            callback(type, item);
+        }
     }
 
     public async Task<List<V1Secret>> GetManagedSecretsAsync()

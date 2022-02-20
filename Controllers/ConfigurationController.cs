@@ -74,7 +74,7 @@ public class ConfigurationController : Controller
         if (string.IsNullOrWhiteSpace(p.AcmeKey))
         {
             _log.LogInformation("Generating new key");
-            p.AcmeKey = _cert.GenerateNewKey();
+            p.AcmeKey = CertClient.GenerateNewKey();
         }
 
         await _kcert.SaveConfigAsync(p);
