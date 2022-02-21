@@ -1,5 +1,4 @@
 ﻿using k8s.Models;
-using KCert.Models;
 using Microsoft.Extensions.Logging;
 using System;
 using System.Collections.Generic;

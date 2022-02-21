@@ -47,7 +47,7 @@ public class KCertConfig
         SMTP = new { SmtpEmailFrom, SmtpHost, SmtpPort, SmtpUser, SmtpPass = HideString(SmtpPass) },
     };
 
-    private static string HideString(string val) => string.Join("", Enumerable.Repeat("*", val.Length));
+    private static string HideString(string val) => string.Join("", Enumerable.Repeat("*", val?.Length ?? 0));
     private string GetString(string key) => _cfg.GetValue<string>(key);
     private int GetInt(string key) => _cfg.GetValue<int>(key);
     private bool GetBool(string key) => _cfg.GetValue<bool>(key);

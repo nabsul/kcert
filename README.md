@@ -2,7 +2,7 @@
 
 KCert is a simple, easy to run and understand alternative to [cert-manager](https://github.com/jetstack/cert-manager):
 
-- Instead of 26000 lines of yaml, `KCert` deploys about 100 lines
+- Instead of 26000 lines of yaml, `KCert` deploys with less than 150 lines
 - Instead of custom resources, `KCert` uses the existing standard Kubernetes objects
 - The codebase is small and easy to understand
 
@@ -10,6 +10,11 @@ KCert is a simple, easy to run and understand alternative to [cert-manager](http
 
 The following instructions assume that you will be using the included `deploy.yml` file as your template for install KCert.
 If you are customizing your setup you will likely need to modify the following instructions accordingly.
+
+### Create the KCert namespace
+
+All KCert resources (deployment, pod, secrets, etc.) will be created inside their own namespace.
+The only exception to this are the ClusterRole and ClusterRoleBinding which are global entities.
 
 ### Create KCert secrets
 
@@ -26,6 +31,7 @@ You can create the ECDSA key using KCert from the command line:
 You can then create your Kubernetes secret with the following (replace `__ACME_KEY__` and `__SMTP_PASS__` with your values):
 
 ```sh
+kubectl create namespace kcert
 kubectl -n kcert create secret generic kcert --from-literal=acme=__ACME_KEY__ --from-literal=smtp=__SMTP_PASS__
 ```
 
