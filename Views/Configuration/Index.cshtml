@@ -13,12 +13,9 @@
 @Html.Raw(JsonSerializer.Serialize(data, options))
 </pre>
 
-<form method="post" asp-action="Save">
-    <div>
-        <button type="submit" class="btn btn-primary">Save</button>
-        @if (!string.IsNullOrWhiteSpace(_cfg.SmtpHost))
-        {
-        <a class="btn btn-info" asp-action="TestEmail">Send Test Email</a>
-        }
-    </div>
-</form>
+@if (!string.IsNullOrWhiteSpace(_cfg.SmtpHost))
+{
+<div>
+    <a class="btn btn-info" asp-action="TestEmail">Send Test Email</a>
+</div>
+}
