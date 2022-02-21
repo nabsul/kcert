@@ -19,7 +19,7 @@ public class ChallengeController : Controller
     }
 
     [HttpGet]
-    public async Task<IActionResult> IndexAsync(string op)
+    public async Task<IActionResult> IndexAsync()
     {
         var ingress = await _kube.GetIngressAsync(_cfg.KCertNamespace, _cfg.KCertIngressName);
         return View(ingress);

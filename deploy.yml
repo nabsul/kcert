@@ -37,28 +37,6 @@ roleRef:
   name: kcert
   apiGroup: rbac.authorization.k8s.io
 ---
-apiVersion: v1
-kind: ConfigMap
-metadata:
-  name: kcert
-  namespace: kcert
-data:
-  appsettings.prod.yaml: |
-    {
-      "EnableAutoRenew": __true|false__,
-      "Acme": {
-        "DirUrl": __"https://acme-staging-v02.api.letsencrypt.org/directory"|"https://acme-v02.api.letsencrypt.org/directory"__,
-        "TermsAccepted": __true|false__,
-        "Email": __EMAIL__
-      },
-      "Smtp": {
-        "EmailFrom": __EMAIL__,
-        "Host": __HOST__,
-        "Port": __000__,
-        "User": __SMTP_USER_NAME__
-      }
-    }
----
 apiVersion: apps/v1
 kind: Deployment
 metadata:
@@ -92,7 +70,32 @@ spec:
           value: Development
         - name: NAMESPACE
           value: kcert
-        - name
+        - name: ENABLEAUTORENEWAL
+          value: "true"
+        - name: ACME__DIRURL
+          value: [https://acme-staging-v02.api.letsencrypt.org/directory or https://acme-v02.api.letsencrypt.org/directory]
+        - name: ACME_KEY
+          valueFrom:
+            secretKeyRef:
+              - name: kcert
+                key: acme
+        - name: ACME__TERMSACCEPTED
+          value: [true or false]
+        - name: ACME__EMAIL
+          value: [YOUR EMAIL]
+        - name: SMTP__EMAILFROM
+          value: [FROM EMAIL]
+        - name: SMTP__HOST
+          value: [SMTP SERVER HOST NAME]
+        - name: SMTP__PORT
+          value: [SMTP SERVER PORT]
+        - name: SMTP__USER
+          value: [SMTP USER NAME]
+        - name: SMTP__PASS
+          fromValue:
+            secretKeyRef:
+              - name: kcert
+                key: smtp
 ---
 apiVersion: v1
 kind: Service

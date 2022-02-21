@@ -15,45 +15,47 @@ public class EmailClient
     private const string TestMessage = "If you received this, then KCert is able to send emails!";
 
     private readonly ILogger<EmailClient> _log;
+    private readonly KCertConfig _cfg;
 
-    public EmailClient(ILogger<EmailClient> log)
+    public EmailClient(ILogger<EmailClient> log, KCertConfig cfg)
     {
         _log = log;
+        _cfg = cfg;
     }
 
-    public async Task SendTestEmailAsync(KCertParams p)
+    public async Task SendTestEmailAsync()
     {
         _log.LogInformation("Attempting to send a test email.");
-        await SendAsync(p, TestSubject, TestMessage);
+        await SendAsync(TestSubject, TestMessage);
     }
 
-    public async Task NotifyRenewalResultAsync(KCertParams p, string secretNamespace, string secretName, RenewalException ex)
+    public async Task NotifyRenewalResultAsync(string secretNamespace, string secretName, RenewalException ex)
     {
-        await SendAsync(p, RenewalSubject(secretNamespace, secretName, ex), RenewalMessage(secretNamespace, secretName, ex));
+        await SendAsync(RenewalSubject(secretNamespace, secretName, ex), RenewalMessage(secretNamespace, secretName, ex));
     }
 
-    private async Task SendAsync(KCertParams p, string subject, string text)
+    private async Task SendAsync(string subject, string text)
     {
-        if (!CanSendEmails(p))
+        if (!CanSendEmails())
         {
             _log.LogInformation("Cannot send email email because it's not configured correctly");
             return;
         }
 
-        var client = new SmtpClient(p.SmtpHost, p.SmtpPort)
+        var client = new SmtpClient(_cfg.SmtpHost, _cfg.SmtpPort)
         {
             EnableSsl = true,
-            Credentials = new NetworkCredential(p.SmtpUser, p.SmtpPass),
+            Credentials = new NetworkCredential(_cfg.SmtpUser, _cfg.SmtpPass),
         };
 
-        var message = new MailMessage(p.EmailFrom, p.AcmeEmail, subject, text);
+        var message = new MailMessage(_cfg.SmtpEmailFrom, _cfg.AcmeEmail, subject, text);
 
         await client.SendMailAsync(message);
     }
 
-    private static bool CanSendEmails(KCertParams p)
+    private bool CanSendEmails()
     {
-        var allFields = new[] { p.SmtpHost, p.SmtpUser, p.SmtpPass, p.EmailFrom, p.AcmeEmail };
+        var allFields = new[] { _cfg.SmtpHost, _cfg.SmtpUser, _cfg.SmtpPass, _cfg.SmtpEmailFrom, _cfg.AcmeEmail };
         return !allFields.Any(string.IsNullOrWhiteSpace);
     }
 

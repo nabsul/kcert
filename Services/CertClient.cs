@@ -1,6 +1,5 @@
 ﻿using k8s.Models;
 using Microsoft.AspNetCore.Authentication;
-using Microsoft.Extensions.Logging;
 using System;
 using System.Collections.Generic;
 using System.Linq;
@@ -21,14 +20,7 @@ public class CertClient
 
     private readonly RSA _rsa = RSA.Create(2048);
 
-    private readonly ILogger<CertClient> _log;
-
-    public CertClient(ILogger<CertClient> log)
-    {
-        _log = log;
-    }
-
-    public X509Certificate2 GetCert(V1Secret secret) => new X509Certificate2(secret.Data["tls.crt"]);
+    public X509Certificate2 GetCert(V1Secret secret) => new(secret.Data["tls.crt"]);
 
     public List<string> GetHosts(X509Certificate2 cert)
     {

@@ -76,7 +76,7 @@ public class RenewalService : IHostedService
             return;
         }
 
-        _log.LogInformation($"Event {type} recieved for ingress {ingress.Namespace()}:{ingress.Name()}");
+        _log.LogInformation("Event {type} recieved for ingress {ns}:{name}", type, ingress.Namespace(), ingress.Name());
     }
 
     private async Task RunLoopAsync(CancellationToken tok)
@@ -92,9 +92,7 @@ public class RenewalService : IHostedService
 
     private async Task StartRenewalJobAsync(CancellationToken tok)
     {
-        var p = await _kcert.GetConfigAsync();
-        var autoRenewalEnabled = p?.EnableAutoRenew ?? false;
-        if (!autoRenewalEnabled)
+        if (!_cfg.EnableAutoRenew)
         {
             return;
         }
@@ -109,13 +107,13 @@ public class RenewalService : IHostedService
         foreach (var secret in await _k8s.GetManagedSecretsAsync())
         {
             tok.ThrowIfCancellationRequested();
-            await TryRenewAsync(p, secret, tok);
+            await TryRenewAsync(secret, tok);
         }
 
         _log.LogInformation("Renewal check completed.");
     }
 
-    private async Task TryRenewAsync(KCertParams p, V1Secret secret, CancellationToken tok)
+    private async Task TryRenewAsync(V1Secret secret, CancellationToken tok)
     {
         var cert = _cert.GetCert(secret);
         var hosts = _cert.GetHosts(cert);
@@ -132,11 +130,11 @@ public class RenewalService : IHostedService
         try
         {
             await _kcert.RenewCertAsync(secret.Namespace(), secret.Name());
-            await _email.NotifyRenewalResultAsync(p, secret.Namespace(), secret.Name(), null);
+            await _email.NotifyRenewalResultAsync(secret.Namespace(), secret.Name(), null);
         }
         catch (RenewalException ex)
         {
-            await _email.NotifyRenewalResultAsync(p, secret.Namespace(), secret.Name(), ex);
+            await _email.NotifyRenewalResultAsync(secret.Namespace(), secret.Name(), ex);
         }
     }
 }

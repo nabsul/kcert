@@ -1,75 +1,19 @@
-﻿@model KCertParams
-@{ 
+﻿@inject KCertConfig _cfg
+@{
     ViewData["Title"] = "Configuration";
-
-    var directories = new List<SelectListItem>
-        {
-        new SelectListItem{ Value = "https://acme-staging-v02.api.letsencrypt.org/directory", Text = "Staging"},
-        new SelectListItem{ Value = "https://acme-v02.api.letsencrypt.org/directory", Text = "Production"},
-    };
+    var options = new JsonSerializerOptions { WriteIndented = true };
+    var data = _cfg.AllConfigs;
 }
 
-<h2>KCert Configuration Settings</h2>
+<h2>KCert Configuration</h2>
+
+<p>The following is a summary KCert settings:</p>
+
+<pre>
+@Html.Raw(JsonSerializer.Serialize(data, options))
+</pre>
 
 <form method="post" asp-action="Save">
-    <div class="form-group">
-        <label for="AcmeDir">ACME Directory URL</label>
-        <select id="AcmeDir" name="AcmeDir" class="form-control" asp-for="AcmeDirUrl" asp-items="directories"></select>
-        <small id="AcmeDirHelp" class="form-text text-muted">The mail URL for the ACME server.</small>
-    </div>
-    <div class="form-group">
-        <label for="AcmeEmail">ACME Account Email Address</label>
-        <input asp-for="AcmeEmail" type="email" class="form-control" id="AcmeEmail" name="AcmeEmail" aria-describedby="AcmeEmailHelp">
-        <small id="AcmeEmailHelp" class="form-text text-muted">Email address to use for account.</small>
-    </div>
-    <div class="form-group">
-        <label for="AcmeKey">ACME Key</label>
-        <input id="AcmeKeyField" asp-for="AcmeKey" type="text" class="form-control" aria-describedby="AcmeKeyHelp" value="******">
-        <small id="AcmeKeyHelp" class="form-text text-muted">Account RSA Key. Leave empty to generate a new one. <a href="#" onclick="showKey()">show</a></small>
-    </div>
-    <div class="form-group form-check">
-        <div>
-            <input asp-for="TermsAccepted" type="checkbox" class="form-check-input" id="TermsAccepted" name="TermsAccepted">
-            <label class="form-check-label" for="TermsAccepted">Accept <a href="@ViewBag.TermsOfService" target="_blank">ACME Terms of Service</a></label>
-        </div>
-        <div>
-            <input asp-for="EnableAutoRenew" type="checkbox" class="form-check-input" id="EnableAutoRenew" name="EnableAutoRenew">
-            <label class="form-check-label" for="EnableAutoRenew">Automatically Renew Certs</label>
-        </div>
-    </div>
-    <div>
-        <button type="submit" class="btn btn-primary">Save</button>
-    </div>
-
-    <hr />
-    
-    <h4>Email Settings <small>(optional)</small></h4>
-
-    <div class="form-group">
-        <label for="EmailFrom">From Address</label>
-        <input asp-for="EmailFrom" type="email" class="form-control" id="EmailFrom" name="EmailFrom" aria-describedby="EmailFromHelp">
-        <small id="EmailFromHelp" class="form-text text-muted">The email address from which emails are coming from.</small>
-    </div>
-    <div class="form-group">
-        <label for="SmtpHost">SMTP Host</label>
-        <input asp-for="SmtpHost" type="text" class="form-control" id="SmtpHost" name="SmtpHost" aria-describedby="SmtpHostHelp">
-        <small id="SmtpHostHelp" class="form-text text-muted">The host name of the SMTP server.</small>
-    </div>
-    <div class="form-group">
-        <label for="SmtpPort">SMTP Port</label>
-        <input asp-for="SmtpPort" type="number" class="form-control" id="SmtpPort" name="SmtpPort" aria-describedby="SmtpPortHelp">
-        <small id="SmtpPortHelp" class="form-text text-muted">The port of the SMTP server.</small>
-    </div>
-    <div class="form-group">
-        <label for="SmtpUser">SMTP User Name</label>
-        <input asp-for="SmtpUser" type="text" class="form-control" id="SmtpUser" name="SmtpUser" aria-describedby="SmtpUserHelp">
-        <small id="SmtpUserHelp" class="form-text text-muted">The SMTP user name.</small>
-    </div>
-    <div class="form-group">
-        <label for="SmtpPass">SMTP Password</label>
-        <input asp-for="SmtpPass" type="password" class="form-control" id="SmtpPass" name="SmtpPass" aria-describedby="SmtpPassHelp" value="@Model.SmtpPass">
-        <small id="SmtpPassHelp" class="form-text text-muted">The SMTP user password.</small>
-    </div>
     <div>
         <button type="submit" class="btn btn-primary">Save</button>
         @if (!string.IsNullOrWhiteSpace(Model.SmtpHost))
@@ -78,21 +22,3 @@
         }
     </div>
 </form>
-
-@section Scripts {
-<script>
-    const configState = {
-        key: {
-            show: false,
-            value: "@Model.AcmeKey",
-        },
-    }
-
-    const showKey = () => {
-        const cfg = configState.key
-        const el = document.getElementById('AcmeKeyField')
-        el.value = cfg.show ? '******' : configState.key.value
-        cfg.show = !cfg.show
-    }
-</script>
-}

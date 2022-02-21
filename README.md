@@ -23,11 +23,10 @@ You can create the ECDSA key using KCert from the command line:
 - If you have .NET Core installed you can check out this repo and run `dotnet run generate-key`
 - If you have Docker (or Podman) you can run `docker run -it nabsul/kcert:1.0.0 dotnet KCert.dll generate-key`
 
-Assuming you have saved the ACME Key to a file called `acme.key` and your SMTP password to `smtp.pass`,
-you can now create your Kubernetes secret with:
+You can then create your Kubernetes secret with the following (replace `__ACME_KEY__` and `__SMTP_PASS__` with your values):
 
 ```sh
-kubectl -n kcert create secret generic kcert --from-file=acme=./acme.key --from-file=smtp=./smtp.pass
+kubectl -n kcert create secret generic kcert --from-literal=acme=__ACME_KEY__ --from-literal=smtp=__SMTP_PASS__
 ```
 
 ### Deploy KCert

@@ -26,17 +26,6 @@ public class KCertClient
         _log = log;
     }
 
-    public async Task<KCertParams> GetConfigAsync()
-    {
-        var s = await _kube.GetSecretAsync(_cfg.KCertNamespace, _cfg.KCertSecretName);
-        return s == null ? null : new KCertParams(s);
-    }
-
-    public async Task SaveConfigAsync(KCertParams p)
-    {
-        await _kube.SaveSecretDataAsync(_cfg.KCertNamespace, _cfg.KCertSecretName, p.Export());
-    }
-
     public async Task RenewCertAsync(string ns, string secretName, string[] hosts = null)
     {
         if (hosts == null)
@@ -51,8 +40,7 @@ public class KCertClient
             hosts = _cert.GetHosts(cert).ToArray();
         }
 
-        var p = await GetConfigAsync();
-        await _getCert.RenewCertAsync(ns, secretName, hosts, p);
+        await _getCert.RenewCertAsync(ns, secretName, hosts);
     }
 
     public async Task<bool> SyncHostsAsync(IEnumerable<string> moreHosts = null)
