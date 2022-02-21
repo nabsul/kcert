@@ -2,7 +2,7 @@
 
 KCert is a simple, easy to run and understand alternative to [cert-manager](https://github.com/jetstack/cert-manager):
 
-- Instead of 26000 lines of yaml, `KCert` deploys with less than 100 lines
+- Instead of 26000 lines of yaml, `KCert` deploys about 100 lines
 - Instead of custom resources, `KCert` uses the existing standard Kubernetes objects
 - The codebase is small and easy to understand
 
@@ -31,7 +31,7 @@ kubectl -n kcert create secret generic kcert --from-literal=acme=__ACME_KEY__ --
 
 ### Deploy KCert
 
-Starting with the `deploy.yml` in this repo, file the `appsettings.prod.yaml` section and review the JSON block there.
+Starting with the `deploy.yml` template in this repo, find the `env:` section.
 Fill in all the required values (marked with double underscores).
 If you don't want to set up email notifications you can delete the `smtp` configuration block.
 
@@ -49,15 +49,17 @@ To check that everything is running as expected:
 - Service provides a web UI and to manually manage and certs
 - Automatic renewal can be be enabled from the configuration
 
-## How to Use
-
-- Deploy to your cluster using: `kubectl apply -f deploy.yml`
-- To access the web UI run `kubectl -n kcert port-forward svc/kcert 8080:80` and open your browser at `https://localhost:8080`
-- Go to the configuration tab and configure your settings (email address, optional smtp settings, etc.)
-- Go to "Unmanaged Certs" and select existing certs to be managed by KCert
-- Create new certs or renew existing ones through the UI
-- Turn on auto-renewal to automatically renew certs when they have less than 30 days validity
-
 ## Building from Scratch
 
 To build your own: `docker build -t [your tag] .`
+
+## Uninstalling KCert
+
+If you have the `deploy.yml` file you used to install KCert then you can uninstall with `kubectl delete -f deploy.yml`.
+If you do not have access to that file, you can uninstall everything with the following commands:
+
+```sh
+kubectl delete namespace kcert
+kubectl delete clusterrolebinding kcert
+kubectl delete clusterrole kcert
+```

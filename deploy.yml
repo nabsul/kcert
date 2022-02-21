@@ -15,19 +15,41 @@ metadata:
   name: kcert
 rules:
 - apiGroups: [""]
-  resources: ["namespaces"]
-  verbs: ["get", "list"]
-- apiGroups: [""]
-  resources: ["secrets", "services"]
-  verbs: ["get", "list", "create", "update", "patch", "delete"]
+  resources: ["secrets"]
+  verbs: ["get", "list", "create", "update", "patch"]
 - apiGroups: ["networking.k8s.io"]
   resources: ["ingresses"]
-  verbs: ["get", "create", "update", "patch", "delete"]
+  verbs: ["get", "list", "watch"]
 ---
 apiVersion: rbac.authorization.k8s.io/v1
 kind: ClusterRoleBinding
 metadata:
   name: kcert
+subjects:
+- kind: ServiceAccount
+  name: kcert
+  namespace: kcert
+roleRef:
+  kind: ClusterRole
+  name: kcert
+  apiGroup: rbac.authorization.k8s.io
+---
+apiVersion: rbac.authorization.k8s.io/v1
+kind: Role
+metadata:
+  name: kcert
+  namespace: kcert
+rules:
+- apiGroups: ["networking.k8s.io"]
+  resources: ["ingresses"]
+  resourceNames: ["kcert"]
+  verbs: ["get", "update", "create", "patch"]
+---
+apiVersion: rbac.authorization.k8s.io/v1
+kind: RoleBinding
+metadata:
+  name: kcert
+  namespace: kcert
 subjects:
 - kind: ServiceAccount
   name: kcert
@@ -55,10 +77,6 @@ spec:
         app: kcert
     spec:
       serviceAccountName: kcert
-      volumes:
-      - name: kcert
-        configMap:
-          name: kcert
       containers:
       - name: kcert
         image: nabsul/kcert:v1.0.0
@@ -66,31 +84,31 @@ spec:
         - containerPort: 80
           name: http
         env:
-        - name: ASPNETCORE_ENVIRONMENT
-          value: Development
         - name: NAMESPACE
           value: kcert
         - name: ENABLEAUTORENEWAL
-          value: "true"
+          value: true
         - name: ACME__DIRURL
-          value: [https://acme-staging-v02.api.letsencrypt.org/directory or https://acme-v02.api.letsencrypt.org/directory]
+          value: # set this to "https://acme-staging-v02.api.letsencrypt.org/directory" or "https://acme-v02.api.letsencrypt.org/directory" (you probably want the second one)
         - name: ACME_KEY
           valueFrom:
             secretKeyRef:
               - name: kcert
                 key: acme
         - name: ACME__TERMSACCEPTED
-          value: [true or false]
+          value: # You must set this to "true" to indicate that you have read and accepted Let's Encrypt's TOS: https://letsencrypt.org/documents/LE-SA-v1.2-November-15-2017.pdf
         - name: ACME__EMAIL
-          value: [YOUR EMAIL]
+          value: # This should be the email that Let's Encrypt contacts about your certificate
+
+        # I you don't want to set up email notifications, you can delete all the "SMTP__" settings here.
         - name: SMTP__EMAILFROM
-          value: [FROM EMAIL]
+          value: # The address from which KCert will send you notifications
         - name: SMTP__HOST
-          value: [SMTP SERVER HOST NAME]
+          value: # Host name of your SMTP server
         - name: SMTP__PORT
-          value: [SMTP SERVER PORT]
+          value: # Port of your SMTP server
         - name: SMTP__USER
-          value: [SMTP USER NAME]
+          value: # SMTP Username
         - name: SMTP__PASS
           fromValue:
             secretKeyRef:
