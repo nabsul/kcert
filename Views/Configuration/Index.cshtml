@@ -7,7 +7,10 @@
 
 <h2>KCert Configuration</h2>
 
-<p>The following is a summary KCert settings:</p>
+<p>
+    The following is a summary KCert settings. Settings can be overridden using environment variables such as
+    "KCERT__SERVICENAME" (with two underscores) to configure the "KCert:ServiceName" value.
+</p>
 
 <pre>
 @Html.Raw(JsonSerializer.Serialize(data, options))

@@ -46,29 +46,29 @@ public class KCertClient
     {
         moreHosts ??= Enumerable.Empty<string>();
         var kcertIngress = await _kube.GetIngressAsync(_cfg.KCertNamespace, _cfg.KCertIngressName);
-        var configuredHosts = kcertIngress?.Spec.Rules.Select(r => r.Host).Distinct().ToArray() ?? Array.Empty<string>();
+        var configuredHosts = kcertIngress.Spec.Rules.Where(r => r.Host != null)
+            .Select(r => r.Host).Distinct().ToArray() ?? Array.Empty<string>();
 
         var secrets = await _kube.GetManagedSecretsAsync();
         var allHosts = secrets.Select(_cert.GetCert).SelectMany(_cert.GetHosts)
             .Concat(moreHosts)
             .Distinct().ToArray();
 
-        if (configuredHosts.Length == allHosts.Length && configuredHosts.Intersect(allHosts).Count() == allHosts.Length)
+        var needsRefresh = configuredHosts.Length == allHosts.Length && configuredHosts.Intersect(allHosts).Count() == allHosts.Length;
+        if (!needsRefresh)
         {
             return false;
         }
 
-        try
+        var rules = allHosts.Select(CreateRule).ToList();
+        if (rules.Count == 0)
         {
-            var rules = allHosts.Select(CreateRule).ToList();
-            await _kube.UpsertIngressAsync(_cfg.KCertNamespace, _cfg.KCertIngressName, i => i.Spec.Rules = rules);
-            return true;
+            rules.Add(CreateRule(null));
         }
-        catch (Exception ex)
-        {
-            _log.LogError(ex, "err");
-            throw;
-        }
+
+        kcertIngress.Spec.Rules = rules;
+        await _kube.UpdateIngressAsync(kcertIngress);
+        return true;
     }
 
     private V1IngressRule CreateRule(string host)

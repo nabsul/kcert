@@ -4,6 +4,8 @@ using KCert.Models;
 using Microsoft.Extensions.Hosting;
 using Microsoft.Extensions.Logging;
 using System;
+using System.Collections.Generic;
+using System.Linq;
 using System.Threading;
 using System.Threading.Tasks;
 
@@ -69,11 +71,36 @@ public class RenewalService : IHostedService
         }
     }
 
-    private void HandleIngressEvent(WatchEventType type, V1Ingress ingress)
+    private async Task HandleIngressEvent(WatchEventType type, V1Ingress ingress)
     {
         if (type != WatchEventType.Added && type != WatchEventType.Modified)
         {
             return;
+        }
+
+        if (!ingress.Metadata.Labels.TryGetValue("kcert.dev/kcert", out var label) || label != "managed")
+        {
+            return;
+        }
+
+        foreach (var tls in ingress?.Spec?.Tls ?? Enumerable.Empty<V1IngressTLS>())
+        {
+            var secret = await _k8s.GetSecretAsync(tls.SecretName, ingress.Namespace());
+            var hosts = new HashSet<string>(tls.Hosts);
+            if (secret != null)
+            {
+                var cert = _cert.GetCert(secret);
+                var certHosts = _cert.GetHosts(cert);
+                certHosts.Select(hosts.Add);
+
+                if (hosts.Count == certHosts.Count)
+                {
+                    continue;
+                }
+            }
+
+            await _kcert.SyncHostsAsync(tls.Hosts);
+            await _kcert.RenewCertAsync(tls.SecretName, ingress.Namespace(), tls.Hosts.ToArray());
         }
 
         _log.LogInformation("Event {type} recieved for ingress {ns}:{name}", type, ingress.Namespace(), ingress.Name());

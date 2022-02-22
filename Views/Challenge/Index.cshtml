@@ -2,10 +2,15 @@
 @{ 
     ViewData["Title"] = "Challenge Routes";
     var options = new JsonSerializerOptions { WriteIndented = true };
-    var data = Model?.Spec?.Rules?.Select(r => new { r.Host, Paths = r.Http.Paths.Select(p => p.Path) });
+    var data = Model?.Spec?.Rules;
 }
 
-<h2>Ingress: @Model?.Namespace() - @Model?.Name()</h2>
+<h2>Challenge Ingress</h2>
+
+<p>
+    The Challenge Ingress routes requests to ".well-known/acme-challenge" to KCert for validation.
+    Click the "Refresh" to scan all certificates and re-configure the Ingress accordingly.
+</p>
 
 <p><a class="btn btn-primary" asp-action="Refresh">Refresh</a></p>
 
