@@ -21,7 +21,6 @@ public class HomeController : Controller
     [HttpGet]
     public async Task<IActionResult> IndexAsync()
     {
-        ViewBag.HostsUpdated = await _kcert.SyncHostsAsync();
         var secrets = await _kube.GetManagedSecretsAsync();
         return View(secrets);
     }

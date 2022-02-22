@@ -63,7 +63,7 @@ public class RenewalService : IHostedService
     {
         try
         {
-            await _k8s.WatchIngressesAsync(HandleIngressEvent, tok);
+            await _k8s.WatchIngressesAsync(HandleIngressEventAsync, tok);
         }
         catch (Exception ex)
         {
@@ -71,39 +71,42 @@ public class RenewalService : IHostedService
         }
     }
 
-    private async Task HandleIngressEvent(WatchEventType type, V1Ingress ingress)
+    private async Task HandleIngressEventAsync(WatchEventType type, V1Ingress ingress, CancellationToken tok)
     {
         if (type != WatchEventType.Added && type != WatchEventType.Modified)
         {
             return;
         }
 
-        if (!ingress.Metadata.Labels.TryGetValue("kcert.dev/kcert", out var label) || label != "managed")
+        // Ingress must be labelled for KCert management
+        ingress.Metadata.Labels.TryGetValue(K8sClient.IngressLabelKey, out var label);
+        if (label != K8sClient.IngressLabelValue)
         {
             return;
         }
 
-        foreach (var tls in ingress?.Spec?.Tls ?? Enumerable.Empty<V1IngressTLS>())
+        // fetch all ingresses to figure out which certs need have which hosts
+        var nsLookup = new Dictionary<(string, string), HashSet<string>>();
+        await foreach (var ing in _k8s.GetAllIngressesAsync())
         {
-            var secret = await _k8s.GetSecretAsync(tls.SecretName, ingress.Namespace());
-            var hosts = new HashSet<string>(tls.Hosts);
-            if (secret != null)
+            foreach (var tls in ing?.Spec?.Tls ?? new List<V1IngressTLS>())
             {
-                var cert = _cert.GetCert(secret);
-                var certHosts = _cert.GetHosts(cert);
-                certHosts.Select(hosts.Add);
-
-                if (hosts.Count == certHosts.Count)
+                var key = (ing.Namespace(), tls.SecretName);
+                if (!nsLookup.TryGetValue(key, out var hosts))
                 {
-                    continue;
+                    hosts = new HashSet<string>();
+                    nsLookup.Add(key, hosts);
                 }
-            }
 
-            await _kcert.SyncHostsAsync(tls.Hosts);
-            await _kcert.RenewCertAsync(tls.SecretName, ingress.Namespace(), tls.Hosts.ToArray());
+                tls.Hosts.Select(h => hosts.Add(h));
+            }
         }
 
-        _log.LogInformation("Event {type} recieved for ingress {ns}:{name}", type, ingress.Namespace(), ingress.Name());
+        foreach (var ((ns, name), hosts) in nsLookup)
+        {
+            
+            await TryUpdateSecretAsync(ns, name, hosts, tok);
+        }
     }
 
     private async Task RunLoopAsync(CancellationToken tok)
@@ -124,12 +127,6 @@ public class RenewalService : IHostedService
             return;
         }
 
-        if (await _kcert.SyncHostsAsync())
-        {
-            _log.LogInformation("Challenge ingress was updated. Give it time to propagate...");
-            await Task.Delay(TimeSpan.FromSeconds(10), tok);
-        }
-
         _log.LogInformation("Checking for certs that need renewals...");
         foreach (var secret in await _k8s.GetManagedSecretsAsync())
         {
@@ -138,6 +135,40 @@ public class RenewalService : IHostedService
         }
 
         _log.LogInformation("Renewal check completed.");
+    }
+
+    private async Task TryUpdateSecretAsync(string ns, string name, IEnumerable<string> hosts, CancellationToken tok)
+    {
+        var secret = await _k8s.GetSecretAsync(ns, name);
+        var hostLookup = hosts.ToHashSet();
+
+        if (secret != null)
+        {
+            var cert = _cert.GetCert(secret);
+            var certHosts = _cert.GetHosts(cert);
+            if (certHosts.All(h => hostLookup.Contains(h)))
+            {
+                // nothing to do, cert already has all the hosts it needs to have
+                return;
+            }
+        }
+
+        try
+        {
+            if (await _kcert.AddChallengeHostsAsync(hosts))
+            {
+                _log.LogInformation("Giving challenge ingress time to propagate");
+                await Task.Delay(TimeSpan.FromSeconds(10), tok);
+            }
+
+            await _kcert.RenewCertAsync(secret.Namespace(), secret.Name(), hosts.ToArray());
+            await _kcert.RemoveChallengeHostsAsync(hosts);
+            await _email.NotifyRenewalResultAsync(secret.Namespace(), secret.Name(), null);
+        }
+        catch (RenewalException ex)
+        {
+            await _email.NotifyRenewalResultAsync(secret.Namespace(), secret.Name(), ex);
+        }
     }
 
     private async Task TryRenewAsync(V1Secret secret, CancellationToken tok)
@@ -156,7 +187,14 @@ public class RenewalService : IHostedService
 
         try
         {
+            if (await _kcert.AddChallengeHostsAsync(hosts))
+            {
+                _log.LogInformation("Giving challenge ingress time to propagate");
+                await Task.Delay(TimeSpan.FromSeconds(10), tok);
+            }
+
             await _kcert.RenewCertAsync(secret.Namespace(), secret.Name());
+            await _kcert.RemoveChallengeHostsAsync(hosts);
             await _email.NotifyRenewalResultAsync(secret.Namespace(), secret.Name(), null);
         }
         catch (RenewalException ex)

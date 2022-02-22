@@ -1,17 +1,23 @@
 ﻿@inject CertClient _cert
 @model List<V1Secret>
-@{ ViewData["Title"] = "Ingress"; }
-
-<h2>Managed Certificates</h2>
-
-@if (ViewBag.HostsUpdated)
-{
-    <div class="alert alert-info" role="alert">
-        Challenge Ingress was updated.
-    </div>
+@{
+    ViewData["Title"] = "Ingress";
+    var rows = Model.Select(r =>
+    {
+        var cert = _cert.GetCert(r);
+        var hosts = _cert.GetHosts(cert);
+        return new
+        {
+            Namespace = r.Namespace(),
+            Secret = r.Name(),
+            Hosts = string.Join("<br>", hosts.Select(h => $"<a target='_blank' href='https://{h}'>{h}</a>")),
+            Created = cert?.NotBefore.ToString("s"),
+            Expiration = cert?.NotAfter.ToString("s")
+        };
+    });
 }
 
-<p><a class="btn btn-primary" asp-controller="Certificate" asp-action="New">New Cert</a></p>
+<h2>Managed Certificates</h2>
 
 <div>
     <table class="table">
@@ -26,22 +32,21 @@
             </tr>
         </thead>
         <tbody>
-            @foreach (var row in Model)
+            @foreach (var row in rows)
             {
-                var cert = _cert.GetCert(row);
-                var hosts = _cert.GetHosts(cert);
-<tr>
-    <td>@row.Namespace()</td>
-    <td>@row.Name()</td>
-    <td>@Html.Raw(string.Join("<br>", hosts.Select(h => $"<a target='_blank' href='https://{h}'>{h}</a>")))</td>
-    <td>@cert?.NotBefore.ToString("s")</td>
-    <td>@cert?.NotAfter.ToString("s")</td>
-    <td>
-        <a class="btn btn-primary" asp-action="Renew" asp-route-ns="@row.Namespace()" asp-route-name="@row.Name()">Renew</a>
-        <a class="btn btn-warning" asp-controller="Certificate" asp-action="Edit" asp-route-ns="@row.Namespace()" asp-route-name="@row.Name()">Edit</a>
-        <a class="btn btn-info" asp-controller="Manage" asp-action="Unmanage" asp-route-ns="@row.Namespace()" asp-route-name="@row.Name()">Unmanage</a>
-    </td>
-</tr>            }
+            <tr>
+                <td>@row.Namespace</td>
+                <td>@row.Secret</td>
+                <td>@Html.Raw(row.Hosts)</td>
+                <td>@row.Created</td>
+                <td>@row.Expiration</td>
+                <td>
+                    <a class="btn btn-primary" asp-action="Renew" asp-route-ns="@row.Namespace" asp-route-name="@row.Secret">
+                        Renew
+                    </a>
+                </td>
+            </tr>
+            }
         </tbody>
     </table>
 </div>

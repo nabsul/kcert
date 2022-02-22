@@ -14,15 +14,13 @@ public class KCertClient
     private readonly RenewalHandler _getCert;
     private readonly CertClient _cert;
     private readonly KCertConfig _cfg;
-    private readonly ILogger<KCertClient> _log;
 
-    public KCertClient(K8sClient kube, KCertConfig cfg, RenewalHandler getCert, CertClient cert, ILogger<KCertClient> log)
+    public KCertClient(K8sClient kube, KCertConfig cfg, RenewalHandler getCert, CertClient cert)
     {
         _kube = kube;
         _cfg = cfg;
         _getCert = getCert;
         _cert = cert;
-        _log = log;
     }
 
     public async Task RenewCertAsync(string ns, string secretName, string[] hosts = null)
@@ -42,31 +40,38 @@ public class KCertClient
         await _getCert.RenewCertAsync(ns, secretName, hosts);
     }
 
-    public async Task<bool> SyncHostsAsync(IEnumerable<string> moreHosts = null)
+    public async Task<bool> AddChallengeHostsAsync(IEnumerable<string> hosts)
     {
-        moreHosts ??= Enumerable.Empty<string>();
         var kcertIngress = await _kube.GetIngressAsync(_cfg.KCertNamespace, _cfg.KCertIngressName);
-        var configuredHosts = kcertIngress.Spec.Rules.Where(r => r.Host != null)
-            .Select(r => r.Host).Distinct().ToArray() ?? Array.Empty<string>();
+        var configuredHosts = kcertIngress.Spec.Rules.Select(r => r.Host).ToHashSet();
+        var changed = false;
+        foreach (var host in hosts.Where(h => !configuredHosts.Contains(h)))
+        {
+            changed = true;
+            kcertIngress.Spec.Rules.Add(CreateRule(host));
+        }
 
-        var secrets = await _kube.GetManagedSecretsAsync();
-        var allHosts = secrets.Select(_cert.GetCert).SelectMany(_cert.GetHosts)
-            .Concat(moreHosts)
-            .Distinct().ToArray();
+        if (changed)
+        {
+            await _kube.UpdateIngressAsync(kcertIngress);
+        }
 
-        var needsRefresh = configuredHosts.Length == allHosts.Length && configuredHosts.Intersect(allHosts).Count() == allHosts.Length;
-        if (!needsRefresh)
+        return changed;
+    }
+
+    public async Task<bool> RemoveChallengeHostsAsync(IEnumerable<string> hosts)
+    {
+        var toRemove = hosts.ToHashSet();
+        var kcertIngress = await _kube.GetIngressAsync(_cfg.KCertNamespace, _cfg.KCertIngressName);
+
+        var filteredRules = kcertIngress.Spec.Rules.Where(r => !toRemove.Contains(r.Host)).ToList();
+
+        if (filteredRules.Count == kcertIngress.Spec.Rules.Count)
         {
             return false;
         }
 
-        var rules = allHosts.Select(CreateRule).ToList();
-        if (rules.Count == 0)
-        {
-            rules.Add(CreateRule(null));
-        }
-
-        kcertIngress.Spec.Rules = rules;
+        kcertIngress.Spec.Rules = filteredRules;
         await _kube.UpdateIngressAsync(kcertIngress);
         return true;
     }

@@ -2,18 +2,15 @@
 @{ 
     ViewData["Title"] = "Challenge Routes";
     var options = new JsonSerializerOptions { WriteIndented = true };
-    var data = Model?.Spec?.Rules;
 }
 
 <h2>Challenge Ingress</h2>
 
 <p>
-    The Challenge Ingress routes requests to ".well-known/acme-challenge" to KCert for validation.
-    Click the "Refresh" to scan all certificates and re-configure the Ingress accordingly.
+    The Challenge Ingress ".well-known/acme-challenge" requests to KCert for validation.
+    We keep an "example.com" entry in the routes because we can't have an empty Ingress.
 </p>
 
-<p><a class="btn btn-primary" asp-action="Refresh">Refresh</a></p>
-
 <pre>
-@Html.Raw(JsonSerializer.Serialize(data, options))
+@Html.Raw(JsonSerializer.Serialize(Model, options))
 </pre>
