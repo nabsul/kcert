@@ -63,6 +63,7 @@ public class RenewalService : IHostedService
     {
         try
         {
+            _log.LogInformation("Watching for ingress changes");
             await _k8s.WatchIngressesAsync(HandleIngressEventAsync, tok);
         }
         catch (Exception ex)
@@ -73,14 +74,8 @@ public class RenewalService : IHostedService
 
     private async Task HandleIngressEventAsync(WatchEventType type, V1Ingress ingress, CancellationToken tok)
     {
+        _log.LogInformation("event [{type}] for {ns}-{name}", type, ingress.Namespace(), ingress.Name());
         if (type != WatchEventType.Added && type != WatchEventType.Modified)
-        {
-            return;
-        }
-
-        // Ingress must be labelled for KCert management
-        ingress.Metadata.Labels.TryGetValue(K8sClient.IngressLabelKey, out var label);
-        if (label != K8sClient.IngressLabelValue)
         {
             return;
         }
@@ -89,6 +84,7 @@ public class RenewalService : IHostedService
         var nsLookup = new Dictionary<(string, string), HashSet<string>>();
         await foreach (var ing in _k8s.GetAllIngressesAsync())
         {
+            _log.LogInformation("Processing ingress {ns}:{n}", ing.Namespace(), ing.Name());
             foreach (var tls in ing?.Spec?.Tls ?? new List<V1IngressTLS>())
             {
                 var key = (ing.Namespace(), tls.SecretName);
@@ -98,13 +94,16 @@ public class RenewalService : IHostedService
                     nsLookup.Add(key, hosts);
                 }
 
-                tls.Hosts.Select(h => hosts.Add(h));
+                foreach (var h in tls.Hosts)
+                {
+                    hosts.Add(h);
+                }
             }
         }
 
         foreach (var ((ns, name), hosts) in nsLookup)
         {
-            
+            _log.LogInformation("Handling cert {ns} - {name} hosts: {h}", ns, name, string.Join(", ", hosts));
             await TryUpdateSecretAsync(ns, name, hosts, tok);
         }
     }
@@ -140,15 +139,15 @@ public class RenewalService : IHostedService
     private async Task TryUpdateSecretAsync(string ns, string name, IEnumerable<string> hosts, CancellationToken tok)
     {
         var secret = await _k8s.GetSecretAsync(ns, name);
-        var hostLookup = hosts.ToHashSet();
 
         if (secret != null)
         {
             var cert = _cert.GetCert(secret);
-            var certHosts = _cert.GetHosts(cert);
-            if (certHosts.All(h => hostLookup.Contains(h)))
+            var certHosts = _cert.GetHosts(cert).ToHashSet();
+            if (hosts.All(h => certHosts.Contains(h)))
             {
                 // nothing to do, cert already has all the hosts it needs to have
+                _log.LogInformation("Certificate already has all the needed hosts configured");
                 return;
             }
         }
@@ -161,13 +160,13 @@ public class RenewalService : IHostedService
                 await Task.Delay(TimeSpan.FromSeconds(10), tok);
             }
 
-            await _kcert.RenewCertAsync(secret.Namespace(), secret.Name(), hosts.ToArray());
+            await _kcert.RenewCertAsync(ns, name, hosts.ToArray());
             await _kcert.RemoveChallengeHostsAsync(hosts);
-            await _email.NotifyRenewalResultAsync(secret.Namespace(), secret.Name(), null);
+            await _email.NotifyRenewalResultAsync(ns, name, null);
         }
         catch (RenewalException ex)
         {
-            await _email.NotifyRenewalResultAsync(secret.Namespace(), secret.Name(), ex);
+            await _email.NotifyRenewalResultAsync(ns, name, ex);
         }
     }
 

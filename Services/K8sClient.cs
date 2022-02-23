@@ -1,6 +1,7 @@
 ﻿using k8s;
 using k8s.Exceptions;
 using k8s.Models;
+using Microsoft.Extensions.Logging;
 using Microsoft.Rest;
 using System;
 using System.Collections.Generic;
@@ -18,22 +19,27 @@ public class K8sClient
     private const string TlsSecretType = "kubernetes.io/tls";
     private const string SecretLabelKey = "kcert.dev/secret";
     private const string SecretLabelValue = "managed";
-    public const string IngressLabelKey = "kcert.dev/secret";
+    public const string IngressLabelKey = "kcert.dev/ingress";
     public const string IngressLabelValue = "managed";
     private const string TlsTypeSelector = "type=kubernetes.io/tls";
 
     private readonly KCertConfig _cfg;
+
+    private readonly ILogger<K8sClient> _log;
+
     private readonly Kubernetes _client;
 
-    public K8sClient(KCertConfig cfg)
+    public K8sClient(KCertConfig cfg, ILogger<K8sClient> log)
     {
         _cfg = cfg;
+        _log = log;
         _client = new Kubernetes(GetConfig());
     }
 
     public async Task WatchIngressesAsync(Func<WatchEventType, V1Ingress, CancellationToken, Task> callback, CancellationToken tok)
     {
         var label = $"{IngressLabelKey}={IngressLabelValue}";
+        _log.LogInformation("Watching for all ingresses with: {label}", label);
         var message = _client.ListIngressForAllNamespacesWithHttpMessagesAsync(watch: true, cancellationToken: tok, labelSelector: label);
         await foreach (var (type, item) in message.WatchAsync<V1Ingress, V1IngressList>())
         {
@@ -53,7 +59,7 @@ public class K8sClient
             {
                 yield return i;
             }
-        } 
+        }
         while (tok != null);
     }
 

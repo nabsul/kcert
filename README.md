@@ -42,12 +42,13 @@ Congratulations, KCert should now be running!
 
 To check that everything is running as expected:
 
-- Run `kubectl -n kcert logs svc/kcert` and make sure there are no error logs
+- Run `kubectl -n kcert logs svc/kcert` and make sure there are no error messages
 - Run `kubectl -n kcert port-forward svc/kcert 80` and go to `http://localhost:80` in your browser
 
 ## Uninstalling KCert
 
-KCert does not create many resources, and most of them are restricted to the kcert namespace.
+KCert does not create many resources,
+and most of them are restricted to the kcert namespace.
 Removing KCert from your cluster is as simple as executing these three commands:
 
 ```sh
@@ -56,7 +57,7 @@ kubectl delete clusterrolebinding kcert
 kubectl delete clusterrole kcert
 ```
 
-Note that certificates created by KCert in other namespaces will NOT be deleted this way.
+Note that certificates created by KCert in other namespaces will NOT be deleted.
 You can keep those certificates or manually delete them.
 
 ## How it Works
