@@ -20,5 +20,9 @@ Host.CreateDefaultBuilder(args)
         cfg.AddEnvironmentVariables();
     })
     .ConfigureWebHostDefaults(webBuilder => webBuilder.UseStartup<Startup>())
-    .ConfigureServices(services => services.AddHostedService<RenewalService>())
+    .ConfigureServices(services =>
+    {
+        services.AddHostedService<RenewalService>();
+        services.AddHostedService<IngressMonitorService>();
+    })
     .Build().Run();
