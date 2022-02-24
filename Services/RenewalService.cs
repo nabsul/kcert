@@ -32,7 +32,13 @@ public class RenewalService : IHostedService
 
     public Task StopAsync(CancellationToken cancellationToken) => Task.CompletedTask;
 
-    public async Task StartAsync(CancellationToken cancellationToken)
+    public Task StartAsync(CancellationToken cancellationToken)
+    {
+        _ = StartInnerAsync(cancellationToken);
+        return Task.CompletedTask;
+    }
+
+    public async Task StartInnerAsync(CancellationToken cancellationToken)
     {
         int numFailures = 0;
         while (numFailures < MaxServiceFailures && !cancellationToken.IsCancellationRequested)
@@ -68,30 +74,22 @@ public class RenewalService : IHostedService
 
     private async Task StartRenewalJobAsync(CancellationToken tok)
     {
-        var p = await _kcert.GetConfigAsync();
-        var autoRenewalEnabled = p?.EnableAutoRenew ?? false;
-        if (!autoRenewalEnabled)
+        if (!_cfg.EnableAutoRenew)
         {
             return;
-        }
-
-        if (await _kcert.SyncHostsAsync())
-        {
-            _log.LogInformation("Challenge ingress was updated. Give it time to propagate...");
-            await Task.Delay(TimeSpan.FromSeconds(10), tok);
         }
 
         _log.LogInformation("Checking for certs that need renewals...");
         foreach (var secret in await _k8s.GetManagedSecretsAsync())
         {
             tok.ThrowIfCancellationRequested();
-            await TryRenewAsync(p, secret, tok);
+            await TryRenewAsync(secret, tok);
         }
 
         _log.LogInformation("Renewal check completed.");
     }
 
-    private async Task TryRenewAsync(KCertParams p, V1Secret secret, CancellationToken tok)
+    private async Task TryRenewAsync(V1Secret secret, CancellationToken tok)
     {
         var cert = _cert.GetCert(secret);
         var hosts = _cert.GetHosts(cert);
@@ -107,12 +105,19 @@ public class RenewalService : IHostedService
 
         try
         {
+            if (await _kcert.AddChallengeHostsAsync(hosts))
+            {
+                _log.LogInformation("Giving challenge ingress time to propagate");
+                await Task.Delay(TimeSpan.FromSeconds(10), tok);
+            }
+
             await _kcert.RenewCertAsync(secret.Namespace(), secret.Name());
-            await _email.NotifyRenewalResultAsync(p, secret.Namespace(), secret.Name(), null);
+            await _kcert.RemoveChallengeHostsAsync(hosts);
+            await _email.NotifyRenewalResultAsync(secret.Namespace(), secret.Name(), null);
         }
         catch (RenewalException ex)
         {
-            await _email.NotifyRenewalResultAsync(p, secret.Namespace(), secret.Name(), ex);
+            await _email.NotifyRenewalResultAsync(secret.Namespace(), secret.Name(), ex);
         }
     }
 }

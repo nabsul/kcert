@@ -1,0 +1,52 @@
+﻿@inject CertClient _cert
+@model List<V1Secret>
+@{
+    ViewData["Title"] = "Ingress";
+    var rows = Model.Select(r =>
+    {
+        var cert = _cert.GetCert(r);
+        var hosts = _cert.GetHosts(cert);
+        return new
+        {
+            Namespace = r.Namespace(),
+            Secret = r.Name(),
+            Hosts = string.Join("<br>", hosts.Select(h => $"<a target='_blank' href='https://{h}'>{h}</a>")),
+            Created = cert?.NotBefore.ToString("s"),
+            Expiration = cert?.NotAfter.ToString("s")
+        };
+    });
+}
+
+<h2>Managed Certificates</h2>
+
+<div>
+    <table class="table">
+        <thead>
+            <tr>
+                <th scope="col">Namespace</th>
+                <th scope="col">Secret</th>
+                <th scope="col">Hosts</th>
+                <th scope="col">Created</th>
+                <th scope="col">Expiration</th>
+                <th scope="col">Actions</th>
+            </tr>
+        </thead>
+        <tbody>
+            @foreach (var row in rows)
+            {
+            <tr>
+                <td>@row.Namespace</td>
+                <td>@row.Secret</td>
+                <td>@Html.Raw(row.Hosts)</td>
+                <td>@row.Created</td>
+                <td>@row.Expiration</td>
+                <td>
+                    <a class="btn btn-primary" asp-action="Renew" asp-route-ns="@row.Namespace" asp-route-name="@row.Secret">
+                        Renew
+                    </a>
+                </td>
+            </tr>
+            }
+        </tbody>
+    </table>
+</div>

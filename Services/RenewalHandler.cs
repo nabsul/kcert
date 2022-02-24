@@ -25,29 +25,29 @@ public class RenewalHandler
         _cert = cert;
     }
 
-    public async Task RenewCertAsync(string ns, string secretName, string[] hosts, KCertParams p)
+    public async Task RenewCertAsync(string ns, string secretName, string[] hosts)
     {
         _log.Clear();
 
         try
         {
-            var (kid, initNonce) = await InitAsync(p.AcmeKey, p.AcmeDirUrl, p.AcmeEmail, p.TermsAccepted);
+            var (kid, initNonce) = await InitAsync(_cfg.AcmeKey, _cfg.AcmeDir, _cfg.AcmeEmail, _cfg.AcmeAccepted);
             _log.LogInformation("Initialized renewal process for secret {ns}/{secretName} - hosts {hosts} - kid {kid}",
                 ns, secretName, string.Join(",", hosts), kid);
 
-            var (orderUri, finalizeUri, authorizations, orderNonce) = await CreateOrderAsync(p.AcmeKey, hosts, kid, initNonce);
+            var (orderUri, finalizeUri, authorizations, orderNonce) = await CreateOrderAsync(_cfg.AcmeKey, hosts, kid, initNonce);
             _log.LogInformation("Order {orderUri} created with finalizeUri {finalizeUri}", orderUri, finalizeUri);
 
             var validateNonce = orderNonce;
             foreach (var authUrl in authorizations)
             {
-                validateNonce = await ValidateAuthorizationAsync(p.AcmeKey, kid, validateNonce, authUrl);
+                validateNonce = await ValidateAuthorizationAsync(_cfg.AcmeKey, kid, validateNonce, authUrl);
                 _log.LogInformation("Validated auth: {authUrl}", authUrl);
             }
 
-            var (certUri, finalizeNonce) = await FinalizeOrderAsync(p.AcmeKey, orderUri, finalizeUri, hosts, kid, validateNonce);
+            var (certUri, finalizeNonce) = await FinalizeOrderAsync(_cfg.AcmeKey, orderUri, finalizeUri, hosts, kid, validateNonce);
             _log.LogInformation("Finalized order and received cert URI: {certUri}", certUri);
-            await SaveCertAsync(p.AcmeKey, ns, secretName, certUri, kid, finalizeNonce);
+            await SaveCertAsync(_cfg.AcmeKey, ns, secretName, certUri, kid, finalizeNonce);
             _log.LogInformation("Saved cert");
         }
         catch (Exception ex)

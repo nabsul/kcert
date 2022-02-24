@@ -1,0 +1,24 @@
+﻿@inject KCertConfig _cfg
+@{
+    ViewData["Title"] = "Configuration";
+    var options = new JsonSerializerOptions { WriteIndented = true };
+    var data = _cfg.AllConfigs;
+}
+
+<h2>KCert Configuration</h2>
+
+<p>
+    The following is a summary KCert settings. Settings can be overridden using environment variables such as
+    "KCERT__SERVICENAME" (with two underscores) to configure the "KCert:ServiceName" value.
+</p>
+
+<pre>
+@Html.Raw(JsonSerializer.Serialize(data, options))
+</pre>
+
+@if (!string.IsNullOrWhiteSpace(_cfg.SmtpHost))
+{
+<div>
+    <a class="btn btn-info" asp-action="TestEmail">Send Test Email</a>
+</div>
+}

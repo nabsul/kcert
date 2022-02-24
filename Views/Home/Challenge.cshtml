@@ -1,0 +1,16 @@
+﻿@model V1Ingress
+@{ 
+    ViewData["Title"] = "Challenge Routes";
+    var options = new JsonSerializerOptions { WriteIndented = true };
+}
+
+<h2>Challenge Ingress</h2>
+
+<p>
+    The Challenge Ingress ".well-known/acme-challenge" requests to KCert for validation.
+    There is a "dummy.example.test" entry in the routes because we can't have an empty Ingress.
+</p>
+
+<pre>
+@Html.Raw(JsonSerializer.Serialize(Model?.Spec?.Rules, options))
+</pre>

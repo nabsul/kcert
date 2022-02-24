@@ -15,19 +15,41 @@ metadata:
   name: kcert
 rules:
 - apiGroups: [""]
-  resources: ["namespaces"]
-  verbs: ["get", "list"]
-- apiGroups: [""]
-  resources: ["secrets", "services"]
-  verbs: ["get", "list", "create", "update", "patch", "delete"]
+  resources: ["secrets"]
+  verbs: ["get", "list", "create", "update", "patch"]
 - apiGroups: ["networking.k8s.io"]
   resources: ["ingresses"]
-  verbs: ["get", "create", "update", "patch", "delete"]
+  verbs: ["get", "list", "watch"]
 ---
 apiVersion: rbac.authorization.k8s.io/v1
 kind: ClusterRoleBinding
 metadata:
   name: kcert
+subjects:
+- kind: ServiceAccount
+  name: kcert
+  namespace: kcert
+roleRef:
+  kind: ClusterRole
+  name: kcert
+  apiGroup: rbac.authorization.k8s.io
+---
+apiVersion: rbac.authorization.k8s.io/v1
+kind: Role
+metadata:
+  name: kcert
+  namespace: kcert
+rules:
+- apiGroups: ["networking.k8s.io"]
+  resources: ["ingresses"]
+  resourceNames: ["kcert"]
+  verbs: ["get", "create", "update", "patch"]
+---
+apiVersion: rbac.authorization.k8s.io/v1
+kind: RoleBinding
+metadata:
+  name: kcert
+  namespace: kcert
 subjects:
 - kind: ServiceAccount
   name: kcert
@@ -57,15 +79,39 @@ spec:
       serviceAccountName: kcert
       containers:
       - name: kcert
-        image: nabsul/kcert:v0.9.2
+        image: ghcr.io/nabsul/kcert:sha-fe8d892
         ports:
         - containerPort: 80
           name: http
         env:
-        - name: ASPNETCORE_ENVIRONMENT
-          value: Development
-        - name: KCERT_NAMESPACE
+        - name: NAMESPACE
           value: kcert
+        - name: ENABLEAUTORENEWAL
+          value: "true"
+        - name: ACME__DIRURL
+          value: https://acme-v02.api.letsencrypt.org/directory
+        - name: ACME__TERMSACCEPTED
+          value: # You must set this to "true" to indicate your acceptance of Let's Encrypt's terms of service (https://letsencrypt.org/documents/LE-SA-v1.2-November-15-2017.pdf)
+        - name: ACME__EMAIL
+          value: # Your email address for Let's Encrypt and email notifications
+        - name: ACME__KEY
+          valueFrom:
+            secretKeyRef:
+              name: kcert
+              key: acme
+        - name: SMTP__EMAILFROM
+          value: # The address from which you will send automated emails
+        - name: SMTP__HOST
+          value: SMTP host for email notifications
+        - name: SMTP__PORT
+          value: "587" # Change this if necessary
+        - name: SMTP__USER
+          value: # SMTP user name
+        - name: SMTP__PASS
+          valueFrom:
+            secretKeyRef:
+              name: kcert
+              key: smtp
 ---
 apiVersion: v1
 kind: Service
@@ -82,3 +128,23 @@ spec:
       targetPort: 80
   selector:
     app: kcert
+---
+apiVersion: networking.k8s.io/v1
+kind: Ingress
+metadata:
+  name: kcert
+  namespace: kcert
+  annotations:
+    kubernetes.io/ingress.class: nginx
+spec:
+  rules:
+  - host: dummy.example.test # needed because we can't have an empty ingress
+    http:
+      paths:
+      - path: /.well-known/acme-challenge
+        pathType: Prefix
+        backend:
+          service:
+            name: kcert
+            port:
+              number: 80

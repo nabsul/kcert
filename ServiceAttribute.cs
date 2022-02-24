@@ -1,8 +1,8 @@
 ﻿using System;
 
-namespace KCert
+namespace KCert;
+
+[AttributeUsage(AttributeTargets.Class)]
+public class ServiceAttribute : Attribute
 {
-    public class ServiceAttribute : Attribute
-    {
-    }
 }

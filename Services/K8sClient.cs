@@ -1,12 +1,14 @@
 ﻿using k8s;
 using k8s.Exceptions;
 using k8s.Models;
+using Microsoft.Extensions.Logging;
 using Microsoft.Rest;
 using System;
 using System.Collections.Generic;
 using System.Linq;
 using System.Net;
 using System.Text;
+using System.Threading;
 using System.Threading.Tasks;
 
 namespace KCert.Services;
@@ -15,27 +17,61 @@ namespace KCert.Services;
 public class K8sClient
 {
     private const string TlsSecretType = "kubernetes.io/tls";
-    private const string LabelKey = "kcert.dev/label";
+    private const string SecretLabelKey = "kcert.dev/secret";
+    private const string SecretLabelValue = "managed";
+    public const string IngressLabelKey = "kcert.dev/ingress";
+    public const string IngressLabelValue = "managed";
     private const string TlsTypeSelector = "type=kubernetes.io/tls";
 
     private readonly KCertConfig _cfg;
+
+    private readonly ILogger<K8sClient> _log;
+
     private readonly Kubernetes _client;
 
-    public K8sClient(KCertConfig cfg)
+    public K8sClient(KCertConfig cfg, ILogger<K8sClient> log)
     {
         _cfg = cfg;
+        _log = log;
         _client = new Kubernetes(GetConfig());
+    }
+
+    public async Task WatchIngressesAsync(Func<WatchEventType, V1Ingress, CancellationToken, Task> callback, CancellationToken tok)
+    {
+        var label = $"{IngressLabelKey}={IngressLabelValue}";
+        _log.LogInformation("Watching for all ingresses with: {label}", label);
+        var message = _client.ListIngressForAllNamespacesWithHttpMessagesAsync(watch: true, cancellationToken: tok, labelSelector: label);
+        await foreach (var (type, item) in message.WatchAsync<V1Ingress, V1IngressList>())
+        {
+            await callback(type, item, tok);
+        }
+    }
+
+    public async IAsyncEnumerable<V1Ingress> GetAllIngressesAsync()
+    {
+        var label = $"{IngressLabelKey}={IngressLabelValue}";
+        string tok = null;
+        do
+        {
+            var result = await _client.ListIngressForAllNamespacesAsync(labelSelector: label, continueParameter: tok);
+            tok = result.Continue();
+            foreach (var i in result.Items)
+            {
+                yield return i;
+            }
+        }
+        while (tok != null);
     }
 
     public async Task<List<V1Secret>> GetManagedSecretsAsync()
     {
-        var result = await _client.ListSecretForAllNamespacesAsync(fieldSelector: TlsTypeSelector, labelSelector: $"{LabelKey}={_cfg.Label}");
+        var result = await _client.ListSecretForAllNamespacesAsync(fieldSelector: TlsTypeSelector, labelSelector: $"{SecretLabelKey}={SecretLabelValue}");
         return result.Items.ToList();
     }
 
     public async Task<List<V1Secret>> GetUnmanagedSecretsAsync()
     {
-        var result = await _client.ListSecretForAllNamespacesAsync(fieldSelector: TlsTypeSelector, labelSelector: $"!{LabelKey}");
+        var result = await _client.ListSecretForAllNamespacesAsync(fieldSelector: TlsTypeSelector, labelSelector: $"!{SecretLabelKey}");
         return result.Items.ToList();
     }
 
@@ -43,7 +79,7 @@ public class K8sClient
     {
         var secret = await _client.ReadNamespacedSecretAsync(name, ns);
         secret.Metadata.Labels ??= new Dictionary<string, string>();
-        secret.Metadata.Labels[LabelKey] = _cfg.Label;
+        secret.Metadata.Labels[SecretLabelKey] = SecretLabelValue;
         await _client.ReplaceNamespacedSecretAsync(secret, name, ns);
     }
 
@@ -51,7 +87,7 @@ public class K8sClient
     {
         var secret = await _client.ReadNamespacedSecretAsync(name, ns);
         secret.Metadata.Labels = secret.Metadata.Labels ?? new Dictionary<string, string>();
-        secret.Metadata.Labels.Remove(LabelKey);
+        secret.Metadata.Labels.Remove(SecretLabelKey);
         await _client.ReplaceNamespacedSecretAsync(secret, name, ns);
     }
 
@@ -127,57 +163,37 @@ public class K8sClient
         }
     }
 
-    public async Task UpsertIngressAsync(string ns, string name, Action<V1Ingress> setValues)
+    public async Task UpdateIngressAsync(V1Ingress ingress)
     {
-        var ingress = await GetIngressAsync(ns, name);
-        if (ingress == null)
-        {
-            await CreateIngressAsync(ns, name, setValues);
-            return;
-        }
-
-        setValues(ingress);
-        await _client.ReplaceNamespacedIngressAsync(ingress, name, ns);
-    }
-
-    private async Task CreateIngressAsync(string ns, string name, Action<V1Ingress> setValues)
-    {
-        var ingress = new V1Ingress
-        {
-            Metadata = new V1ObjectMeta
-            {
-                Name = name,
-                NamespaceProperty = ns,
-                Annotations = new Dictionary<string, string> { { "kubernetes.io/ingress.class", "nginx" } },
-            },
-            Spec = new V1IngressSpec(),
-        };
-
-        setValues(ingress);
-        await _client.CreateNamespacedIngressAsync(ingress, ns);
+        await _client.ReplaceNamespacedIngressAsync(ingress, ingress.Name(), ingress.Namespace());
     }
 
     public async Task UpdateTlsSecretAsync(string ns, string name, string key, string cert)
     {
-        bool create = false;
         var secret = await GetSecretAsync(ns, name);
-        if (secret == null)
+        if (secret != null)
         {
-            secret = InitSecret(name);
-            create = true;
+            UpdateSecretData(secret, ns, name, key, cert);
+            await _client.ReplaceNamespacedSecretAsync(secret, name, ns);
+            return;
         }
 
+        secret = InitSecret(name);
+        UpdateSecretData(secret, ns, name, key, cert);
+        await _client.CreateNamespacedSecretAsync(secret, ns);
+    }
+
+    private static void UpdateSecretData(V1Secret secret, string ns, string name, string key, string cert)
+    {
         if (secret.Type != TlsSecretType)
         {
             throw new Exception($"Secret {ns}:{name} is not a TLS secret type");
         }
 
         secret.Metadata.Labels ??= new Dictionary<string, string>();
-        secret.Metadata.Labels[LabelKey] = _cfg.Label;
+        secret.Metadata.Labels[SecretLabelKey] = SecretLabelValue;
         secret.Data["tls.key"] = Encoding.UTF8.GetBytes(key);
         secret.Data["tls.crt"] = Encoding.UTF8.GetBytes(cert);
-        var task = create ? _client.CreateNamespacedSecretAsync(secret, ns) : _client.ReplaceNamespacedSecretAsync(secret, name, ns);
-        await task;
     }
 
     private static V1Secret InitSecret(string name)
