@@ -1,5 +1,6 @@
 ﻿using k8s.Models;
 using Microsoft.AspNetCore.Authentication;
+using Microsoft.Extensions.Logging;
 using System;
 using System.Collections.Generic;
 using System.Linq;
@@ -19,6 +20,15 @@ public class CertClient
     private const string SanOid = "2.5.29.17";
 
     private readonly RSA _rsa = RSA.Create(2048);
+    private readonly Dictionary<string, DateTime> _validKeys = new();
+    private readonly KCertConfig _cfg;
+    private readonly ILogger<CertClient> _log;
+
+    public CertClient(KCertConfig cfg, ILogger<CertClient> log)
+    {
+        _cfg = cfg;
+        _log = log;
+    }
 
     public X509Certificate2 GetCert(V1Secret secret) => new(secret.Data["tls.crt"]);
 
@@ -54,10 +64,32 @@ public class CertClient
         var key = sign.ExportECPrivateKey();
         return Base64UrlTextEncoder.Encode(key);
     }
+    public void AddChallengeKey(string key)
+    {
+        if (_cfg.AcceptAllChallenges)
+        {
+            return;
+        }
+
+        var threshold = TimeSpan.FromHours(1);
+        var now = DateTime.UtcNow;
+        _validKeys.Add(key, now);
+        foreach (var p in _validKeys.Where(p => now - p.Value > threshold))
+        {
+            _log.LogInformation("Removing old key: {k}", p.Key);
+            _validKeys.Remove(p.Key);
+        }
+    }
 
     public string GetThumbprint(string key)
     {
-        var sign = GetSigner(key);
+        if (!_cfg.AcceptAllChallenges && !_validKeys.ContainsKey(key))
+        {
+            _log.LogWarning("Rejected thumb request for {k}", key);
+            return null;
+        }
+
+        var sign = GetSigner(_cfg.AcmeKey);
         var jwk = GetJwk(sign);
         var jwkJson = JsonSerializer.Serialize(jwk);
         var jwkBytes = Encoding.UTF8.GetBytes(jwkJson);

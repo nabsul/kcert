@@ -8,9 +8,9 @@
 
 <p>
     The Challenge Ingress ".well-known/acme-challenge" requests to KCert for validation.
-    We keep an "example.com" entry in the routes because we can't have an empty Ingress.
+    There is a "dummy.example.test" entry in the routes because we can't have an empty Ingress.
 </p>
 
 <pre>
-@Html.Raw(JsonSerializer.Serialize(Model, options))
+@Html.Raw(JsonSerializer.Serialize(Model?.Spec?.Rules, options))
 </pre>

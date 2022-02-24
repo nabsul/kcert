@@ -79,5 +79,4 @@ public class EmailClient
 
         return string.Join('\n', lines);
     }
-
 }
