@@ -33,8 +33,8 @@ public class IngressMonitorService : IHostedService
 
     public Task StartAsync(CancellationToken cancellationToken)
     {
-         _ = WatchIngressesAsync(cancellationToken);
-         return Task.CompletedTask;
+        _ = WatchIngressesAsync(cancellationToken);
+        return Task.CompletedTask;
     }
 
     private async Task WatchIngressesAsync(CancellationToken tok)

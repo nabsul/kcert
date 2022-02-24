@@ -9,7 +9,7 @@ namespace KCert.Services;
 public class BufferedLogger<TT> : ILogger<TT>
 {
     private readonly ILogger<TT> _inner;
-    private readonly Queue<string> _buff = new Queue<string>();
+    private readonly Queue<string> _buff = new();
 
     public BufferedLogger(ILogger<TT> inner)
     {

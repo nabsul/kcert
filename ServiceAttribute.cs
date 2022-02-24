@@ -2,7 +2,7 @@
 
 namespace KCert;
 
-// This mark service classes to be added to the Dependency Injection
+[AttributeUsage(AttributeTargets.Class)]
 public class ServiceAttribute : Attribute
 {
 }

@@ -1,8 +1,8 @@
-﻿using System.Diagnostics;
-using Microsoft.AspNetCore.Mvc;
-using KCert.Models;
-using System.Threading.Tasks;
+﻿using KCert.Models;
 using KCert.Services;
+using Microsoft.AspNetCore.Mvc;
+using System.Diagnostics;
+using System.Threading.Tasks;
 
 namespace KCert.Controllers;
 

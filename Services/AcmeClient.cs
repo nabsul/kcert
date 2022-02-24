@@ -19,9 +19,9 @@ public class AcmeClient
     private const string ContentType = "application/jose+json";
     private const string Alg = "ES256";
 
-    private static readonly JsonSerializerOptions options = new JsonSerializerOptions { PropertyNameCaseInsensitive = true };
+    private static readonly JsonSerializerOptions options = new() { PropertyNameCaseInsensitive = true };
 
-    private readonly HttpClient _http = new HttpClient();
+    private readonly HttpClient _http = new();
     private readonly CertClient _cert;
 
     public AcmeClient(CertClient cert)

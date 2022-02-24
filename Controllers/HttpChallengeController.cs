@@ -10,7 +10,7 @@ public class HttpChallengeController : ControllerBase
     private readonly CertClient _cert;
     private readonly ILogger<HttpChallengeController> _log;
 
-    public HttpChallengeController(ILogger<HttpChallengeController> log, CertClient cert, KCertConfig cfg)
+    public HttpChallengeController(ILogger<HttpChallengeController> log, CertClient cert)
     {
         _log = log;
         _cert = cert;
