@@ -36,7 +36,7 @@ jobs:
         id: meta_docker
         uses: docker/metadata-action@v3
         with:
-          images: ${{ env.REGISTRY }}/${{ env.IMAGE_NAME }}
+          images: nabsul/kcert
           tags: |
             type=semver,pattern=v{{version}}
             type=semver,pattern=v{{major}}.{{minor}}
@@ -44,7 +44,7 @@ jobs:
       - name: Log in to the Container registry
         uses: docker/login-action@v1
         with:
-          registry: ${{ env.REGISTRY }}
+          registry: ghcr.io/nabsul/kcert
           username: ${{ github.actor }}
           password: ${{ secrets.GITHUB_TOKEN }}
 
