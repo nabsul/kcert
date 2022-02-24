@@ -1,4 +1,9 @@
 apiVersion: v1
+kind: Namespace
+metadata:
+  name: kcert
+---
+apiVersion: v1
 kind: ServiceAccount
 metadata:
   name: kcert
@@ -38,7 +43,7 @@ rules:
 - apiGroups: ["networking.k8s.io"]
   resources: ["ingresses"]
   resourceNames: ["kcert"]
-  verbs: ["get", "update", "patch"]
+  verbs: ["get", "create", "update", "patch"]
 ---
 apiVersion: rbac.authorization.k8s.io/v1
 kind: RoleBinding
@@ -74,36 +79,39 @@ spec:
       serviceAccountName: kcert
       containers:
       - name: kcert
-        image: nabsul/kcert:v1.0.0
+        image: ghcr.io/nabsul/kcert:sha-fe8d892
         ports:
         - containerPort: 80
           name: http
         env:
+        - name: NAMESPACE
+          value: kcert
+        - name: ENABLEAUTORENEWAL
+          value: "true"
         - name: ACME__DIRURL
-          value: # set this to "https://acme-staging-v02.api.letsencrypt.org/directory" or "" (you probably want the second one)
+          value: https://acme-v02.api.letsencrypt.org/directory
         - name: ACME__TERMSACCEPTED
-          value: # You must set this to "true" to indicate that you have read and accepted Let's Encrypt's TOS: https://letsencrypt.org/documents/LE-SA-v1.2-November-15-2017.pdf
+          value: # You must set this to "true" to indicate your acceptance of Let's Encrypt's terms of service (https://letsencrypt.org/documents/LE-SA-v1.2-November-15-2017.pdf)
         - name: ACME__EMAIL
-          value: # This should be the email that Let's Encrypt contacts about your certificate
+          value: # Your email address for Let's Encrypt and email notifications
         - name: ACME__KEY
           valueFrom:
             secretKeyRef:
-              - name: kcert
-                key: acme
-        # I you don't want to set up email notifications, you can delete all the "SMTP__" settings here.
+              name: kcert
+              key: acme
         - name: SMTP__EMAILFROM
-          value: # The address from which KCert will send you notifications
+          value: # The address from which you will send automated emails
         - name: SMTP__HOST
-          value: # Host name of your SMTP server
+          value: SMTP host for email notifications
         - name: SMTP__PORT
-          value: # Port of your SMTP server (be sure to put quotes around the port number)
+          value: "587" # Change this if necessary
         - name: SMTP__USER
-          value: # SMTP Username
+          value: # SMTP user name
         - name: SMTP__PASS
-          fromValue:
+          valueFrom:
             secretKeyRef:
-              - name: kcert
-                key: smtp
+              name: kcert
+              key: smtp
 ---
 apiVersion: v1
 kind: Service
@@ -130,7 +138,8 @@ metadata:
     kubernetes.io/ingress.class: nginx
 spec:
   rules:
-  - http:
+  - host: dummy.example.test # needed because we can't have an empty ingress
+    http:
       paths:
       - path: /.well-known/acme-challenge
         pathType: Prefix
