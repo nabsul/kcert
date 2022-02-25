@@ -1,6 +1,5 @@
 ﻿using k8s;
 using k8s.Models;
-using KCert.Models;
 using Microsoft.Extensions.Hosting;
 using Microsoft.Extensions.Logging;
 using System;
@@ -102,21 +101,6 @@ public class IngressMonitorService : IHostedService
             }
         }
 
-        try
-        {
-            if (await _kcert.AddChallengeHostsAsync(hosts))
-            {
-                _log.LogInformation("Giving challenge ingress time to propagate");
-                await Task.Delay(TimeSpan.FromSeconds(10), tok);
-            }
-
-            await _kcert.RenewCertAsync(ns, name, hosts.ToArray());
-            await _kcert.RemoveChallengeHostsAsync(hosts);
-            await _email.NotifyRenewalResultAsync(ns, name, null);
-        }
-        catch (RenewalException ex)
-        {
-            await _email.NotifyRenewalResultAsync(ns, name, ex);
-        }
+        await _kcert.StartRenewalProcessAsync(ns, name, hosts.ToArray());
     }
 }

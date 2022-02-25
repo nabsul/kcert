@@ -20,7 +20,7 @@ public class CertClient
     private const string SanOid = "2.5.29.17";
 
     private readonly RSA _rsa = RSA.Create(2048);
-    private readonly Dictionary<string, DateTime> _validKeys = new();
+    private readonly HashSet<string> _validKeys = new();
     private readonly KCertConfig _cfg;
     private readonly ILogger<CertClient> _log;
 
@@ -71,21 +71,24 @@ public class CertClient
             return;
         }
 
-        var threshold = TimeSpan.FromHours(1);
-        var now = DateTime.UtcNow;
-        _validKeys.Add(key, now);
-        foreach (var p in _validKeys.Where(p => now - p.Value > threshold))
-        {
-            _log.LogInformation("Removing old key: {k}", p.Key);
-            _validKeys.Remove(p.Key);
-        }
+        _validKeys.Add(key);
     }
 
-    public string GetThumbprint(string key)
+    public void RemoveChallengeKey(string key)
     {
-        if (!_cfg.AcceptAllChallenges && !_validKeys.ContainsKey(key))
+        if (_cfg.AcceptAllChallenges)
         {
-            _log.LogWarning("Rejected thumb request for {k}", key);
+            return;
+        }
+
+        _validKeys.Remove(key);
+    }
+
+    public string GetThumbprint(string token)
+    {
+        if (!_cfg.AcceptAllChallenges && !_validKeys.Contains(token))
+        {
+            _log.LogWarning("Rejected thumb request for {k}", token);
             return null;
         }
 

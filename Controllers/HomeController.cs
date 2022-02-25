@@ -14,16 +14,18 @@ public class HomeController : Controller
     private readonly KCertConfig _cfg;
     private readonly EmailClient _email;
     private readonly AcmeClient _acme;
+    private readonly CertClient _cert;
 
     private static string TermsOfServiceUrl;
 
-    public HomeController(KCertClient kcert, K8sClient kube, KCertConfig cfg, EmailClient email, AcmeClient acme)
+    public HomeController(KCertClient kcert, K8sClient kube, KCertConfig cfg, EmailClient email, AcmeClient acme, CertClient cert)
     {
         _kcert = kcert;
         _kube = kube;
         _cfg = cfg;
         _email = email;
         _acme = acme;
+        _cert = cert;
     }
 
     [HttpGet("")]
@@ -62,7 +64,16 @@ public class HomeController : Controller
     [HttpGet("renew/{ns}/{name}")]
     public async Task<IActionResult> RenewAsync(string ns, string name)
     {
-        await _kcert.RenewCertAsync(ns, name);
+        var secret = await _kube.GetSecretAsync(ns, name);
+        if (secret == null)
+        {
+            return NotFound();
+        }
+
+        var cert = _cert.GetCert(secret);
+        var hosts = _cert.GetHosts(cert).ToArray();
+
+        await _kcert.StartRenewalProcessAsync(ns, name, hosts);
         return RedirectToAction("Home");
     }
 

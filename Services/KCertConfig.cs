@@ -21,6 +21,8 @@ public class KCertConfig
     public string KCertIngressName => GetString("KCert:IngressName");
     public int KCertServicePort => GetInt("KCert:ServicePort");
 
+    public string ChallengeIngressAnnotation => GetString("ChallengeIngress:Annotation");
+
     public TimeSpan AcmeWaitTime => TimeSpan.FromSeconds(_cfg.GetValue<int>("Acme:ValidationWaitTimeSeconds"));
     public int AcmeNumRetries => _cfg.GetValue<int>("Acme:ValidationNumRetries");
     public bool EnableAutoRenew => GetBool("Acme:AutoRenewal");

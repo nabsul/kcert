@@ -1,4 +1,6 @@
 ﻿using k8s.Models;
+using KCert.Models;
+using Microsoft.Extensions.Logging;
 using System;
 using System.Collections.Generic;
 using System.Linq;
@@ -13,66 +15,94 @@ public class KCertClient
     private readonly RenewalHandler _getCert;
     private readonly CertClient _cert;
     private readonly KCertConfig _cfg;
+    private readonly ILogger<KCertClient> _log;
+    private readonly EmailClient _email;
 
-    public KCertClient(K8sClient kube, KCertConfig cfg, RenewalHandler getCert, CertClient cert)
+    private Task _running = Task.CompletedTask;
+
+    public KCertClient(K8sClient kube, KCertConfig cfg, RenewalHandler getCert, CertClient cert, ILogger<KCertClient> log, EmailClient email)
     {
         _kube = kube;
         _cfg = cfg;
         _getCert = getCert;
         _cert = cert;
+        _log = log;
+        _email = email;
     }
 
-    public async Task RenewCertAsync(string ns, string secretName, string[] hosts = null)
+    // Ensure that only one cert is renewed at a time
+    public Task StartRenewalProcessAsync(string ns, string secretName, string[] hosts)
     {
-        if (hosts == null)
+        Task task;
+        lock(this)
         {
-            var secret = await _kube.GetSecretAsync(ns, secretName);
-            if (secret == null)
+            task = RenewCertAsync(_running, ns, secretName, hosts);
+            _running = task;
+        }
+
+        return task;
+    }
+
+    private async Task RenewCertAsync(Task prev, string ns, string secretName, string[] hosts)
+    {
+        try
+        {
+            await prev;
+        }
+        catch (Exception ex)
+        {
+            _log.LogError(ex, "Previous task in rewal chain failed.");
+        }
+
+        try
+        {
+            await AddChallengeHostsAsync(hosts);
+            _log.LogInformation("Giving challenge ingress time to propagate");
+            await _getCert.RenewCertAsync(ns, secretName, hosts);
+            await _kube.DeleteIngressAsync(_cfg.KCertNamespace, _cfg.KCertIngressName);
+            await _email.NotifyRenewalResultAsync(ns, secretName, null);
+        }
+        catch (RenewalException ex)
+        {
+            _log.LogError(ex, "Renewal failed");
+            await _email.NotifyRenewalResultAsync(ns, secretName, ex);
+        }
+        catch (Exception ex)
+        {
+            _log.LogError(ex, "Unexpected renewal failure");
+        }
+    }
+
+    private async Task AddChallengeHostsAsync(IEnumerable<string> hosts)
+    {
+        var kcertIngress = await _kube.GetIngressAsync(_cfg.KCertNamespace, _cfg.KCertIngressName);
+        if (kcertIngress != null)
+        {
+            await _kube.DeleteIngressAsync(_cfg.KCertNamespace, _cfg.KCertIngressName);
+        }
+
+        kcertIngress = new()
+        {
+            Metadata = new()
             {
-                throw new Exception($"Secret not found: {ns} - {secretName}");
+                Name = _cfg.KCertIngressName,
+                NamespaceProperty = _cfg.KCertNamespace,
+            },
+            Spec = new()
+            {
+                Rules = hosts.Select(CreateRule).ToList()
             }
+        };
 
-            var cert = _cert.GetCert(secret);
-            hosts = _cert.GetHosts(cert).ToArray();
-        }
-
-        await _getCert.RenewCertAsync(ns, secretName, hosts);
-    }
-
-    public async Task<bool> AddChallengeHostsAsync(IEnumerable<string> hosts)
-    {
-        var kcertIngress = await _kube.GetIngressAsync(_cfg.KCertNamespace, _cfg.KCertIngressName);
-        var configuredHosts = kcertIngress.Spec.Rules.Select(r => r.Host).ToHashSet();
-        var changed = false;
-        foreach (var host in hosts.Where(h => !configuredHosts.Contains(h)))
+        var annotation = _cfg.ChallengeIngressAnnotation;
+        if (annotation != null)
         {
-            changed = true;
-            kcertIngress.Spec.Rules.Add(CreateRule(host));
+            var parts = annotation.Split(":", 2);
+            kcertIngress.Metadata.Annotations = new Dictionary<string, string>();
+            kcertIngress.Metadata.Annotations.Add(parts[0], parts[1]);
         }
 
-        if (changed)
-        {
-            await _kube.UpdateIngressAsync(kcertIngress);
-        }
-
-        return changed;
-    }
-
-    public async Task<bool> RemoveChallengeHostsAsync(IEnumerable<string> hosts)
-    {
-        var toRemove = hosts.ToHashSet();
-        var kcertIngress = await _kube.GetIngressAsync(_cfg.KCertNamespace, _cfg.KCertIngressName);
-
-        var filteredRules = kcertIngress.Spec.Rules.Where(r => !toRemove.Contains(r.Host)).ToList();
-
-        if (filteredRules.Count == kcertIngress.Spec.Rules.Count)
-        {
-            return false;
-        }
-
-        kcertIngress.Spec.Rules = filteredRules;
-        await _kube.UpdateIngressAsync(kcertIngress);
-        return true;
+        await _kube.CreateIngressAsync(kcertIngress);
     }
 
     private V1IngressRule CreateRule(string host)

@@ -16,16 +16,16 @@ public class HttpChallengeController : ControllerBase
         _cert = cert;
     }
 
-    [HttpGet("{key}")]
-    public IActionResult GetChallengeResults(string key)
+    [HttpGet("{token}")]
+    public IActionResult GetChallengeResults(string token)
     {
-        _log.LogInformation("Received ACME Challenge: {key}", key);
-        var thumb = _cert.GetThumbprint(key);
+        _log.LogInformation("Received ACME Challenge: {token}", token);
+        var thumb = _cert.GetThumbprint(token);
         if (thumb == null)
         {
             return NotFound();
         }
 
-        return Ok($"{key}.{thumb}");
+        return Ok($"{token}.{thumb}");
     }
 }

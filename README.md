@@ -2,23 +2,35 @@
 
 KCert is a simple alternative to [cert-manager](https://github.com/jetstack/cert-manager):
 
-- Instead of 26000 lines of yaml, `KCert` deploys with less than 150 lines
-- Instead of custom resources, `KCert` uses the existing standard Kubernetes objects
-- The codebase is small and easy to understand
+- Deploys with less than 150 lines (vs. 26000 lines of yaml for cert-manager)
+- Does not create or need any CRDs (Custom Resource Definitions) to operate
+- Runs a single service in your cluster, isolated in its own namespace
+
+## How it Works
+
+- KCert runs as a single-replica deployment in your cluster
+- An ingress is managed to route `.acme/challenge` requests to the service
+- Service provides a web UI for basic information and configuration details
+- Checks for certificates needing renewal every 6 hours
+- Automatically renews certificates with less than 30 days of validity
+- Watches for created and updated ingresses in the cluster
+- Automatically creates certificates for ingresses with the `kcert.dev/kcert=managed` label
 
 ## Installing KCert
 
-The following instructions assume that you will be using the included `deploy.yml` file as your template for install KCert.
+The following instructions assume that you will be using the included `deploy.yml` file as your template to install KCert.
 If you are customizing your setup you will likely need to modify the following instructions accordingly.
 
 Below you can find more details, but setting up KCert involves the following steps:
 
 - Create SMTP credentials for KCert to send automatic email notifications (or skip SMTP related instructions)
-- Generate a ECDSA key by running `docker run -it nabsul/kcert:1.0.0 dotnet KCert.dll generate-key`
+- Generate an ECDSA key by running `docker run -it nabsul/kcert:v1.0.0 dotnet KCert.dll generate-key`
 - Create the KCert namespace with `kubectl create namespace kcert`
-- Create the KCert secret with `kubectl -n kcert create secret generic kcert --from-literal=acme=[...] --from-literal=smtp=[...]`
+- Create a secret with `kubectl -n kcert create secret generic kcert --from-literal=acme=[...] --from-literal=smtp=[...]`
 - Fill in the `deploy.yml` file and run `kubectl apply -f deploy.yml`
 - Start `kubectl -n kcert port-forward svc/kcert 80` and view the dashboard at `http://localhost`
+
+The following sections describe the above in more detail.
 
 ### Create KCert secrets
 
@@ -53,21 +65,6 @@ To check that everything is running as expected:
 
 - Run `kubectl -n kcert logs svc/kcert` and make sure there are no error messages
 - Run `kubectl -n kcert port-forward svc/kcert 80` and go to `http://localhost:80` in your browser
-
-## Uninstalling KCert
-
-KCert does not create many resources,
-and most of them are restricted to the kcert namespace.
-Removing KCert from your cluster is as simple as executing these three commands:
-
-```sh
-kubectl delete namespace kcert
-kubectl delete clusterrolebinding kcert
-kubectl delete clusterrole kcert
-```
-
-Note that certificates created by KCert in other namespaces will NOT be deleted.
-You can keep those certificates or manually delete them.
 
 ## Creating Certificates
 
@@ -176,22 +173,28 @@ with a `ACME__RENEWALCHECKTIMEHOURS` environment variable.
 Note that there are two underscore (`_`) characters in between the two parts of the setting name.
 For more information see the [official .NET Core documentation](https://docs.microsoft.com/en-us/aspnet/core/fundamentals/configuration/?view=aspnetcore-6.0).
 
-## How it Works
-
-- An ingress definition routes `.acme/challenge` requests to KCert for HTTP challenge requests
-- Service provides a web UI and to manually manage and certs
-- KCert will automatically check for certificates needing renewal every 6 hours
-- KCert will renew a certificate if it expires in less than 30 days
-- KCert watches for created and updated ingresses in the cluster
-- KCert will automatically create and manage certificates for ingresses with the `kcert.dev/kcert=managed` label
-
 ## Building from Scratch
 
 To build your own container image: `docker build -t [your tag] .`
 
 ## Running Locally
 
+For local development, I recommend using `dotnet user-secrets` to configure all of KCert's required settings.
 You can run KCert locally with `dotnet run`.
-If you have Kubectl configured to connect to your cluster,
-KCert will use those settings to do the same.
+KCert will use your local kubectl configuration to connect to a Kubernetes cluster.
 It will behave as if it is running in the cluster and you will be able to explore any settings that might be there.
+
+## Uninstalling KCert
+
+KCert does not create many resources,
+and most of them are restricted to the kcert namespace.
+Removing KCert from your cluster is as simple as executing these three commands:
+
+```sh
+kubectl delete namespace kcert
+kubectl delete clusterrolebinding kcert
+kubectl delete clusterrole kcert
+```
+
+Note that certificates created by KCert in other namespaces will NOT be deleted.
+You can keep those certificates or manually delete them.
