@@ -182,7 +182,7 @@ public class K8sClient
 
     public async Task CreateIngressAsync(V1Ingress ingress)
     {
-        await _client.CreateNamespacedIngressAsync(ingress, ingress.Name(), ingress.Namespace());
+        await _client.CreateNamespacedIngressAsync(ingress, _cfg.KCertNamespace);
     }
 
     public async Task UpdateTlsSecretAsync(string ns, string name, string key, string cert)

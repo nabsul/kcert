@@ -85,7 +85,6 @@ public class KCertClient
             Metadata = new()
             {
                 Name = _cfg.KCertIngressName,
-                NamespaceProperty = _cfg.KCertNamespace,
                 Annotations = _cfg.ChallengeIngressAnnotations,
             },
             Spec = new()
