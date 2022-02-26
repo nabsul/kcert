@@ -163,9 +163,26 @@ public class K8sClient
         }
     }
 
-    public async Task UpdateIngressAsync(V1Ingress ingress)
+    public async Task DeleteIngressAsync(string ns, string name)
     {
-        await _client.ReplaceNamespacedIngressAsync(ingress, ingress.Name(), ingress.Namespace());
+        try
+        {
+            await _client.DeleteNamespacedIngressAsync(name, ns);
+        }
+        catch (HttpOperationException ex)
+        {
+            if (ex.Response.StatusCode == HttpStatusCode.NotFound)
+            {
+                return;
+            }
+
+            throw;
+        }
+    }
+
+    public async Task CreateIngressAsync(V1Ingress ingress)
+    {
+        await _client.CreateNamespacedIngressAsync(ingress, _cfg.KCertNamespace);
     }
 
     public async Task UpdateTlsSecretAsync(string ns, string name, string key, string cert)

@@ -1,6 +1,5 @@
 ﻿using k8s;
 using k8s.Models;
-using KCert.Models;
 using Microsoft.Extensions.Hosting;
 using Microsoft.Extensions.Logging;
 using System;
@@ -18,15 +17,13 @@ public class IngressMonitorService : IHostedService
     private readonly KCertClient _kcert;
     private readonly K8sClient _k8s;
     private readonly CertClient _cert;
-    private readonly EmailClient _email;
 
-    public IngressMonitorService(ILogger<IngressMonitorService> log, KCertClient kcert, K8sClient k8s, CertClient cert, EmailClient email)
+    public IngressMonitorService(ILogger<IngressMonitorService> log, KCertClient kcert, K8sClient k8s, CertClient cert)
     {
         _log = log;
         _kcert = kcert;
         _k8s = k8s;
         _cert = cert;
-        _email = email;
     }
 
     public Task StopAsync(CancellationToken cancellationToken) => Task.CompletedTask;
@@ -65,6 +62,7 @@ public class IngressMonitorService : IHostedService
             _log.LogInformation("Processing ingress {ns}:{n}", ing.Namespace(), ing.Name());
             foreach (var tls in ing?.Spec?.Tls ?? new List<V1IngressTLS>())
             {
+                _log.LogInformation("Processing secret {s}", tls.SecretName);
                 var key = (ing.Namespace(), tls.SecretName);
                 if (!nsLookup.TryGetValue(key, out var hosts))
                 {
@@ -81,7 +79,7 @@ public class IngressMonitorService : IHostedService
 
         foreach (var ((ns, name), hosts) in nsLookup)
         {
-            _log.LogInformation("Handling cert {ns} - {name} hosts: {h}", ns, name, string.Join(", ", hosts));
+            _log.LogInformation("Handling cert {ns} - {name} hosts: {h}", ns, name, string.Join(",", hosts));
             await TryUpdateSecretAsync(ns, name, hosts, tok);
         }
     }
@@ -89,6 +87,7 @@ public class IngressMonitorService : IHostedService
     private async Task TryUpdateSecretAsync(string ns, string name, IEnumerable<string> hosts, CancellationToken tok)
     {
         var secret = await _k8s.GetSecretAsync(ns, name);
+        tok.ThrowIfCancellationRequested();
 
         if (secret != null)
         {
@@ -102,21 +101,6 @@ public class IngressMonitorService : IHostedService
             }
         }
 
-        try
-        {
-            if (await _kcert.AddChallengeHostsAsync(hosts))
-            {
-                _log.LogInformation("Giving challenge ingress time to propagate");
-                await Task.Delay(TimeSpan.FromSeconds(10), tok);
-            }
-
-            await _kcert.RenewCertAsync(ns, name, hosts.ToArray());
-            await _kcert.RemoveChallengeHostsAsync(hosts);
-            await _email.NotifyRenewalResultAsync(ns, name, null);
-        }
-        catch (RenewalException ex)
-        {
-            await _email.NotifyRenewalResultAsync(ns, name, ex);
-        }
+        await _kcert.StartRenewalProcessAsync(ns, name, hosts.ToArray(), tok);
     }
 }

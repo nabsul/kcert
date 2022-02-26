@@ -1,5 +1,7 @@
 ﻿using Microsoft.Extensions.Configuration;
 using System;
+using System.Collections.Generic;
+using System.Linq;
 
 namespace KCert.Services;
 
@@ -20,6 +22,10 @@ public class KCertConfig
     public string KCertServiceName => GetString("KCert:ServiceName");
     public string KCertIngressName => GetString("KCert:IngressName");
     public int KCertServicePort => GetInt("KCert:ServicePort");
+
+    public Dictionary<string, string> ChallengeIngressAnnotations => GetDictionary("ChallengeIngress:Annotations");
+
+    public Dictionary<string, string> ChallengeIngressLabels => GetDictionary("ChallengeIngress:Labels");
 
     public TimeSpan AcmeWaitTime => TimeSpan.FromSeconds(_cfg.GetValue<int>("Acme:ValidationWaitTimeSeconds"));
     public int AcmeNumRetries => _cfg.GetValue<int>("Acme:ValidationNumRetries");
@@ -74,4 +80,10 @@ public class KCertConfig
     private string GetString(string key) => _cfg.GetValue<string>(key);
     private int GetInt(string key) => _cfg.GetValue<int>(key);
     private bool GetBool(string key) => _cfg.GetValue<bool>(key);
+
+    private Dictionary<string, string> GetDictionary(string key)
+    {
+        var data = _cfg.GetSection(key)?.GetChildren() ?? Enumerable.Empty<IConfigurationSection>();
+        return data.ToDictionary(s => s.Key, s => s.Value);
+    }
 }

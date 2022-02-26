@@ -105,14 +105,7 @@ public class RenewalService : IHostedService
 
         try
         {
-            if (await _kcert.AddChallengeHostsAsync(hosts))
-            {
-                _log.LogInformation("Giving challenge ingress time to propagate");
-                await Task.Delay(TimeSpan.FromSeconds(10), tok);
-            }
-
-            await _kcert.RenewCertAsync(secret.Namespace(), secret.Name());
-            await _kcert.RemoveChallengeHostsAsync(hosts);
+            await _kcert.StartRenewalProcessAsync(secret.Namespace(), secret.Name(), hosts.ToArray(), tok);
             await _email.NotifyRenewalResultAsync(secret.Namespace(), secret.Name(), null);
         }
         catch (RenewalException ex)
