@@ -2,6 +2,7 @@
 using KCert.Services;
 using Microsoft.AspNetCore.Mvc;
 using System.Diagnostics;
+using System.Threading;
 using System.Threading.Tasks;
 
 namespace KCert.Controllers;
@@ -73,7 +74,7 @@ public class HomeController : Controller
         var cert = _cert.GetCert(secret);
         var hosts = _cert.GetHosts(cert).ToArray();
 
-        await _kcert.StartRenewalProcessAsync(ns, name, hosts);
+        await _kcert.StartRenewalProcessAsync(ns, name, hosts, CancellationToken.None);
         return RedirectToAction("Home");
     }
 

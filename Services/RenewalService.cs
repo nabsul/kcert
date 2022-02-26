@@ -105,7 +105,7 @@ public class RenewalService : IHostedService
 
         try
         {
-            await _kcert.StartRenewalProcessAsync(secret.Namespace(), secret.Name(), hosts.ToArray());
+            await _kcert.StartRenewalProcessAsync(secret.Namespace(), secret.Name(), hosts.ToArray(), tok);
             await _email.NotifyRenewalResultAsync(secret.Namespace(), secret.Name(), null);
         }
         catch (RenewalException ex)

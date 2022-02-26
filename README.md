@@ -19,44 +19,28 @@ KCert is a simple alternative to [cert-manager](https://github.com/jetstack/cert
 ## Installing KCert
 
 The following instructions assume that you will be using the included `deploy.yml` file as your template to install KCert.
-If you are customizing your setup you will likely need to modify the following instructions accordingly.
+If you are customizing your setup you will likely need to modify the instructions accordingly.
 
-Below you can find more details, but setting up KCert involves the following steps:
+> Note: KCert has been tested with the Ingress [Nginx NGINX Controller](https://kubernetes.github.io/ingress-nginx/).
+> If you'd like to use it with a different controller and have trouble, there may be some hidden settings that need to be tweaked.
+> Please [create an issue](https://github.com/nabsul/kcert/issues) and I'd be happy to help.
 
-- Create SMTP credentials for KCert to send automatic email notifications (or skip SMTP related instructions)
-- Generate an ECDSA key by running `docker run -it nabsul/kcert:v1.0.0 dotnet KCert.dll generate-key`
-- Create the KCert namespace with `kubectl create namespace kcert`
-- Create a secret with `kubectl -n kcert create secret generic kcert --from-literal=acme=[...] --from-literal=smtp=[...]`
-- Fill in the `deploy.yml` file and run `kubectl apply -f deploy.yml`
-- Start `kubectl -n kcert port-forward svc/kcert 80` and view the dashboard at `http://localhost`
+Getting started with KCert is very straigh-forward.
+Starting with the `deploy.yml` template in this repo, find the `env:` section.
+Fill in all the required values (marked with `#` comments):
 
-The following sections describe the above in more detail.
-
-### Create KCert secrets
-
-It's bad practice to save secrets in yaml files, so we will be creating them separately.
-KCert configuration involves two secrets:
-
-- The ACME ECDSA key which is needed to create and renew certificates
-- The optional SMTP password if you want to have email notifications
-
-You can create the ECDSA key using KCert from the command line:
-
-- If you have .NET Core installed you can check out this repo and run `dotnet run generate-key`
-- If you have Docker (or Podman) you can run `docker run -it nabsul/kcert:v1.0.0 dotnet KCert.dll generate-key`
-
-You can then create your Kubernetes secret with the following (replace the placeholders with your own values):
-
-```sh
-kubectl create namespace kcert
-kubectl -n kcert create secret generic kcert --from-literal=acme=[YOUR ACME KEY] --from-literal=smtp=[YOUR SMTP PASSWORD]
+```yaml
+        - name: ACME__DIRURL
+          value: # https://acme-staging-v02.api.letsencrypt.org/directory or https://acme-v02.api.letsencrypt.org/directory
+        - name: ACME__TERMSACCEPTED
+          value: # You must set this to "true" to indicate your acceptance of Let's Encrypt's terms of service (https://letsencrypt.org/documents/LE-SA-v1.2-November-15-2017.pdf)
+        - name: ACME__EMAIL
+          value: # Your email address for Let's Encrypt and email notifications
 ```
 
-### Deploy KCert
-
-Starting with the `deploy.yml` template in this repo, find the `env:` section.
-Fill in all the required values (marked with `#` comments).
-If you don't want to set up email notifications you can delete all environment variables that start with `SMTP__`.
+If this is your first time using KCert you should probably start out with `https://acme-staging-v02.api.letsencrypt.org/directory`.
+Experiment and make sure everything is working as expected, then switch over to `https://acme-v02.api.letsencrypt.org/directory`.
+More information this topic can be found [here](https://letsencrypt.org/docs/staging-environment/).
 
 Once you've configured your settings, deploy KCert by running `kubectl apply -f ./deploy.yml`.
 Congratulations, KCert should now be running!
@@ -65,6 +49,71 @@ To check that everything is running as expected:
 
 - Run `kubectl -n kcert logs svc/kcert` and make sure there are no error messages
 - Run `kubectl -n kcert port-forward svc/kcert 80` and go to `http://localhost:80` in your browser
+
+### Recommended: Email Notifications
+
+KCert can auotmatically send you an email notification when it renews a certificate or fails to do so.
+To configure email, you'll need to provide the following SMTP configuration details:
+
+- The email address, username and password of the SMTP account
+- The hostname and port of the SMTP server (SSL required)
+
+The password should be placed in a Kubernetes secret as follows:
+
+```sh
+kubectl -n kcert create secret generic kcert-smtp --from-literal=password=[...]
+```
+
+You can then add the following to the `env:` section of your deployment:
+
+```yaml
+        - name: SMTP__EMAILFROM
+          value: [...]
+        - name: SMTP__HOST
+          value: [...]
+        - name: SMTP__PORT
+          value: "[...]" # Be sure to put the port number between quotes
+        - name: SMTP__USER
+          value: [...]
+        - name: SMTP__PASS
+          valueFrom:
+            secretKeyRef:
+              name: kcert-smtp
+              key: password
+```
+
+To test your email configuration you can connect to the KCert dasboard by running
+`kubectl -n kcert port-forward svc/kcert 80` and opening `http://localhost` in your browser.
+From there, navigate to the configuration section.
+Check that your settings are listed there, and then click "Send Test Email" to receive a test email.
+
+### Optional: Configure a fixed ACME Key
+
+By default KCert will generate a random secret key at startup.
+For many use cases this should be fine.
+If you would like to use a fixed key, you can provide it with an environment variable.
+
+You can generate your own random key with the following:
+
+```sh
+docker run -it nabsul/kcert:v1.0.0 dotnet KCert.dll generate-key
+```
+
+Next you would need to put that generated key into a Kubernetes secret:
+
+```sh
+kubectl -n kcert create secret generic kcert-key --from-literal=key=[...]
+```
+
+Finally, add this to your deployment's environment variables:
+
+```yaml
+        - name: ACME__KEY
+          valueFrom:
+            secretKeyRef:
+              name: kcert-key
+              key: key
+```
 
 ## Creating Certificates
 

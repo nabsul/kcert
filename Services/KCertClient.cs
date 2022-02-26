@@ -6,6 +6,7 @@ using System;
 using System.Collections.Generic;
 using System.Linq;
 using System.Text.Json;
+using System.Threading;
 using System.Threading.Tasks;
 
 namespace KCert.Services;
@@ -15,41 +16,40 @@ public class KCertClient
 {
     private readonly K8sClient _kube;
     private readonly RenewalHandler _getCert;
-    private readonly CertClient _cert;
     private readonly KCertConfig _cfg;
     private readonly ILogger<KCertClient> _log;
     private readonly EmailClient _email;
 
     private Task _running = Task.CompletedTask;
 
-    public KCertClient(K8sClient kube, KCertConfig cfg, RenewalHandler getCert, CertClient cert, ILogger<KCertClient> log, EmailClient email)
+    public KCertClient(K8sClient kube, KCertConfig cfg, RenewalHandler getCert, ILogger<KCertClient> log, EmailClient email)
     {
         _kube = kube;
         _cfg = cfg;
         _getCert = getCert;
-        _cert = cert;
         _log = log;
         _email = email;
     }
 
     // Ensure that no certs are renewed in parallel
-    public Task StartRenewalProcessAsync(string ns, string secretName, string[] hosts)
+    public Task StartRenewalProcessAsync(string ns, string secretName, string[] hosts, CancellationToken tok)
     {
         Task task;
-        lock(this)
+        lock (this)
         {
-            task = RenewCertAsync(_running, ns, secretName, hosts);
+            task = RenewCertAsync(_running, ns, secretName, hosts, tok);
             _running = task;
         }
 
         return task;
     }
 
-    private async Task RenewCertAsync(Task prev, string ns, string secretName, string[] hosts)
+    private async Task RenewCertAsync(Task prev, string ns, string secretName, string[] hosts, CancellationToken tok)
     {
         try
         {
             await prev;
+            tok.ThrowIfCancellationRequested();
         }
         catch (Exception ex)
         {
@@ -59,9 +59,11 @@ public class KCertClient
         try
         {
             await AddChallengeHostsAsync(hosts);
+            tok.ThrowIfCancellationRequested();
             await _getCert.RenewCertAsync(ns, secretName, hosts);
             await _kube.DeleteIngressAsync(_cfg.KCertNamespace, _cfg.KCertIngressName);
             await _email.NotifyRenewalResultAsync(ns, secretName, null);
+            tok.ThrowIfCancellationRequested();
         }
         catch (RenewalException ex)
         {
@@ -70,7 +72,7 @@ public class KCertClient
         }
         catch (HttpOperationException ex)
         {
-            _log.LogError(ex.Response.Content);
+            _log.LogError(ex, "HTTP Operation failed with respones: {resp}", ex.Response.Content);
             throw;
         }
         catch (Exception ex)
@@ -101,7 +103,6 @@ public class KCertClient
             }
         };
 
-        _log.LogInformation(JsonSerializer.Serialize(kcertIngress));
         await _kube.CreateIngressAsync(kcertIngress);
         _log.LogInformation("Giving challenge ingress time to propagate");
         await Task.Delay(TimeSpan.FromSeconds(5));

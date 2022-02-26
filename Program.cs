@@ -5,17 +5,25 @@ using Microsoft.Extensions.Configuration;
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Hosting;
 using System;
+using System.Collections.Generic;
 
 if (args.Length > 0 && args[^1] == "generate-key")
 {
+    Console.WriteLine("Generating ACME Key");
     var key = CertClient.GenerateNewKey();
     Console.WriteLine(key);
     return;
 }
 
-Host.CreateDefaultBuilder(args)
+var fallbacks = new Dictionary<string, string>
+{
+    { "Acme:Key", CertClient.GenerateNewKey() }
+};
+
+var host = Host.CreateDefaultBuilder(args)
     .ConfigureAppConfiguration((ctx, cfg) =>
     {
+        cfg.AddInMemoryCollection(fallbacks);
         cfg.AddUserSecrets<Program>(optional: true);
         cfg.AddEnvironmentVariables();
     })
@@ -25,4 +33,6 @@ Host.CreateDefaultBuilder(args)
         services.AddHostedService<RenewalService>();
         services.AddHostedService<IngressMonitorService>();
     })
-    .Build().Run();
+    .Build();
+
+host.Run();
