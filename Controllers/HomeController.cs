@@ -1,6 +1,8 @@
-﻿using KCert.Models;
+﻿using k8s.Models;
+using KCert.Models;
 using KCert.Services;
 using Microsoft.AspNetCore.Mvc;
+using System.Collections.Generic;
 using System.Diagnostics;
 using System.Threading;
 using System.Threading.Tasks;
@@ -34,6 +36,18 @@ public class HomeController : Controller
     {
         var secrets = await _kube.GetManagedSecretsAsync();
         return View(secrets);
+    }
+
+    [HttpGet("ingresses")]
+    public async Task<IActionResult> IngressesAsync()
+    {
+        var ingresses = new List<V1Ingress>();
+        await foreach (var i in _kube.GetAllIngressesAsync())
+        {
+            ingresses.Add(i);
+        }
+
+        return View(ingresses);
     }
 
     [HttpGet("challenge")]

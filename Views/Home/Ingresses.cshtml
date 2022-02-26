@@ -1,0 +1,20 @@
+﻿@model List<V1Ingress>
+@{
+    ViewData["Title"] = "Challenge Routes";
+    var options = new JsonSerializerOptions { WriteIndented = true };
+    var formatted = Model.Select(i => new
+    {
+        Tls = i?.Spec?.Tls,
+        Rules = i?.Spec?.Rules
+    }).ToList();
+}
+
+<h2>Ingresses</h2>
+
+<p>
+    These are the ingresses that KCert is handling:
+</p>
+
+<pre>
+@Html.Raw(JsonSerializer.Serialize(formatted, options))
+</pre>

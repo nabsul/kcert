@@ -21,7 +21,7 @@ KCert is a simple alternative to [cert-manager](https://github.com/jetstack/cert
 The following instructions assume that you will be using the included `deploy.yml` file as your template to install KCert.
 If you are customizing your setup you will likely need to modify the instructions accordingly.
 
-> Note: KCert has been tested with the Ingress [Nginx NGINX Controller](https://kubernetes.github.io/ingress-nginx/).
+> Note: KCert has been tested with [Ingress NGINX Controller](https://kubernetes.github.io/ingress-nginx/).
 > If you'd like to use it with a different controller and have trouble, there may be some hidden settings that need to be tweaked.
 > Please [create an issue](https://github.com/nabsul/kcert/issues) and I'd be happy to help.
 
