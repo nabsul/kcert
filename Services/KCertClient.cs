@@ -30,7 +30,7 @@ public class KCertClient
         _email = email;
     }
 
-    // Ensure that only one cert is renewed at a time
+    // Ensure that no certs are renewed in parallel
     public Task StartRenewalProcessAsync(string ns, string secretName, string[] hosts)
     {
         Task task;
@@ -57,7 +57,6 @@ public class KCertClient
         try
         {
             await AddChallengeHostsAsync(hosts);
-            _log.LogInformation("Giving challenge ingress time to propagate");
             await _getCert.RenewCertAsync(ns, secretName, hosts);
             await _kube.DeleteIngressAsync(_cfg.KCertNamespace, _cfg.KCertIngressName);
             await _email.NotifyRenewalResultAsync(ns, secretName, null);
@@ -87,6 +86,7 @@ public class KCertClient
             {
                 Name = _cfg.KCertIngressName,
                 NamespaceProperty = _cfg.KCertNamespace,
+                Annotations = _cfg.ChallengeIngressAnnotations,
             },
             Spec = new()
             {
@@ -94,15 +94,9 @@ public class KCertClient
             }
         };
 
-        var annotation = _cfg.ChallengeIngressAnnotation;
-        if (annotation != null)
-        {
-            var parts = annotation.Split(":", 2);
-            kcertIngress.Metadata.Annotations = new Dictionary<string, string>();
-            kcertIngress.Metadata.Annotations.Add(parts[0], parts[1]);
-        }
-
         await _kube.CreateIngressAsync(kcertIngress);
+        _log.LogInformation("Giving challenge ingress time to propagate");
+        await Task.Delay(TimeSpan.FromSeconds(5));
     }
 
     private V1IngressRule CreateRule(string host)

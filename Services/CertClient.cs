@@ -64,25 +64,9 @@ public class CertClient
         var key = sign.ExportECPrivateKey();
         return Base64UrlTextEncoder.Encode(key);
     }
-    public void AddChallengeKey(string key)
-    {
-        if (_cfg.AcceptAllChallenges)
-        {
-            return;
-        }
+    public void AddChallengeToken(string token) => _validKeys.Add(token);
 
-        _validKeys.Add(key);
-    }
-
-    public void RemoveChallengeKey(string key)
-    {
-        if (_cfg.AcceptAllChallenges)
-        {
-            return;
-        }
-
-        _validKeys.Remove(key);
-    }
+    public void ClearChallengeTokens() => _validKeys.Clear();
 
     public string GetThumbprint(string token)
     {

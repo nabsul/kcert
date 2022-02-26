@@ -5,6 +5,7 @@ using Microsoft.Extensions.Hosting;
 using System;
 using System.Linq;
 using System.Reflection;
+using System.Text.Json;
 
 namespace KCert;
 
