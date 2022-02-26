@@ -2,7 +2,7 @@
 
 KCert is a simple alternative to [cert-manager](https://github.com/jetstack/cert-manager):
 
-- Deploys with less than 150 lines (vs. 26000 lines of yaml for cert-manager)
+- Deploys with around 100 lines of yaml (vs. thousands of lines for [cert-manager](https://cert-manager.io/docs/installation/))
 - Does not create or need any CRDs (Custom Resource Definitions) to operate
 - Runs a single service in your cluster, isolated in its own namespace
 
