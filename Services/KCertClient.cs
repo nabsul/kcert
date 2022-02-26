@@ -4,6 +4,7 @@ using Microsoft.Extensions.Logging;
 using System;
 using System.Collections.Generic;
 using System.Linq;
+using System.Text.Json;
 using System.Threading.Tasks;
 
 namespace KCert.Services;
@@ -85,6 +86,7 @@ public class KCertClient
             Metadata = new()
             {
                 Name = _cfg.KCertIngressName,
+                NamespaceProperty = _cfg.KCertNamespace,
                 Annotations = _cfg.ChallengeIngressAnnotations,
             },
             Spec = new()
@@ -93,6 +95,7 @@ public class KCertClient
             }
         };
 
+        _log.LogInformation(JsonSerializer.Serialize(kcertIngress));
         await _kube.CreateIngressAsync(kcertIngress);
         _log.LogInformation("Giving challenge ingress time to propagate");
         await Task.Delay(TimeSpan.FromSeconds(5));
