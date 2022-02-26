@@ -1,6 +1,7 @@
 ﻿using k8s.Models;
 using KCert.Models;
 using Microsoft.Extensions.Logging;
+using Microsoft.Rest;
 using System;
 using System.Collections.Generic;
 using System.Linq;
@@ -66,6 +67,11 @@ public class KCertClient
         {
             _log.LogError(ex, "Renewal failed");
             await _email.NotifyRenewalResultAsync(ns, secretName, ex);
+        }
+        catch (HttpOperationException ex)
+        {
+            _log.LogError(ex.Response.Content);
+            throw;
         }
         catch (Exception ex)
         {
