@@ -40,7 +40,6 @@ public class EmailClient
         var subject = "KCert encountered an unexpected error";
         var body = $"{message}\n\n{ex.Message}\n\n{ex.StackTrace}";
         await SendAsync(subject, body);
-
     }
 
     private async Task SendAsync(string subject, string text)

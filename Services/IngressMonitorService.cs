@@ -55,7 +55,6 @@ public class IngressMonitorService : IHostedService
             catch (TaskCanceledException ex)
             {
                 _log.LogError(ex, "Ingress watch service cancelled.");
-                throw;
             }
             catch (Exception ex)
             {
