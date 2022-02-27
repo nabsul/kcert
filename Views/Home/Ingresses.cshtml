@@ -6,11 +6,20 @@
     {
         Name = i.Name(),
         Namespace = i.Namespace(),
-        Tls = i?.Spec?.Tls?.Select(t => $"{t?.SecretName}:{JsonSerializer.Serialize(t?.Hosts)}"),
+        Tls = i?.Spec?.Tls?.Select(t => new
+        {
+            SecretName = t?.SecretName,
+            Hosts = t?.Hosts,
+        })?.ToArray(),
         Rules = i?.Spec?.Rules.Select(r => new
         {
             Host = r?.Host,
-            Paths = JsonSerializer.Serialize(r?.Http?.Paths?.Select(p => $"{p.PathType}:{p.Path}:{p?.Backend?.Service?.Name}").ToArray())
+            Paths = r?.Http?.Paths?.Select(p => new
+            {
+                PathType = p.PathType,
+                Path = p.Path,
+                ServiceName = p?.Backend?.Service?.Name,
+            }).ToArray()
         })
     }).ToList();
 }
