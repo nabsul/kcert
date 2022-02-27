@@ -34,7 +34,11 @@ public class RenewalService : IHostedService
 
     public Task StartAsync(CancellationToken cancellationToken)
     {
-        _ = StartInnerAsync(cancellationToken);
+        if (_cfg.EnableAutoRenew)
+        {
+            _ = StartInnerAsync(cancellationToken);
+        }
+
         return Task.CompletedTask;
     }
 
@@ -43,6 +47,7 @@ public class RenewalService : IHostedService
         int numFailures = 0;
         while (numFailures < MaxServiceFailures && !cancellationToken.IsCancellationRequested)
         {
+            Exception error = null;
             _log.LogInformation("Starting up renewal service.");
             try
             {
@@ -51,12 +56,24 @@ public class RenewalService : IHostedService
             catch (TaskCanceledException ex)
             {
                 _log.LogError(ex, "Renewal loop cancelled.");
-                break;
             }
             catch (Exception ex)
             {
                 numFailures++;
                 _log.LogError(ex, "Renewal Service encountered error {numFailures} of max {MaxServiceFailures}", numFailures, MaxServiceFailures);
+                error = ex;
+            }
+
+            if (error != null)
+            {
+                try
+                {
+                    await _email.NotifyFailureAsync("Certificate renewal failed unexpectedly", error);
+                }
+                catch (Exception ex)
+                {
+                    _log.LogError(ex, "Failed to send cert renewal failure email");
+                }
             }
         }
     }

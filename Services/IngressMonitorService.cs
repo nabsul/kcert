@@ -17,70 +17,116 @@ public class IngressMonitorService : IHostedService
     private readonly KCertClient _kcert;
     private readonly K8sClient _k8s;
     private readonly CertClient _cert;
+    private readonly EmailClient _email;
+    private readonly KCertConfig _cfg;
 
-    public IngressMonitorService(ILogger<IngressMonitorService> log, KCertClient kcert, K8sClient k8s, CertClient cert)
+    public IngressMonitorService(ILogger<IngressMonitorService> log, KCertClient kcert, K8sClient k8s, CertClient cert, EmailClient email, KCertConfig cfg)
     {
         _log = log;
         _kcert = kcert;
         _k8s = k8s;
         _cert = cert;
+        _email = email;
+        _cfg = cfg;
     }
 
     public Task StopAsync(CancellationToken cancellationToken) => Task.CompletedTask;
 
     public Task StartAsync(CancellationToken cancellationToken)
     {
-        _ = WatchIngressesAsync(cancellationToken);
+        if (_cfg.WatchIngresses)
+        {
+            _ = WatchIngressesAsync(cancellationToken);
+        }
+
         return Task.CompletedTask;
     }
 
     private async Task WatchIngressesAsync(CancellationToken tok)
     {
-        try
+        int numTries = 5;
+        while (numTries-- > 0)
         {
-            _log.LogInformation("Watching for ingress changes");
-            await _k8s.WatchIngressesAsync(HandleIngressEventAsync, tok);
-        }
-        catch (Exception ex)
-        {
-            _log.LogError(ex, "Ingress watcher failed");
+            try
+            {
+                _log.LogInformation("Watching for ingress changes");
+                await _k8s.WatchIngressesAsync(HandleIngressEventAsync, tok);
+            }
+            catch (TaskCanceledException ex)
+            {
+                _log.LogError(ex, "Ingress watch service cancelled.");
+            }
+            catch (Exception ex)
+            {
+                _log.LogError(ex, "Ingress watcher failed");
+                try
+                {
+                    await _email.NotifyFailureAsync("Ingress watching failed unexpectedly", ex);
+                }
+                catch (Exception ex2)
+                {
+                    _log.LogError(ex2, "Failed to send error notification");
+                }
+            }
+
+            _log.LogError("Watch Ingresses failed. Sleeping for 10 seconds then trying {n} more times.", numTries);
+            await Task.Delay(TimeSpan.FromSeconds(10), tok);
         }
     }
 
     private async Task HandleIngressEventAsync(WatchEventType type, V1Ingress ingress, CancellationToken tok)
     {
-        _log.LogInformation("event [{type}] for {ns}-{name}", type, ingress.Namespace(), ingress.Name());
-        if (type != WatchEventType.Added && type != WatchEventType.Modified)
+        try
         {
-            return;
-        }
-
-        // fetch all ingresses to figure out which certs need have which hosts
-        var nsLookup = new Dictionary<(string, string), HashSet<string>>();
-        await foreach (var ing in _k8s.GetAllIngressesAsync())
-        {
-            _log.LogInformation("Processing ingress {ns}:{n}", ing.Namespace(), ing.Name());
-            foreach (var tls in ing?.Spec?.Tls ?? new List<V1IngressTLS>())
+            _log.LogInformation("event [{type}] for {ns}-{name}", type, ingress.Namespace(), ingress.Name());
+            if (type != WatchEventType.Added && type != WatchEventType.Modified)
             {
-                _log.LogInformation("Processing secret {s}", tls.SecretName);
-                var key = (ing.Namespace(), tls.SecretName);
-                if (!nsLookup.TryGetValue(key, out var hosts))
-                {
-                    hosts = new HashSet<string>();
-                    nsLookup.Add(key, hosts);
-                }
+                return;
+            }
 
-                foreach (var h in tls.Hosts)
+            // fetch all ingresses to figure out which certs need have which hosts
+            var nsLookup = new Dictionary<(string, string), HashSet<string>>();
+            await foreach (var ing in _k8s.GetAllIngressesAsync())
+            {
+                _log.LogInformation("Processing ingress {ns}:{n}", ing.Namespace(), ing.Name());
+                foreach (var tls in ing?.Spec?.Tls ?? new List<V1IngressTLS>())
                 {
-                    hosts.Add(h);
+                    _log.LogInformation("Processing secret {s}", tls.SecretName);
+                    var key = (ing.Namespace(), tls.SecretName);
+                    if (!nsLookup.TryGetValue(key, out var hosts))
+                    {
+                        hosts = new HashSet<string>();
+                        nsLookup.Add(key, hosts);
+                    }
+
+                    foreach (var h in tls.Hosts)
+                    {
+                        hosts.Add(h);
+                    }
                 }
             }
-        }
 
-        foreach (var ((ns, name), hosts) in nsLookup)
+            foreach (var ((ns, name), hosts) in nsLookup)
+            {
+                _log.LogInformation("Handling cert {ns} - {name} hosts: {h}", ns, name, string.Join(",", hosts));
+                await TryUpdateSecretAsync(ns, name, hosts, tok);
+            }
+        }
+        catch (TaskCanceledException ex)
         {
-            _log.LogInformation("Handling cert {ns} - {name} hosts: {h}", ns, name, string.Join(",", hosts));
-            await TryUpdateSecretAsync(ns, name, hosts, tok);
+            _log.LogError(ex, "Ingress watch service cancelled.");
+        }
+        catch (Exception ex)
+        {
+            _log.LogError(ex, "Ingress event handler failed unexpectedly");
+            try
+            {
+                await _email.NotifyFailureAsync("Ingress watching failed unexpectedly", ex);
+            }
+            catch (Exception ex2)
+            {
+                _log.LogError(ex2, "Failed to send error notification");
+            }
         }
     }
 

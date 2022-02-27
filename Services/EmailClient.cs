@@ -1,5 +1,6 @@
 ﻿using KCert.Models;
 using Microsoft.Extensions.Logging;
+using System;
 using System.Collections.Generic;
 using System.Linq;
 using System.Net;
@@ -32,6 +33,13 @@ public class EmailClient
     public async Task NotifyRenewalResultAsync(string secretNamespace, string secretName, RenewalException ex)
     {
         await SendAsync(RenewalSubject(secretNamespace, secretName, ex), RenewalMessage(secretNamespace, secretName, ex));
+    }
+
+    public async Task NotifyFailureAsync(string message, Exception ex)
+    {
+        var subject = "KCert encountered an unexpected error";
+        var body = $"{message}\n\n{ex.Message}\n\n{ex.StackTrace}";
+        await SendAsync(subject, body);
     }
 
     private async Task SendAsync(string subject, string text)
