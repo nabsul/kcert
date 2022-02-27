@@ -32,7 +32,7 @@ public class KCertConfig
     public int AcmeNumRetries => _cfg.GetValue<int>("Acme:ValidationNumRetries");
     public bool EnableAutoRenew => GetBool("Acme:AutoRenewal");
     public TimeSpan RenewalTimeBetweenChecks => TimeSpan.FromHours(_cfg.GetValue<int>("Acme:RenewalCheckTimeHours"));
-    public TimeSpan RenewalExpirationLimit => TimeSpan.FromDays(_cfg.GetValue<int>("Acme:RenewalExpirationRenewalDays"));
+    public TimeSpan RenewalExpirationLimit => TimeSpan.FromDays(_cfg.GetValue<int>("Acme:RenewalThresholdDays"));
 
     public Uri AcmeDir => new(GetString("Acme:DirUrl"));
     public string AcmeEmail => GetString("Acme:Email");
@@ -61,7 +61,7 @@ public class KCertConfig
             ValidationNumRetries = AcmeNumRetries,
             AutoRenewal = EnableAutoRenew,
             RenewalCheckTimeHours = RenewalTimeBetweenChecks,
-            RenewalExpirationRenewalDays = RenewalExpirationLimit,
+            RenewalThresholdDays = RenewalExpirationLimit,
             TermsAccepted = AcmeAccepted,
             DirUrl = AcmeDir,
             Email = AcmeEmail,
