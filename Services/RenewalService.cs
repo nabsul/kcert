@@ -53,12 +53,14 @@ public class RenewalService : IHostedService
             {
                 await RunLoopAsync(cancellationToken);
             }
-            catch (TaskCanceledException ex)
-            {
-                _log.LogError(ex, "Renewal loop cancelled.");
-            }
             catch (Exception ex)
             {
+                if (ex is TaskCanceledException)
+                {
+                    _log.LogError(ex, "Renewal loop cancelled.");
+                    throw;
+                }
+
                 numFailures++;
                 _log.LogError(ex, "Renewal Service encountered error {numFailures} of max {MaxServiceFailures}", numFailures, MaxServiceFailures);
                 error = ex;

@@ -52,12 +52,14 @@ public class IngressMonitorService : IHostedService
                 _log.LogInformation("Watching for ingress changes");
                 await _k8s.WatchIngressesAsync(HandleIngressEventAsync, tok);
             }
-            catch (TaskCanceledException ex)
-            {
-                _log.LogError(ex, "Ingress watch service cancelled.");
-            }
             catch (Exception ex)
             {
+                if (ex is TaskCanceledException)
+                {
+                    _log.LogError(ex, "Ingress watch service cancelled.");
+                    throw;
+                }
+
                 _log.LogError(ex, "Ingress watcher failed");
                 try
                 {
@@ -112,12 +114,14 @@ public class IngressMonitorService : IHostedService
                 await TryUpdateSecretAsync(ns, name, hosts, tok);
             }
         }
-        catch (TaskCanceledException ex)
-        {
-            _log.LogError(ex, "Ingress watch service cancelled.");
-        }
         catch (Exception ex)
         {
+            if (ex is TaskCanceledException)
+            {
+                _log.LogError(ex, "Ingress watch service cancelled.");
+                throw;
+            }
+
             _log.LogError(ex, "Ingress event handler failed unexpectedly");
             try
             {
