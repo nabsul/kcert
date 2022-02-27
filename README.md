@@ -26,7 +26,8 @@ If you are customizing your setup you will likely need to modify the instruction
 > Please [create an issue](https://github.com/nabsul/kcert/issues) and I'd be happy to help.
 
 Getting started with KCert is very straigh-forward.
-Starting with the `deploy.yml` template in this repo, find the `env:` section.
+Starting with the `deploy.yml` [template in this repo](https://raw.githubusercontent.com/nabsul/kcert/main/deploy.yml),
+find the `env:` section.
 Fill in all the required values (marked with `#` comments):
 
 ```yaml
@@ -237,7 +238,7 @@ It will behave as if it is running in the cluster and you will be able to explor
 
 KCert does not create many resources,
 and most of them are restricted to the kcert namespace.
-Removing KCert from your cluster is as simple as executing these three commands:
+Removing KCert from your cluster is as simple as executing `kubectl delete -f deploy.yml` or these three commands:
 
 ```sh
 kubectl delete namespace kcert
