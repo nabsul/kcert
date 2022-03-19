@@ -1,4 +1,5 @@
 ﻿@inject CertClient _cert
+@inject KCertConfig _cfg
 @model List<V1Secret>
 @{
     ViewData["Title"] = "Ingress";
@@ -28,7 +29,10 @@
                 <th scope="col">Hosts</th>
                 <th scope="col">Created</th>
                 <th scope="col">Expiration</th>
+                @if (_cfg.ShowRenewButton)
+                {
                 <th scope="col">Actions</th>
+                }
             </tr>
         </thead>
         <tbody>
@@ -40,11 +44,14 @@
                 <td>@Html.Raw(row.Hosts)</td>
                 <td>@row.Created</td>
                 <td>@row.Expiration</td>
+                @if (_cfg.ShowRenewButton)
+                {
                 <td>
                     <a class="btn btn-primary" asp-action="Renew" asp-route-ns="@row.Namespace" asp-route-name="@row.Secret">
                         Renew
                     </a>
                 </td>
+                }
             </tr>
             }
         </tbody>

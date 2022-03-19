@@ -23,6 +23,7 @@ public class KCertConfig
     public string KCertServiceName => GetString("KCert:ServiceName");
     public string KCertIngressName => GetString("KCert:IngressName");
     public int KCertServicePort => GetInt("KCert:ServicePort");
+    public bool ShowRenewButton => GetBool("KCert:ShowRenewButton");
 
     public Dictionary<string, string> ChallengeIngressAnnotations => GetDictionary("ChallengeIngress:Annotations");
 
