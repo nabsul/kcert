@@ -36,14 +36,24 @@ public class K8sClient
         _client = new Kubernetes(GetConfig());
     }
 
-    public async Task WatchIngressesAsync(Func<WatchEventType, V1Ingress, CancellationToken, Task> callback, CancellationToken tok)
+    public async Task WatchIngressesAsync(Func<WatchEventType, V1Ingress, Task> callback, CancellationToken tok)
     {
         var label = $"{IngressLabelKey}={IngressLabelValue}";
         _log.LogInformation("Watching for all ingresses with: {label}", label);
         var message = _client.ListIngressForAllNamespacesWithHttpMessagesAsync(watch: true, cancellationToken: tok, labelSelector: label);
         await foreach (var (type, item) in message.WatchAsync<V1Ingress, V1IngressList>())
         {
-            await callback(type, item, tok);
+            await callback(type, item);
+        }
+    }
+
+    public async Task WatchSecretsAsync(Func<WatchEventType, V1Secret, Task> callback, CancellationToken tok)
+    {
+        _log.LogInformation("Watching for secrets");
+        var message = _client.ListSecretForAllNamespacesWithHttpMessagesAsync(watch: true, cancellationToken: tok);
+        await foreach (var (type, item) in message.WatchAsync<V1Secret, V1SecretList>())
+        {
+            await callback(type, item);
         }
     }
 

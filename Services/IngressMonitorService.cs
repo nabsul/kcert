@@ -50,7 +50,7 @@ public class IngressMonitorService : IHostedService
             try
             {
                 _log.LogInformation("Watching for ingress changes");
-                await _k8s.WatchIngressesAsync(HandleIngressEventAsync, tok);
+                await _k8s.WatchIngressesAsync((e, i) => HandleIngressEventAsync(e, i, tok), tok);
             }
             catch (Exception ex)
             {
