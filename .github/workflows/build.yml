@@ -1,13 +1,11 @@
+---
 name: Build KCert
 on:
   push:
     branches:
-    - 'main'
+    - '**'
     tags:
-    - 'v*'
-  pull_request:
-    branches:
-    - 'main'
+    - '**'
 
 jobs:
   build-and-push-image:
@@ -15,7 +13,8 @@ jobs:
     permissions:
       contents: read
       packages: write
-
+    env:
+      IS_MAIN: ${{github.GITHUB_REF_NAME == 'main'}}
     steps:
       - name: Checkout repository
         uses: actions/checkout@v2
@@ -43,7 +42,7 @@ jobs:
         uses: docker/build-push-action@v2
         with:
           context: .
-          push: true
+          push: ${{ env.IS_MAIN }}
           tags: ${{ steps.meta_ghcr.outputs.tags }}
           labels: ${{ steps.meta_ghcr.outputs.labels }}
 
@@ -69,6 +68,6 @@ jobs:
         uses: docker/build-push-action@v2
         with:
           context: .
-          push: true
+          push: ${{ env.IS_MAIN }}
           tags: ${{ steps.meta_docker.outputs.tags }}
           labels: ${{ steps.meta_docker.outputs.labels }}
