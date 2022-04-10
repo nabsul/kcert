@@ -65,12 +65,12 @@ public class KCertConfig
             RenewalThresholdDays = RenewalExpirationLimit,
             TermsAccepted = AcmeAccepted,
             DirUrl = AcmeDir,
-            Email = AcmeEmail,
+            Email = HideString(AcmeEmail),
             Key = HideString(AcmeKey)
         },
         SMTP = new
         {
-            EmailFrom = SmtpEmailFrom,
+            EmailFrom = HideString(SmtpEmailFrom),
             Host = SmtpHost,
             Port = SmtpPort,
             User = SmtpUser,
