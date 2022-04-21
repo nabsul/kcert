@@ -1,9 +1,11 @@
 ﻿using KCert.Services;
 using Microsoft.AspNetCore.Mvc;
+using Microsoft.AspNetCore.Routing;
 using Microsoft.Extensions.Logging;
 
 namespace KCert.Controllers;
 
+[Host("*:80")]
 [Route(".well-known/acme-challenge")]
 public class HttpChallengeController : ControllerBase
 {
@@ -15,6 +17,10 @@ public class HttpChallengeController : ControllerBase
         _log = log;
         _cert = cert;
     }
+
+    [HttpGet("test/{value}")]
+    public IActionResult GetTest(string value) => Ok(new { success = true, value });
+
 
     [HttpGet("{token}")]
     public IActionResult GetChallengeResults(string token)
