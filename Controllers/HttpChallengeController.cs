@@ -18,6 +18,10 @@ public class HttpChallengeController : ControllerBase
         _cert = cert;
     }
 
+    [HttpGet("test/{value}")]
+    public IActionResult GetTest(string value) => Ok(new { success = true, value });
+
+
     [HttpGet("{token}")]
     public IActionResult GetChallengeResults(string token)
     {
