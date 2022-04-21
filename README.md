@@ -97,7 +97,7 @@ If you would like to use a fixed key, you can provide it with an environment var
 You can generate your own random key with the following:
 
 ```sh
-docker run -it nabsul/kcert:v1.0.0 dotnet KCert.dll generate-key
+docker run -it nabsul/kcert:v1.0.1 dotnet KCert.dll generate-key
 ```
 
 Next you would need to put that generated key into a Kubernetes secret:
