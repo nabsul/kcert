@@ -54,7 +54,8 @@ public class KCertConfig
             IngressName = KCertIngressName,
             SecertName = KCertSecretName,
             ServiceName = KCertServiceName,
-            ServicePort = KCertServicePort
+            ServicePort = KCertServicePort,
+            ShowRenewButton,
         },
         ACME = new
         {
@@ -71,9 +72,9 @@ public class KCertConfig
         SMTP = new
         {
             EmailFrom = HideString(SmtpEmailFrom),
-            Host = SmtpHost,
+            Host = HideString(SmtpHost),
             Port = SmtpPort,
-            User = SmtpUser,
+            User = HideString(SmtpUser),
             Pass = HideString(SmtpPass)
         },
     };
