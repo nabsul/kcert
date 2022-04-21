@@ -80,3 +80,5 @@ jobs:
           push: true
           tags: ${{ steps.meta_docker.outputs.tags }}
           labels: ${{ steps.meta_docker.outputs.labels }}
+          cache-from: type=gha,scope=kcert
+          cache-to: type=gha,scope=kcert
