@@ -27,7 +27,15 @@ var host = Host.CreateDefaultBuilder(args)
         cfg.AddUserSecrets<Program>(optional: true);
         cfg.AddEnvironmentVariables();
     })
-    .ConfigureWebHostDefaults(webBuilder => webBuilder.UseStartup<Startup>())
+    .ConfigureWebHostDefaults(webBuilder =>
+    {
+        webBuilder.ConfigureKestrel(opt =>
+        {
+            opt.ListenAnyIP(80);
+            opt.ListenAnyIP(8080);
+        });
+        webBuilder.UseStartup<Startup>();
+    })
     .ConfigureServices(services =>
     {
         services.AddHostedService<RenewalService>();

@@ -2,6 +2,7 @@
 using KCert.Models;
 using KCert.Services;
 using Microsoft.AspNetCore.Mvc;
+using Microsoft.AspNetCore.Routing;
 using System.Collections.Generic;
 using System.Diagnostics;
 using System.Threading;
@@ -9,6 +10,7 @@ using System.Threading.Tasks;
 
 namespace KCert.Controllers;
 
+[Host("*:8080")]
 [Route("")]
 public class HomeController : Controller
 {
