@@ -49,7 +49,7 @@ Congratulations, KCert should now be running!
 To check that everything is running as expected:
 
 - Run `kubectl -n kcert logs svc/kcert` and make sure there are no error messages
-- Run `kubectl -n kcert port-forward svc/kcert 80` and go to `http://localhost:80` in your browser
+- Run `kubectl -n kcert port-forward svc/kcert 8080` and go to `http://localhost:8080` in your browser
 
 ### Recommended: Email Notifications
 

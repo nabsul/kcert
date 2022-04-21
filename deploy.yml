@@ -82,6 +82,8 @@ spec:
         ports:
         - containerPort: 80
           name: http
+        - containerPort: 8080
+          name: http-admin
         env:
         - name: ACME__DIRURL
           value: # https://acme-staging-v02.api.letsencrypt.org/directory or https://acme-v02.api.letsencrypt.org/directory
@@ -103,5 +105,9 @@ spec:
       protocol: TCP
       port: 80
       targetPort: 80
+    - name: http-admin
+      protocol: TCP
+      port: 8080
+      targetPort: 8080
   selector:
     app: kcert
