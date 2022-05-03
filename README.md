@@ -14,7 +14,7 @@ KCert is a simple alternative to [cert-manager](https://github.com/jetstack/cert
 - Checks for certificates needing renewal every 6 hours
 - Automatically renews certificates with less than 30 days of validity
 - Watches for created and updated ingresses in the cluster
-- Automatically creates certificates for ingresses with the `kcert.dev/kcert=managed` label
+- Automatically creates certificates for ingresses with the `kcert.dev/ingress=managed` label
 
 ## Installing KCert
 
