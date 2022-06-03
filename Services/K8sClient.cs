@@ -17,8 +17,10 @@ namespace KCert.Services;
 public class K8sClient
 {
     private const string TlsSecretType = "kubernetes.io/tls";
-    private const string SecretLabelKey = "kcert.dev/secret";
-    private const string SecretLabelValue = "managed";
+    private const string CertLabelKey = "kcert.dev/secret";
+    private const string CertLabelValue = "managed";
+    private const string CertRequestKey = "kcert.dev/cert-request";
+    private const string CertRequestValue = "request";
     public const string IngressLabelKey = "kcert.dev/ingress";
     public const string IngressLabelValue = "managed";
     private const string TlsTypeSelector = "type=kubernetes.io/tls";
@@ -47,6 +49,17 @@ public class K8sClient
         }
     }
 
+    public async Task WatchSecretsAsync(Func<WatchEventType, V1Secret, CancellationToken, Task> callback, CancellationToken tok)
+    {
+        var label = $"{CertRequestKey}={CertRequestValue}";
+        _log.LogInformation("Watching for all secrets with: {label}", label);
+        var message = _client.ListSecretForAllNamespacesWithHttpMessagesAsync(watch: true, cancellationToken: tok, labelSelector: label);
+        await foreach (var (type, item) in message.WatchAsync<V1Secret, V1SecretList>())
+        {
+            await callback(type, item, tok);
+        }
+    }
+
     public async IAsyncEnumerable<V1Ingress> GetAllIngressesAsync()
     {
         var label = $"{IngressLabelKey}={IngressLabelValue}";
@@ -65,13 +78,13 @@ public class K8sClient
 
     public async Task<List<V1Secret>> GetManagedSecretsAsync()
     {
-        var result = await _client.ListSecretForAllNamespacesAsync(fieldSelector: TlsTypeSelector, labelSelector: $"{SecretLabelKey}={SecretLabelValue}");
+        var result = await _client.ListSecretForAllNamespacesAsync(fieldSelector: TlsTypeSelector, labelSelector: $"{CertLabelKey}={CertLabelValue}");
         return result.Items.ToList();
     }
 
     public async Task<List<V1Secret>> GetUnmanagedSecretsAsync()
     {
-        var result = await _client.ListSecretForAllNamespacesAsync(fieldSelector: TlsTypeSelector, labelSelector: $"!{SecretLabelKey}");
+        var result = await _client.ListSecretForAllNamespacesAsync(fieldSelector: TlsTypeSelector, labelSelector: $"!{CertLabelKey}");
         return result.Items.ToList();
     }
 
@@ -79,7 +92,7 @@ public class K8sClient
     {
         var secret = await _client.ReadNamespacedSecretAsync(name, ns);
         secret.Metadata.Labels ??= new Dictionary<string, string>();
-        secret.Metadata.Labels[SecretLabelKey] = SecretLabelValue;
+        secret.Metadata.Labels[CertLabelKey] = CertLabelValue;
         await _client.ReplaceNamespacedSecretAsync(secret, name, ns);
     }
 
@@ -87,7 +100,7 @@ public class K8sClient
     {
         var secret = await _client.ReadNamespacedSecretAsync(name, ns);
         secret.Metadata.Labels = secret.Metadata.Labels ?? new Dictionary<string, string>();
-        secret.Metadata.Labels.Remove(SecretLabelKey);
+        secret.Metadata.Labels.Remove(CertLabelKey);
         await _client.ReplaceNamespacedSecretAsync(secret, name, ns);
     }
 
@@ -208,7 +221,7 @@ public class K8sClient
         }
 
         secret.Metadata.Labels ??= new Dictionary<string, string>();
-        secret.Metadata.Labels[SecretLabelKey] = SecretLabelValue;
+        secret.Metadata.Labels[CertLabelKey] = CertLabelValue;
         secret.Data["tls.key"] = Encoding.UTF8.GetBytes(key);
         secret.Data["tls.crt"] = Encoding.UTF8.GetBytes(cert);
     }
