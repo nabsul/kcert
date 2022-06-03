@@ -44,22 +44,21 @@ public class IngressMonitorService : IHostedService
 
     private async Task WatchIngressesAsync(CancellationToken tok)
     {
-        int numTries = 5;
-        while (numTries-- > 0)
+        int sleepOnFailure = _cfg.InitialSleepOnFailure;
+        while (true)
         {
             try
             {
                 _log.LogInformation("Watching for ingress changes");
                 await _k8s.WatchIngressesAsync(HandleIngressEventAsync, tok);
             }
+            catch (TaskCanceledException ex)
+            {
+                _log.LogError(ex, "Ingress watch service cancelled.");
+                return;
+            }
             catch (Exception ex)
             {
-                if (ex is TaskCanceledException)
-                {
-                    _log.LogError(ex, "Ingress watch service cancelled.");
-                    throw;
-                }
-
                 _log.LogError(ex, "Ingress watcher failed");
                 try
                 {
@@ -71,8 +70,9 @@ public class IngressMonitorService : IHostedService
                 }
             }
 
-            _log.LogError("Watch Ingresses failed. Sleeping for 10 seconds then trying {n} more times.", numTries);
-            await Task.Delay(TimeSpan.FromSeconds(10), tok);
+            _log.LogError("Watch Ingresses failed. Sleeping for {n} seconds before trying again.", sleepOnFailure);
+            await Task.Delay(TimeSpan.FromSeconds(sleepOnFailure), tok);
+            sleepOnFailure *= 2;
         }
     }
 
