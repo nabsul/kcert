@@ -36,8 +36,13 @@ public class IngressMonitorService : IHostedService
     {
         if (_cfg.WatchIngresses)
         {
+            _log.LogInformation("Watching for ingress is enabled");
             var action = () => WatchIngressesAsync(cancellationToken);
             _ = _exp.DoWithExponentialBackoffAsync("Watch ingresses", action, cancellationToken);
+        }
+        else
+        {
+            _log.LogInformation("Watching for ingress is disabled");
         }
 
         return Task.CompletedTask;
