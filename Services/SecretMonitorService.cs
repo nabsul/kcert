@@ -65,7 +65,7 @@ public class SecretMonitorService : IHostedService
                 return;
             }
 
-            await HandleCertificateRequestAsync(secret, tok)
+            await HandleCertificateRequestAsync(secret, tok);
         }
         catch (TaskCanceledException ex)
         {
