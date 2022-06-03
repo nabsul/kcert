@@ -24,6 +24,7 @@ public class KCertConfig
     public string KCertIngressName => GetString("KCert:IngressName");
     public int KCertServicePort => GetInt("KCert:ServicePort");
     public bool ShowRenewButton => GetBool("KCert:ShowRenewButton");
+    public int InitialSleepOnFailure => GetInt("KCert:InitialSleepOnFailure");
 
     public Dictionary<string, string> ChallengeIngressAnnotations => GetDictionary("ChallengeIngress:Annotations");
 

@@ -17,17 +17,17 @@ public class IngressMonitorService : IHostedService
     private readonly KCertClient _kcert;
     private readonly K8sClient _k8s;
     private readonly CertClient _cert;
-    private readonly EmailClient _email;
     private readonly KCertConfig _cfg;
+    private readonly ExponentialBackoff _exp;
 
-    public IngressMonitorService(ILogger<IngressMonitorService> log, KCertClient kcert, K8sClient k8s, CertClient cert, EmailClient email, KCertConfig cfg)
+    public IngressMonitorService(ILogger<IngressMonitorService> log, KCertClient kcert, K8sClient k8s, CertClient cert, KCertConfig cfg, ExponentialBackoff exp)
     {
         _log = log;
         _kcert = kcert;
         _k8s = k8s;
         _cert = cert;
-        _email = email;
         _cfg = cfg;
+        _exp = exp;
     }
 
     public Task StopAsync(CancellationToken cancellationToken) => Task.CompletedTask;
@@ -36,44 +36,22 @@ public class IngressMonitorService : IHostedService
     {
         if (_cfg.WatchIngresses)
         {
-            _ = WatchIngressesAsync(cancellationToken);
+            _log.LogInformation("Watching for ingress is enabled");
+            var action = () => WatchIngressesAsync(cancellationToken);
+            _ = _exp.DoWithExponentialBackoffAsync("Watch ingresses", action, cancellationToken);
+        }
+        else
+        {
+            _log.LogInformation("Watching for ingress is disabled");
         }
 
         return Task.CompletedTask;
     }
 
-    private async Task WatchIngressesAsync(CancellationToken tok)
+    private async Task WatchIngressesAsync(CancellationToken cancellationToken)
     {
-        int numTries = 5;
-        while (numTries-- > 0)
-        {
-            try
-            {
-                _log.LogInformation("Watching for ingress changes");
-                await _k8s.WatchIngressesAsync(HandleIngressEventAsync, tok);
-            }
-            catch (Exception ex)
-            {
-                if (ex is TaskCanceledException)
-                {
-                    _log.LogError(ex, "Ingress watch service cancelled.");
-                    throw;
-                }
-
-                _log.LogError(ex, "Ingress watcher failed");
-                try
-                {
-                    await _email.NotifyFailureAsync("Ingress watching failed unexpectedly", ex);
-                }
-                catch (Exception ex2)
-                {
-                    _log.LogError(ex2, "Failed to send error notification");
-                }
-            }
-
-            _log.LogError("Watch Ingresses failed. Sleeping for 10 seconds then trying {n} more times.", numTries);
-            await Task.Delay(TimeSpan.FromSeconds(10), tok);
-        }
+        _log.LogInformation("Watching for ingress changes");
+        await _k8s.WatchIngressesAsync(HandleIngressEventAsync, cancellationToken);
     }
 
     private async Task HandleIngressEventAsync(WatchEventType type, V1Ingress ingress, CancellationToken tok)
@@ -123,14 +101,6 @@ public class IngressMonitorService : IHostedService
             }
 
             _log.LogError(ex, "Ingress event handler failed unexpectedly");
-            try
-            {
-                await _email.NotifyFailureAsync("Ingress watching failed unexpectedly", ex);
-            }
-            catch (Exception ex2)
-            {
-                _log.LogError(ex2, "Failed to send error notification");
-            }
         }
     }
 
