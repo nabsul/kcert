@@ -36,16 +36,17 @@ public class IngressMonitorService : IHostedService
     {
         if (_cfg.WatchIngresses)
         {
-            var action = async () =>
-            {
-                _log.LogInformation("Watching for ingress changes");
-                await _k8s.WatchIngressesAsync(HandleIngressEventAsync, cancellationToken);
-            };
-
+            var action = () => WatchIngressesAsync(cancellationToken);
             _ = _exp.DoWithExponentialBackoffAsync("Watch ingresses", action, cancellationToken);
         }
 
         return Task.CompletedTask;
+    }
+
+    private async Task WatchIngressesAsync(CancellationToken cancellationToken)
+    {
+        _log.LogInformation("Watching for ingress changes");
+        await _k8s.WatchIngressesAsync(HandleIngressEventAsync, cancellationToken);
     }
 
     private async Task HandleIngressEventAsync(WatchEventType type, V1Ingress ingress, CancellationToken tok)
