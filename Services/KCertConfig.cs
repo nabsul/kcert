@@ -16,6 +16,7 @@ public class KCertConfig
     }
 
     public bool WatchIngresses => GetBool("KCert:WatchIngresses");
+    public bool WatchSecrets => GetBool("KCert:WatchSecrets");
     public string K8sConfigFile => _cfg["Config"];
     public string KCertNamespace => GetString("KCert:Namespace");
     public string KCertSecretName => GetString("KCert:SecretName");

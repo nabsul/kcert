@@ -58,7 +58,7 @@ public class IngressMonitorService : IHostedService
     {
         try
         {
-            _log.LogInformation("event [{type}] for {ns}-{name}", type, ingress.Namespace(), ingress.Name());
+            _log.LogInformation("Ingress change event [{type}] for {ns}-{name}", type, ingress.Namespace(), ingress.Name());
             if (type != WatchEventType.Added && type != WatchEventType.Modified)
             {
                 return;
@@ -92,15 +92,13 @@ public class IngressMonitorService : IHostedService
                 await TryUpdateSecretAsync(ns, name, hosts, tok);
             }
         }
+        catch (TaskCanceledException ex)
+        {
+            _log.LogError(ex, "Ingress watch event handler cancelled.");
+        }
         catch (Exception ex)
         {
-            if (ex is TaskCanceledException)
-            {
-                _log.LogError(ex, "Ingress watch service cancelled.");
-                throw;
-            }
-
-            _log.LogError(ex, "Ingress event handler failed unexpectedly");
+            _log.LogError(ex, "Ingress watch event handler failed unexpectedly");
         }
     }
 

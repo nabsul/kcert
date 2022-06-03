@@ -203,9 +203,7 @@ public class K8sClient
         var secret = await GetSecretAsync(ns, name);
         if (secret != null)
         {
-            UpdateSecretData(secret, ns, name, key, cert);
-            await _client.ReplaceNamespacedSecretAsync(secret, name, ns);
-            return;
+            await _client.DeleteNamespacedSecretAsync(name, ns);
         }
 
         secret = InitSecret(name);
