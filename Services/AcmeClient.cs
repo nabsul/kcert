@@ -56,6 +56,17 @@ public class AcmeClient
         return _dir.Meta.TermsOfService;
     }
 
+    private string GetHMAC(string text, string key)
+    {
+        key = key ?? "";
+
+        using (var hmacsha256 = new HMACSHA256(Encoding.UTF8.GetBytes(key)))
+        {
+            var hash = hmacsha256.ComputeHash(Encoding.UTF8.GetBytes(text));
+            return Convert.ToBase64String(hash);
+        }
+    }
+
     public async Task<AcmeAccountResponse> CreateAccountAsync(string key, string email, string nonce, bool termsAccepted, bool eab, string eabKid, string eabMacKey)
     {
             var contact = new[] { $"mailto:{email}" };
@@ -70,11 +81,13 @@ public class AcmeClient
                 url: uri
             };
             var eabEncodedProtected = Base64UrlTextEncoder.Encode(eabProtected);
+            var signature = GetHMAC(eabKid, eabHmacKey);
             var payloadObject = new { 
                     contact, 
                     termsOfServiceAgreed = termsAccepted, 
                     externalAccountBinding: eabEncodedPayload,
                     payload: Base64UrlTextEncoder.Encode(eabKid),
+                    signature: signature
                 };
             return await PostAsync<AcmeAccountResponse>(key, uri, payloadObject, nonce);
         }
