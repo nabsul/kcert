@@ -56,12 +56,34 @@ public class AcmeClient
         return _dir.Meta.TermsOfService;
     }
 
-    public async Task<AcmeAccountResponse> CreateAccountAsync(string key, string email, string nonce, bool termsAccepted)
+    public async Task<AcmeAccountResponse> CreateAccountAsync(string key, string email, string nonce, bool termsAccepted, bool eab, string eabKid, string eabMacKey)
     {
-        var contact = new[] { $"mailto:{email}" };
-        var payloadObject = new { contact, termsOfServiceAgreed = termsAccepted };
-        var uri = new Uri(_dir.NewAccount);
-        return await PostAsync<AcmeAccountResponse>(key, uri, payloadObject, nonce);
+            var contact = new[] { $"mailto:{email}" };
+            var uri = new Uri(_dir.NewAccount);
+        if(!eab) {
+            var payloadObject = new { contact, termsOfServiceAgreed = termsAccepted };
+            return await PostAsync<AcmeAccountResponse>(key, uri, payloadObject, nonce);
+        } else {
+            var eabProtected = new {
+                alg: 'HS256',
+                kid: eabKid,
+                url: uri
+            };
+            var eabEncodedProtected = Base64UrlTextEncoder.Encode(eabProtected);
+            var payloadObject = new { 
+                    contact, 
+                    termsOfServiceAgreed = termsAccepted, 
+                    externalAccountBinding: eabEncodedPayload,
+                    payload: Base64UrlTextEncoder.Encode(eabKid),
+                };
+            return await PostAsync<AcmeAccountResponse>(key, uri, payloadObject, nonce);
+        }
+    }
+
+    public async Task<AcmeAccountResponse> CreateEABAccountAsync(string eabKid, string eabHmacKey, string alg)
+    {
+        Base64UrlTextEncoder.Encode(protectedObject)
+        var payloadObject = new {  }
     }
 
     public async Task<AcmeOrderResponse> CreateOrderAsync(string key, string kid, IEnumerable<string> hosts, string nonce)
