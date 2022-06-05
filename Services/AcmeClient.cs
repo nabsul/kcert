@@ -67,11 +67,11 @@ public class AcmeClient
         }
     }
 
-    public async Task<AcmeAccountResponse> CreateAccountAsync(string key, string email, string nonce, bool termsAccepted, bool eab, string eabKid, string eabMacKey)
+    public async Task<AcmeAccountResponse> CreateAccountAsync(string key, string email, string nonce, bool termsAccepted, string eabKid, string eabMacKey)
     {
             var contact = new[] { $"mailto:{email}" };
             var uri = new Uri(_dir.NewAccount);
-        if(!eab) {
+        if(!eabKid) {
             var payloadObject = new { contact, termsOfServiceAgreed = termsAccepted };
             return await PostAsync<AcmeAccountResponse>(key, uri, payloadObject, nonce);
         } else {
