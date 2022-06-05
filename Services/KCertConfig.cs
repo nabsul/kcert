@@ -41,6 +41,9 @@ public class KCertConfig
     public string AcmeKey => GetString("Acme:Key");
     public bool AcmeAccepted => GetBool("Acme:TermsAccepted");
 
+    public string AcmeEabKeyId => GetString("Acme:EabKeyId");
+    public string AcmeEabHmacKey => GetString("Acme:EabHmacKey");
+
     public string SmtpEmailFrom => GetString("Smtp:EmailFrom");
     public string SmtpHost => GetString("Smtp:Host");
     public int SmtpPort => GetInt("Smtp:Port");
