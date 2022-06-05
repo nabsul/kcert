@@ -203,6 +203,15 @@ public class K8sClient
         var secret = await GetSecretAsync(ns, name);
         if (secret != null)
         {
+            // if it's a cert we can directly replace it
+            if (secret.Type == TlsSecretType)
+            {
+                UpdateSecretData(secret, ns, name, key, cert);
+                await _client.ReplaceNamespacedSecretAsync(secret, name, ns);
+                return;
+            }
+
+            // if it's an opaque secret (ie: a request to create a cert) we delete it and create the cert
             await _client.DeleteNamespacedSecretAsync(name, ns);
         }
 
