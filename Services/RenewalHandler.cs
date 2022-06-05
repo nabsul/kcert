@@ -72,10 +72,20 @@ public class RenewalHandler
         await _acme.ReadDirectoryAsync(acmeDir);
         var nonce = await _acme.GetNonceAsync();
         // TODO read environment variable to add modify method call signatures for EAB use case
-        var account = await _acme.CreateAccountAsync(key, email, nonce, termsAccepted);
-        var kid = account.Location;
-        nonce = account.Nonce;
-        return (kid, nonce);
+        if(_cfg.AcmeEabKeyId)
+        {
+            var account = await _acme.CreateAccountAsync(key, email, nonce, termsAccepted);
+            var kid = account.Location;
+            nonce = account.Nonce;
+            return (kid, nonce);
+        } 
+        else
+        {
+            var account = await _acme.CreateAccountAsync(key, email, nonce, termsAccepted, _cfg.AcmeEabKeyId, _cgf.AcmeEabHmacKey);
+            var kid = account.Location;
+            nonce = account.Nonce;
+            return (kid, nonce);
+        }
     }
 
     private async Task<(Uri OrderUri, Uri FinalizeUri, List<Uri> Authorizations, string Nonce)> CreateOrderAsync(string key, string[] hosts, string kid, string nonce)
