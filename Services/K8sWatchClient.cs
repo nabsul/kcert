@@ -43,7 +43,7 @@ public class K8sWatchClient
     public async Task WatchConfigMapsAsync(Func<WatchEventType, V1ConfigMap, CancellationToken, Task> callback, CancellationToken tok)
     {
         var label = $"{CertRequestKey}={CertRequestValue}";
-        _log.LogInformation("Watching for all secrets with: {label}", label);
+        _log.LogInformation("Watching for all configmaps with: {label}", label);
         var message = _client.ListConfigMapForAllNamespacesWithHttpMessagesAsync(watch: true, cancellationToken: tok, labelSelector: label);
         await foreach (var (type, item) in message.WatchAsync<V1ConfigMap, V1ConfigMapList>())
         {
