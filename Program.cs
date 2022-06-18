@@ -40,6 +40,7 @@ var host = Host.CreateDefaultBuilder(args)
     {
         services.AddHostedService<RenewalService>();
         services.AddHostedService<IngressMonitorService>();
+        services.AddHostedService<ConfigMonitorService>();
     })
     .Build();
 

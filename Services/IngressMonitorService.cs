@@ -16,11 +16,12 @@ public class IngressMonitorService : IHostedService
     private readonly ILogger<IngressMonitorService> _log;
     private readonly KCertClient _kcert;
     private readonly K8sClient _k8s;
+    private readonly K8sWatchClient _watch;
     private readonly CertClient _cert;
     private readonly KCertConfig _cfg;
     private readonly ExponentialBackoff _exp;
 
-    public IngressMonitorService(ILogger<IngressMonitorService> log, KCertClient kcert, K8sClient k8s, CertClient cert, KCertConfig cfg, ExponentialBackoff exp)
+    public IngressMonitorService(ILogger<IngressMonitorService> log, KCertClient kcert, K8sClient k8s, CertClient cert, KCertConfig cfg, ExponentialBackoff exp, K8sWatchClient watch)
     {
         _log = log;
         _kcert = kcert;
@@ -28,6 +29,7 @@ public class IngressMonitorService : IHostedService
         _cert = cert;
         _cfg = cfg;
         _exp = exp;
+        _watch = watch;
     }
 
     public Task StopAsync(CancellationToken cancellationToken) => Task.CompletedTask;
@@ -51,7 +53,7 @@ public class IngressMonitorService : IHostedService
     private async Task WatchIngressesAsync(CancellationToken cancellationToken)
     {
         _log.LogInformation("Watching for ingress changes");
-        await _k8s.WatchIngressesAsync(HandleIngressEventAsync, cancellationToken);
+        await _watch.WatchIngressesAsync(HandleIngressEventAsync, cancellationToken);
     }
 
     private async Task HandleIngressEventAsync(WatchEventType type, V1Ingress ingress, CancellationToken tok)

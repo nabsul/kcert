@@ -8,7 +8,6 @@ using System.Collections.Generic;
 using System.Linq;
 using System.Net;
 using System.Text;
-using System.Threading;
 using System.Threading.Tasks;
 
 namespace KCert.Services;
@@ -19,8 +18,6 @@ public class K8sClient
     private const string TlsSecretType = "kubernetes.io/tls";
     private const string CertLabelKey = "kcert.dev/secret";
     private const string CertLabelValue = "managed";
-    private const string CertRequestKey = "kcert.dev/cert-request";
-    private const string CertRequestValue = "request";
     public const string IngressLabelKey = "kcert.dev/ingress";
     public const string IngressLabelValue = "managed";
     private const string TlsTypeSelector = "type=kubernetes.io/tls";
@@ -36,28 +33,6 @@ public class K8sClient
         _cfg = cfg;
         _log = log;
         _client = new Kubernetes(GetConfig());
-    }
-
-    public async Task WatchIngressesAsync(Func<WatchEventType, V1Ingress, CancellationToken, Task> callback, CancellationToken tok)
-    {
-        var label = $"{IngressLabelKey}={IngressLabelValue}";
-        _log.LogInformation("Watching for all ingresses with: {label}", label);
-        var message = _client.ListIngressForAllNamespacesWithHttpMessagesAsync(watch: true, cancellationToken: tok, labelSelector: label);
-        await foreach (var (type, item) in message.WatchAsync<V1Ingress, V1IngressList>())
-        {
-            await callback(type, item, tok);
-        }
-    }
-
-    public async Task WatchSecretsAsync(Func<WatchEventType, V1Secret, CancellationToken, Task> callback, CancellationToken tok)
-    {
-        var label = $"{CertRequestKey}={CertRequestValue}";
-        _log.LogInformation("Watching for all secrets with: {label}", label);
-        var message = _client.ListSecretForAllNamespacesWithHttpMessagesAsync(watch: true, cancellationToken: tok, labelSelector: label);
-        await foreach (var (type, item) in message.WatchAsync<V1Secret, V1SecretList>())
-        {
-            await callback(type, item, tok);
-        }
     }
 
     public async IAsyncEnumerable<V1Ingress> GetAllIngressesAsync()
