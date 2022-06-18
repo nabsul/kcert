@@ -1,7 +1,7 @@
-﻿using k8s.Models;
+﻿using k8s.Autorest;
+using k8s.Models;
 using KCert.Models;
 using Microsoft.Extensions.Logging;
-using Microsoft.Rest;
 using System;
 using System.Collections.Generic;
 using System.Linq;

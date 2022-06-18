@@ -33,7 +33,7 @@ public class K8sWatchClient
     {
         var label = $"{IngressLabelKey}={IngressLabelValue}";
         _log.LogInformation("Watching for all ingresses with: {label}", label);
-        var message = _client.ListIngressForAllNamespacesWithHttpMessagesAsync(watch: true, cancellationToken: tok, labelSelector: label);
+        var message = _client.NetworkingV1.ListIngressForAllNamespacesWithHttpMessagesAsync(watch: true, cancellationToken: tok, labelSelector: label);
         await foreach (var (type, item) in message.WatchAsync<V1Ingress, V1IngressList>())
         {
             await callback(type, item, tok);
@@ -44,7 +44,7 @@ public class K8sWatchClient
     {
         var label = $"{CertRequestKey}={CertRequestValue}";
         _log.LogInformation("Watching for all configmaps with: {label}", label);
-        var message = _client.ListConfigMapForAllNamespacesWithHttpMessagesAsync(watch: true, cancellationToken: tok, labelSelector: label);
+        var message = _client.CoreV1.ListConfigMapForAllNamespacesWithHttpMessagesAsync(watch: true, cancellationToken: tok, labelSelector: label);
         await foreach (var (type, item) in message.WatchAsync<V1ConfigMap, V1ConfigMapList>())
         {
             await callback(type, item, tok);
