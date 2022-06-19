@@ -1,4 +1,5 @@
 ﻿using k8s;
+using k8s.Autorest;
 using k8s.Exceptions;
 using k8s.Models;
 using Microsoft.Extensions.Logging;
@@ -29,25 +30,40 @@ public class K8sWatchClient
         _client = new Kubernetes(GetConfig());
     }
 
-    public async Task WatchIngressesAsync(Func<WatchEventType, V1Ingress, CancellationToken, Task> callback, CancellationToken tok)
+    public async Task WatchIngressesAsync(Func<WatchEventType, V1Ingress, Task> callback, CancellationToken tok)
     {
         var label = $"{IngressLabelKey}={IngressLabelValue}";
-        _log.LogInformation("Watching for all ingresses with: {label}", label);
-        var message = _client.NetworkingV1.ListIngressForAllNamespacesWithHttpMessagesAsync(watch: true, cancellationToken: tok, labelSelector: label, timeoutSeconds: 60);
-        await foreach (var (type, item) in message.WatchAsync<V1Ingress, V1IngressList>())
-        {
-            await callback(type, item, tok);
-        }
+        var watch = () => _client.NetworkingV1.ListIngressForAllNamespacesWithHttpMessagesAsync(watch: true, cancellationToken: tok, labelSelector: label);
+        await WatchInLoopAsync(label, watch, callback);
     }
 
-    public async Task WatchConfigMapsAsync(Func<WatchEventType, V1ConfigMap, CancellationToken, Task> callback, CancellationToken tok)
+    public async Task WatchConfigMapsAsync(Func<WatchEventType, V1ConfigMap, Task> callback, CancellationToken tok)
     {
         var label = $"{CertRequestKey}={CertRequestValue}";
-        _log.LogInformation("Watching for all configmaps with: {label}", label);
-        var message = _client.CoreV1.ListConfigMapForAllNamespacesWithHttpMessagesAsync(watch: true, cancellationToken: tok, labelSelector: label, timeoutSeconds: 60);
-        await foreach (var (type, item) in message.WatchAsync<V1ConfigMap, V1ConfigMapList>().ConfigureAwait(false))
+        var watch = () => _client.CoreV1.ListConfigMapForAllNamespacesWithHttpMessagesAsync(watch: true, cancellationToken: tok, labelSelector: label);
+        await WatchInLoopAsync(label, watch, callback);
+    }
+
+    private async Task WatchInLoopAsync<T, L>(string label, Func<Task<HttpOperationResponse<L>>> watch, Func<WatchEventType, T, Task> callback)
+    {
+        while (true)
         {
-            await callback(type, item, tok);
+            try
+            {
+                _log.LogInformation("Starting watch request for {type}[{label}]", typeof(T).Name, label);
+                await foreach (var (type, item) in watch().WatchAsync<T, L>())
+                {
+                    await callback(type, item);
+                }
+            }
+            catch (HttpOperationException ex)
+            {
+                if (!ex.Message.Contains("blah"))
+                {
+                    throw;
+                }
+                _log.LogInformation("Empty Kubernetes client result threw an exception. Retrying.");
+            }
         }
     }
 

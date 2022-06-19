@@ -47,7 +47,7 @@ public class ConfigMonitorService : IHostedService
     private async Task WatchConfigMapsAsync(CancellationToken cancellationToken)
     {
         _log.LogInformation("Watching for configmaps changes");
-        await _watch.WatchConfigMapsAsync(HandleConfigMapEventAsync, cancellationToken);
+        await _watch.WatchConfigMapsAsync((t, c) => HandleConfigMapEventAsync(t, c, cancellationToken), cancellationToken);
     }
 
     private async Task HandleConfigMapEventAsync(WatchEventType type, V1ConfigMap config, CancellationToken tok)
