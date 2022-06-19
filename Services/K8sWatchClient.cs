@@ -45,7 +45,7 @@ public class K8sWatchClient
         var label = $"{CertRequestKey}={CertRequestValue}";
         _log.LogInformation("Watching for all configmaps with: {label}", label);
         var message = _client.CoreV1.ListConfigMapForAllNamespacesWithHttpMessagesAsync(watch: true, cancellationToken: tok, labelSelector: label, timeoutSeconds: 60);
-        await foreach (var (type, item) in message.WatchAsync<V1ConfigMap, V1ConfigMapList>())
+        await foreach (var (type, item) in message.WatchAsync<V1ConfigMap, V1ConfigMapList>().ConfigureAwait(false))
         {
             await callback(type, item, tok);
         }
