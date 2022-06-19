@@ -41,7 +41,12 @@ var host = Host.CreateDefaultBuilder(args)
     {
         builder.AddJsonConsole(o =>
         {
-            o.JsonWriterOptions = new System.Text.Json.JsonWriterOptions { Indented = true };
+            o.UseUtcTimestamp = true;
+            o.TimestampFormat = "yyyy:MM:dd hh:mm:ss";
+            o.JsonWriterOptions = new System.Text.Json.JsonWriterOptions
+            {
+                Indented = true,
+            };
         });
     })
     .ConfigureServices(services =>
