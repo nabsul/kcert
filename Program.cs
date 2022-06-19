@@ -4,7 +4,6 @@ using Microsoft.AspNetCore.Hosting;
 using Microsoft.Extensions.Configuration;
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Hosting;
-using Microsoft.Extensions.Logging;
 using System;
 using System.Collections.Generic;
 
@@ -36,18 +35,6 @@ var host = Host.CreateDefaultBuilder(args)
             opt.ListenAnyIP(8080);
         });
         webBuilder.UseStartup<Startup>();
-    })
-    .ConfigureLogging(builder =>
-    {
-        builder.AddJsonConsole(o =>
-        {
-            o.UseUtcTimestamp = true;
-            o.TimestampFormat = "yyyy:MM:dd hh:mm:ss";
-            o.JsonWriterOptions = new System.Text.Json.JsonWriterOptions
-            {
-                Indented = true,
-            };
-        });
     })
     .ConfigureServices(services =>
     {
