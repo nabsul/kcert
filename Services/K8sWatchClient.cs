@@ -4,6 +4,8 @@ using k8s.Exceptions;
 using k8s.Models;
 using Microsoft.Extensions.Logging;
 using System;
+using System.IO;
+using System.Net.Http;
 using System.Threading;
 using System.Threading.Tasks;
 
@@ -56,13 +58,16 @@ public class K8sWatchClient
                     await callback(type, item);
                 }
             }
-            catch (HttpOperationException ex)
+            catch (HttpRequestException ex)
             {
-                if (!ex.Message.Contains("blah"))
+                if (ex.Message == "Error while copying content to a stream.")
+                {
+                    _log.LogInformation("Empty Kubernetes client result threw an exception. Retrying.");
+                }
+                else
                 {
                     throw;
                 }
-                _log.LogInformation("Empty Kubernetes client result threw an exception. Retrying.");
             }
         }
     }
