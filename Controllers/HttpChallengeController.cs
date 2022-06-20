@@ -26,12 +26,7 @@ public class HttpChallengeController : ControllerBase
     public IActionResult GetChallengeResults(string token)
     {
         _log.LogInformation("Received ACME Challenge: {token}", token);
-        var thumb = _cert.GetThumbprint(token);
-        if (thumb == null)
-        {
-            return NotFound();
-        }
-
+        var thumb = _cert.GetThumbprint();
         return Ok($"{token}.{thumb}");
     }
 }
