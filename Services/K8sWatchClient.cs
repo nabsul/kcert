@@ -48,11 +48,12 @@ public class K8sWatchClient
 
     private async Task WatchInLoopAsync<T, L>(string label, Func<Task<HttpOperationResponse<L>>> watch, Func<WatchEventType, T, Task> callback)
     {
+        var type = typeof(T).Name;
         while (true)
         {
             try
             {
-                _log.LogInformation("Starting watch request for {type}[{label}]", typeof(T).Name, label);
+                _log.LogInformation("Starting watch request for {type}[{label}]", type, label);
                 await foreach (var (type, item) in watch().WatchAsync<T, L>())
                 {
                     await callback(type, item);
@@ -62,7 +63,7 @@ public class K8sWatchClient
             {
                 if (ex.Message == "Error while copying content to a stream.")
                 {
-                    _log.LogInformation("Empty Kubernetes client result threw an exception. Retrying.");
+                    _log.LogInformation("Empty Kubernetes client result threw an exception. Retrying {type}[{label}].", type, label);
                 }
                 else
                 {
