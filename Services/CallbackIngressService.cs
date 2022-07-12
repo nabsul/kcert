@@ -61,12 +61,12 @@ public class CallbackIngressService
         return false;
     }
 
-    private static string GetAcmeChallengeTestEndpointUri(string host)
+    private string GetAcmeChallengeTestEndpointUri(string host)
     {
         var requestUri = new UriBuilder(
             Uri.UriSchemeHttp,
             host,
-            port: AcmeChallengeConstants.AcmeChallengeHostPort,
+            port: _cfg.KCertServicePort,
             pathValue: AcmeChallengeConstants.AcmeChallengeTestPath + TestRouteParameter).Uri.OriginalString;
         return requestUri;
     }
