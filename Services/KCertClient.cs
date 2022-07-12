@@ -105,7 +105,7 @@ public class KCertClient
 
         await _kube.CreateIngressAsync(kcertIngress);
         _log.LogInformation("Giving challenge ingress time to propagate");
-        await Task.Delay(TimeSpan.FromSeconds(5));
+        await Task.Delay(TimeSpan.FromSeconds(_cfg.ChallengeIngressPropagationTimeSeconds));
     }
 
     private V1IngressRule CreateRule(string host)

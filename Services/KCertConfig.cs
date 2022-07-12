@@ -29,6 +29,8 @@ public class KCertConfig
     public Dictionary<string, string> ChallengeIngressAnnotations => GetDictionary("ChallengeIngress:Annotations");
 
     public Dictionary<string, string> ChallengeIngressLabels => GetDictionary("ChallengeIngress:Labels");
+    
+    public int ChallengeIngressPropagationTimeSeconds => GetInt("ChallengeIngress:PropagationTimeSeconds");
 
     public TimeSpan AcmeWaitTime => TimeSpan.FromSeconds(_cfg.GetValue<int>("Acme:ValidationWaitTimeSeconds"));
     public int AcmeNumRetries => _cfg.GetValue<int>("Acme:ValidationNumRetries");
