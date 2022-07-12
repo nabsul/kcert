@@ -5,7 +5,6 @@ using Microsoft.Rest;
 using System;
 using System.Collections.Generic;
 using System.Linq;
-using System.Text.Json;
 using System.Threading;
 using System.Threading.Tasks;
 
@@ -19,16 +18,24 @@ public class KCertClient
     private readonly KCertConfig _cfg;
     private readonly ILogger<KCertClient> _log;
     private readonly EmailClient _email;
+    private readonly CallbackIngressService _callbackIngressService;
 
     private Task _running = Task.CompletedTask;
 
-    public KCertClient(K8sClient kube, KCertConfig cfg, RenewalHandler getCert, ILogger<KCertClient> log, EmailClient email)
+    public KCertClient(
+        K8sClient kube,
+        KCertConfig cfg,
+        RenewalHandler getCert,
+        ILogger<KCertClient> log,
+        EmailClient email,
+        CallbackIngressService callbackIngressService)
     {
         _kube = kube;
         _cfg = cfg;
         _getCert = getCert;
         _log = log;
         _email = email;
+        _callbackIngressService = callbackIngressService;
     }
 
     // Ensure that no certs are renewed in parallel
@@ -89,6 +96,7 @@ public class KCertClient
             await _kube.DeleteIngressAsync(_cfg.KCertNamespace, _cfg.KCertIngressName);
         }
 
+        var hostList = hosts.ToList();
         kcertIngress = new()
         {
             Metadata = new()
@@ -99,15 +107,16 @@ public class KCertClient
             },
             Spec = new()
             {
-                Rules = hosts.Select(CreateRule).ToList()
+                Rules = hostList.Select(CreateRule).ToList()
             }
         };
 
         await _kube.CreateIngressAsync(kcertIngress);
         _log.LogInformation("Giving challenge ingress time to propagate");
-        await Task.Delay(TimeSpan.FromSeconds(_cfg.ChallengeIngressPropagationTimeSeconds));
-    }
 
+        await _callbackIngressService.AwaitChallengeIngressPropagatedAsync(hostList);
+    }
+    
     private V1IngressRule CreateRule(string host)
     {
         return new V1IngressRule
@@ -116,21 +125,21 @@ public class KCertClient
             Http = new V1HTTPIngressRuleValue
             {
                 Paths = new List<V1HTTPIngressPath>()
+                {
+                    new V1HTTPIngressPath
                     {
-                        new V1HTTPIngressPath
+                        Path = "/.well-known/acme-challenge/",
+                        PathType = "Prefix",
+                        Backend = new V1IngressBackend
                         {
-                            Path = "/.well-known/acme-challenge/",
-                            PathType = "Prefix",
-                            Backend = new V1IngressBackend
+                            Service = new V1IngressServiceBackend
                             {
-                                Service = new V1IngressServiceBackend
-                                {
-                                    Name = _cfg.KCertServiceName,
-                                    Port = new V1ServiceBackendPort(number: _cfg.KCertServicePort)
-                                },
+                                Name = _cfg.KCertServiceName,
+                                Port = new V1ServiceBackendPort(number: _cfg.KCertServicePort)
                             },
                         },
                     },
+                },
             },
         };
     }

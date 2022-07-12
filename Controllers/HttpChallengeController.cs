@@ -1,4 +1,5 @@
-﻿using KCert.Services;
+﻿using KCert.Constants;
+using KCert.Services;
 using Microsoft.AspNetCore.Mvc;
 using Microsoft.AspNetCore.Routing;
 using Microsoft.Extensions.Logging;
@@ -6,7 +7,7 @@ using Microsoft.Extensions.Logging;
 namespace KCert.Controllers;
 
 [Host("*:80")]
-[Route(".well-known/acme-challenge")]
+[Route(AcmeChallengeConstants.AcmeChallengePath)]
 public class HttpChallengeController : ControllerBase
 {
     private readonly CertClient _cert;
