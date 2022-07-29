@@ -35,9 +35,9 @@ public class CallbackIngressService
 
     private async Task<bool> TryCallAcmeChallengeTestEndpointAsync(string host)
     {
-        try
+        for (var i = _cfg.PropagationNumRetries; i > default(int); i--)
         {
-            for (var i = _cfg.PropagationNumRetries; i > default(int); i--)
+            try
             {
                 await Task.Delay(delay: TimeSpan.FromSeconds(value: _cfg.PropagationWaitTimeSeconds));
 
@@ -50,14 +50,16 @@ public class CallbackIngressService
 
                 _log.LogInformation(
                     message:
-                    $"{acmeChallengeTestRequestUri} could not be reached within {i} x {_cfg.PropagationWaitTimeSeconds} seconds");
+                    "{AcmeChallengeTestRequestUri} could not be reached within {RetryCount} x {PropagationWaitTimeSeconds} seconds",
+                    acmeChallengeTestRequestUri,
+                    i,
+                    _cfg.PropagationWaitTimeSeconds);
+            }
+            catch (Exception e)
+            {
+                _log.LogError(exception: e, message: $"{nameof(TryCallAcmeChallengeTestEndpointAsync)} faulted");
             }
         }
-        catch (Exception e)
-        {
-            _log.LogError(exception: e, message: $"{nameof(TryCallAcmeChallengeTestEndpointAsync)} faulted");
-        }
-        
         return false;
     }
 
