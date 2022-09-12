@@ -1,0 +1,15 @@
+acmeDirUrl: https://acme-staging-v02.api.letsencrypt.org/directory
+acmeEmail: null
+acmeTermsAccepted: false
+
+names:
+  namespace: kcert
+  serviceAccount: kcert
+  clusterRole: kcert
+  clusterRoleBinding: kcert
+  role: kcert
+  roleBinding: kcert
+  deployment: kcert
+  service: kcert
+  app: kcert
+  
