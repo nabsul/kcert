@@ -18,6 +18,26 @@ KCert is a simple alternative to [cert-manager](https://github.com/jetstack/cert
 
 ## Installing KCert
 
+### Deploy with Helm
+
+First, add the Helm repo with: `helm repo add nabsul https://nabsul.github.io/helm`.
+
+Then install with the following command (filling in your details):
+
+
+```sh
+helm install kcert nabsul/kcert --set acmeAcceptTerms=true,acmeEmail=[YOUR EMAIL]
+```
+
+Note: This defaults to running KCert against Let's Encrypt's staging environment.
+After you've tested against staging, you can wticht to production with:
+
+```sh
+helm install kcert nabsul/kcert --set acmeAcceptTerms=true,acmeDirUrl=https://acme-staging-v02.api.letsencrypt.org/directory,acmeEmail=[YOUR EMAIL]
+```
+
+### Deploy with Plain YAML
+
 The following instructions assume that you will be using the included `deploy.yml` file as your template to install KCert.
 If you are customizing your setup you will likely need to modify the instructions accordingly.
 
