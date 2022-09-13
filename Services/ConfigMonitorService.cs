@@ -30,7 +30,7 @@ public class ConfigMonitorService : IHostedService
 
     public Task StartAsync(CancellationToken cancellationToken)
     {
-        if (_cfg.WatchIngresses)
+        if (_cfg.WatchConfigMaps)
         {
             _log.LogInformation("Watching for configmaps is enabled");
             var action = () => WatchConfigMapsAsync(cancellationToken);
