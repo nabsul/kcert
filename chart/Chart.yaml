@@ -1,0 +1,14 @@
+apiVersion: v2
+name: kcert
+description: Deploys KCert for issuing Let's Encrypt certificates 
+version: 1.0.0
+appVersion: 1.0.1
+maintainers:
+- name: Nabeel Sulieman
+  url: https://nabeel.dev
+keywords:
+- kubernetes
+- letsencrypt
+- ssl
+sources:
+ - https://github.com/nabsul/kcert

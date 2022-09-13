@@ -1,0 +1,36 @@
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: {{ required "names.deployment is required" .Values.names.deployment }}
+  namespace: {{ required "names.namespace is required" .Values.names.namespace }}
+  labels:
+    app: {{ required "names.app is required" .Values.names.app }}
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app: {{ required "names.app is required" .Values.names.app }}
+  template:
+    metadata:
+      labels:
+        app: {{ required "names.app is required" .Values.names.app }}
+    spec:
+      serviceAccountName: {{ required "names.serviceAccount is required" .Values.names.serviceAccount }}
+      containers:
+      - name: kcert
+        image: nabsul/kcert:v1.0.1
+        ports:
+        - containerPort: 80
+          name: http
+        - containerPort: 8080
+          name: http-admin
+        env:
+        - name: ACME__DIRURL
+          # https://acme-staging-v02.api.letsencrypt.org/directory or https://acme-v02.api.letsencrypt.org/directory
+          value: {{ required "acmeDirUrl is required" .Values.acmeDirUrl }}
+        - name: ACME__TERMSACCEPTED
+          # You must set this to "true" to indicate your acceptance of Let's Encrypt's terms of service (https://letsencrypt.org/documents/LE-SA-v1.2-November-15-2017.pdf)
+          value: {{ required "acmeTermsAccepted is required" .Values.acmeTermsAccepted }}
+        - name: ACME__EMAIL
+          # Your email address for Let's Encrypt and email notifications
+          value: {{ required "acmeEmail is required" .Values.acmeEmail }}
