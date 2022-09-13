@@ -20,7 +20,6 @@ public class CertClient
     private const string SanOid = "2.5.29.17";
 
     private readonly RSA _rsa = RSA.Create(2048);
-    private readonly HashSet<string> _validKeys = new();
     private readonly KCertConfig _cfg;
     private readonly ILogger<CertClient> _log;
 
@@ -64,18 +63,9 @@ public class CertClient
         var key = sign.ExportECPrivateKey();
         return Base64UrlTextEncoder.Encode(key);
     }
-    public void AddChallengeToken(string token) => _validKeys.Add(token);
 
-    public void ClearChallengeTokens() => _validKeys.Clear();
-
-    public string GetThumbprint(string token)
+    public string GetThumbprint()
     {
-        if (!_cfg.AcceptAllChallenges && !_validKeys.Contains(token))
-        {
-            _log.LogWarning("Rejected thumb request for {k}", token);
-            return null;
-        }
-
         var sign = GetSigner(_cfg.AcmeKey);
         var jwk = GetJwk(sign);
         var jwkJson = JsonSerializer.Serialize(jwk);
