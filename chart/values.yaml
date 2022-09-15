@@ -13,3 +13,4 @@ names:
   service: kcert
   app: kcert
   
+forHelm: true
