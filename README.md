@@ -139,7 +139,7 @@ Finally, add this to your deployment's environment variables:
 ## Creating Certificates
 
 KCert watches for changes to ingresses in cluster and reacts to them accordingly.
-KCert will ignore an ingress unless it is labelled with `kubernetes.io/ingress.class=nginx`.
+KCert will ignore an ingress unless it is labelled with `kcert.dev/ingress=managed`.
 For example, you could configure an ingress as follows:
 
 ```yaml

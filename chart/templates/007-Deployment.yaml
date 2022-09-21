@@ -37,7 +37,7 @@ spec:
           value: {{ required "acmeDirUrl is required" .Values.acmeDirUrl }}
         - name: ACME__TERMSACCEPTED
           # You must set this to "true" to indicate your acceptance of Let's Encrypt's terms of service (https://letsencrypt.org/documents/LE-SA-v1.2-November-15-2017.pdf)
-          value: {{ required "acmeTermsAccepted is required" .Values.acmeTermsAccepted }}
+          value: {{ required "acmeTermsAccepted is required" .Values.acmeTermsAccepted | quote }}
         - name: ACME__EMAIL
           # Your email address for Let's Encrypt and email notifications
           value: {{ required "acmeEmail is required" .Values.acmeEmail }}
