@@ -33,12 +33,10 @@ public class Startup
 
     private static void AddKCertServices(IServiceCollection services)
     {
-        var serviceTypes = Assembly.GetExecutingAssembly().GetTypes()
-            .Where(t => t.GetCustomAttribute<ServiceAttribute>() != null);
-
-        foreach (var t in serviceTypes)
-        {
-            services.AddSingleton(t);
-        }
+        (
+            from t in Assembly.GetExecutingAssembly().GetTypes()
+            where t.GetCustomAttribute<ServiceAttribute>() != null
+            select t
+        ).ForEach(t => services.AddSingleton(t));
     }
 }
