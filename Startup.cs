@@ -2,6 +2,8 @@ using Microsoft.AspNetCore.Builder;
 using Microsoft.AspNetCore.Hosting;
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Hosting;
+using System;
+using System.Collections.Generic;
 using System.Linq;
 using System.Reflection;
 
@@ -11,7 +13,14 @@ public class Startup
 {
     public void ConfigureServices(IServiceCollection services)
     {
-        AddKCertServices(services);
+        var serviceTypes = Assembly.GetExecutingAssembly().GetTypes()
+            .Where(t => t.GetCustomAttribute<ServiceAttribute>() != null);
+
+        foreach (var t in serviceTypes)
+        {
+            services.AddSingleton(t);
+        }
+
         services.AddControllersWithViews();
     }
 
@@ -29,14 +38,5 @@ public class Startup
         app.UseStaticFiles();
         app.UseRouting();
         app.UseEndpoints(endpoints => endpoints.MapControllers());
-    }
-
-    private static void AddKCertServices(IServiceCollection services)
-    {
-        (
-            from t in Assembly.GetExecutingAssembly().GetTypes()
-            where t.GetCustomAttribute<ServiceAttribute>() != null
-            select t
-        ).ForEach(t => services.AddSingleton(t));
     }
 }
