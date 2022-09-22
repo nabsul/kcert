@@ -29,13 +29,12 @@ foreach (var t in serviceTypes)
 
 builder.Services.AddControllersWithViews();
 
-
 builder.Configuration.AddUserSecrets<Program>(optional: true);
 builder.Configuration.AddEnvironmentVariables();
 
 builder.WebHost.ConfigureKestrel(opt => {
-        opt.ListenAnyIP(80);
-        opt.ListenAnyIP(8080);
+    opt.ListenAnyIP(80);
+    opt.ListenAnyIP(8080);
 });
 
 builder.Services.AddHostedService<RenewalService>();
