@@ -4,4 +4,4 @@ obj
 *.user
 appsettings.local.json
 .vscode
-my-helm-values.yaml
+temp

@@ -79,7 +79,7 @@ public class ConfigMonitorService : IHostedService
         
         if (!config.Data.TryGetValue("hosts", out var hostList))
         {
-            _log.LogError("ConfigMap {ns}-{n} does not a hosts entry", ns, name);
+            _log.LogError("ConfigMap {ns}-{n} does not have a hosts entry", ns, name);
             return;
         }
 

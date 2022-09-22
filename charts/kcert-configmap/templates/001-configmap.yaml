@@ -1,0 +1,8 @@
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: {{ .Values.name }}
+  namespace: {{ .Values.namespace }}
+data:
+  hosts: {{ .Values.hosts }}
+  ui_properties_file_name: "user-interface.properties"
