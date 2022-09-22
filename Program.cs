@@ -1,11 +1,13 @@
 using KCert;
 using KCert.Services;
+using Microsoft.AspNetCore.Builder;
 using Microsoft.AspNetCore.Hosting;
 using Microsoft.Extensions.Configuration;
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Hosting;
 using System;
-using System.Collections.Generic;
+using System.Linq;
+using System.Reflection;
 
 if (args.Length > 0 && args[^1] == "generate-key")
 {
@@ -15,33 +17,44 @@ if (args.Length > 0 && args[^1] == "generate-key")
     return;
 }
 
-var fallbacks = new Dictionary<string, string>
+var builder = WebApplication.CreateBuilder(args);
+
+var serviceTypes = Assembly.GetExecutingAssembly().GetTypes()
+    .Where(t => t.GetCustomAttribute<ServiceAttribute>() != null);
+
+foreach (var t in serviceTypes)
 {
-    { "Acme:Key", CertClient.GenerateNewKey() }
-};
+    builder.Services.AddSingleton(t);
+}
 
-var host = Host.CreateDefaultBuilder(args)
-    .ConfigureAppConfiguration((ctx, cfg) =>
-    {
-        cfg.AddInMemoryCollection(fallbacks);
-        cfg.AddUserSecrets<Program>(optional: true);
-        cfg.AddEnvironmentVariables();
-    })
-    .ConfigureWebHostDefaults(webBuilder =>
-    {
-        webBuilder.ConfigureKestrel(opt =>
-        {
-            opt.ListenAnyIP(80);
-            opt.ListenAnyIP(8080);
-        });
-        webBuilder.UseStartup<Startup>();
-    })
-    .ConfigureServices(services =>
-    {
-        services.AddHostedService<RenewalService>();
-        services.AddHostedService<IngressMonitorService>();
-        services.AddHostedService<ConfigMonitorService>();
-    })
-    .Build();
+builder.Services.AddControllersWithViews();
 
-host.Run();
+
+builder.Configuration.AddUserSecrets<Program>(optional: true);
+builder.Configuration.AddEnvironmentVariables();
+
+builder.WebHost.ConfigureKestrel(opt => {
+        opt.ListenAnyIP(80);
+        opt.ListenAnyIP(8080);
+});
+
+builder.Services.AddHostedService<RenewalService>();
+builder.Services.AddHostedService<IngressMonitorService>();
+builder.Services.AddHostedService<ConfigMonitorService>();
+
+var app = builder.Build();
+
+if (builder.Environment.IsDevelopment())
+{
+    app.UseDeveloperExceptionPage();
+}
+else
+{
+    app.UseExceptionHandler("/error");
+}
+
+app.UseStaticFiles();
+app.UseRouting();
+app.UseEndpoints(endpoints => endpoints.MapControllers());
+
+app.Run();

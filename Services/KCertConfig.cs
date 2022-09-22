@@ -9,10 +9,12 @@ namespace KCert.Services;
 public class KCertConfig
 {
     private readonly IConfiguration _cfg;
+    private readonly string _key;
 
     public KCertConfig(IConfiguration cfg)
     {
         _cfg = cfg;
+        _key = CertClient.GenerateNewKey();
     }
 
     public bool WatchIngresses => GetBool("KCert:WatchIngresses");
@@ -38,7 +40,7 @@ public class KCertConfig
 
     public Uri AcmeDir => new(GetString("Acme:DirUrl"));
     public string AcmeEmail => GetString("Acme:Email");
-    public string AcmeKey => GetString("Acme:Key");
+    public string AcmeKey => GetString("Acme:Key") ?? _key; // If no key is provided via configs, use generated key.
     public bool AcmeAccepted => GetBool("Acme:TermsAccepted");
 
     public string SmtpEmailFrom => GetString("Smtp:EmailFrom");
