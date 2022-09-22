@@ -25,7 +25,7 @@ spec:
       serviceAccountName: {{ required "names.serviceAccount is required" .Values.names.serviceAccount }}
       containers:
       - name: kcert
-        image: nabsul/kcert:v1.0.1
+        image: {{ required "kcertImage is required" .Values.kcertImage }}
         ports:
         - containerPort: 80
           name: http
