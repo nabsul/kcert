@@ -2,7 +2,7 @@ apiVersion: apps/v1
 kind: Deployment
 metadata:
   name: {{ required "names.deployment is required" .Values.names.deployment }}
-  namespace: {{ required "names.namespace is required" .Values.names.namespace }}
+  namespace: {{ .Release.Namespace | default "default" }}
   labels:
     app: {{ required "names.app is required" .Values.names.app }}
 {{- if .Values.forHelm }}

@@ -4,7 +4,6 @@ acmeTermsAccepted: false
 kcertImage: null
 
 names:
-  namespace: kcert
   serviceAccount: kcert
   clusterRole: kcert
   clusterRoleBinding: kcert

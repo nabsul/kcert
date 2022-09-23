@@ -13,7 +13,7 @@ metadata:
 subjects:
 - kind: ServiceAccount
   name: {{ required "names.serviceAccount is required" .Values.names.serviceAccount }}
-  namespace: {{ required "names.namespace is required" .Values.names.namespace }}
+  namespace: {{ .Release.Namespace | default "kcert" }}
 roleRef:
   kind: ClusterRole
   name: {{ required "names.clusterRole is required" .Values.names.clusterRole }}

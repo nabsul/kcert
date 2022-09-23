@@ -2,7 +2,7 @@ apiVersion: networking.k8s.io/v1
 kind: Ingress
 metadata:
   name: {{ required "Chart requires name value" .Values.name }}
-  namespace: {{ required "Chart requires namespace value" .Values.namespace }}
+  namespace: {{ .Release.Namespace | default "default" }}
   labels:
     kcert.dev/ingress: "managed"
   annotations:
