@@ -1,4 +1,5 @@
 ﻿using k8s.Models;
+using KCert.Filters;
 using KCert.Models;
 using KCert.Services;
 using Microsoft.AspNetCore.Mvc;
@@ -10,7 +11,7 @@ using System.Threading.Tasks;
 
 namespace KCert.Controllers;
 
-[Host("*:8080")]
+[LocalPortFilter(8080)]
 [Route("")]
 public class HomeController : Controller
 {

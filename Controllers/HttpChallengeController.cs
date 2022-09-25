@@ -1,11 +1,12 @@
-﻿using KCert.Services;
+﻿using KCert.Filters;
+using KCert.Services;
 using Microsoft.AspNetCore.Mvc;
 using Microsoft.AspNetCore.Routing;
 using Microsoft.Extensions.Logging;
 
 namespace KCert.Controllers;
 
-[Host("*:80")]
+[LocalPortFilter(80)]
 [Route(".well-known/acme-challenge")]
 public class HttpChallengeController : ControllerBase
 {

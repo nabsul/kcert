@@ -26,14 +26,14 @@ Then install with the following command (filling in your details):
 
 
 ```sh
-helm install kcert nabsul/kcert --set acmeAcceptTerms=true,acmeEmail=[YOUR EMAIL]
+helm install kcert nabsul/kcert -n kcert --debug --set acmeAcceptTerms=true,acmeEmail=[YOUR EMAIL]
 ```
 
 Note: This defaults to running KCert against Let's Encrypt's staging environment.
-After you've tested against staging, you can wticht to production with:
+After you've tested against staging, you can swicht to production with:
 
 ```sh
-helm install kcert nabsul/kcert --set acmeAcceptTerms=true,acmeDirUrl=https://acme-staging-v02.api.letsencrypt.org/directory,acmeEmail=[YOUR EMAIL]
+helm install kcert nabsul/kcert -n kcert --debug --set acmeAcceptTerms=true,acmeEmail=[YOUR EMAIL],acmeDirUrl=https://acme-v02.api.letsencrypt.org/directory
 ```
 
 ### Deploy with Plain YAML

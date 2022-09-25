@@ -41,3 +41,18 @@ spec:
         - name: ACME__EMAIL
           # Your email address for Let's Encrypt and email notifications
           value: {{ required "acmeEmail is required" .Values.acmeEmail }}
+{{- if .Values.smtp.host }}
+        - name: SMTP__EMAILFROM
+          value: {{ required "smtp.email is required" .Values.smtp.email }}
+        - name: SMTP__HOST
+          value: {{ required "smtp.email is required" .Values.smtp.email }}
+        - name: SMTP__PORT
+          value: "{{ required "smtp.email is required" .Values.smtp.email }}"
+        - name: SMTP__USER
+          value: {{ required "smtp.email is required" .Values.smtp.email }}
+        - name: SMTP__PASS
+          valueFrom:
+            secretKeyRef:
+              name: {{ .Values.names.secret }}
+              key: password
+{{- end }}

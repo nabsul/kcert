@@ -7,4 +7,3 @@ metadata:
     kcert.dev/cert-request: request
 data:
   hosts: {{ .Values.hosts }}
-  ui_properties_file_name: "user-interface.properties"
