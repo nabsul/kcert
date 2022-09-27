@@ -1,7 +1,7 @@
 ﻿using Microsoft.AspNetCore.Mvc;
 using Microsoft.AspNetCore.Mvc.Filters;
 
-namespace KCert.Filters;
+namespace KCert;
 
 public class LocalPortFilterAttribute : ActionFilterAttribute
 {
