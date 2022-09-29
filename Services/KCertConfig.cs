@@ -29,6 +29,7 @@ public class KCertConfig
     public int InitialSleepOnFailure => GetInt("KCert:InitialSleepOnFailure");
 
     public Dictionary<string, string> ChallengeIngressAnnotations => GetDictionary("ChallengeIngress:Annotations");
+    public string ChallengeIngressClassName => GetString("ChallengeIngress:ClassName");
 
     public Dictionary<string, string> ChallengeIngressLabels => GetDictionary("ChallengeIngress:Labels");
 

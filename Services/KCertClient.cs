@@ -99,6 +99,7 @@ public class KCertClient
             },
             Spec = new()
             {
+                IngressClassName = _cfg.ChallengeIngressClassName,
                 Rules = hosts.Select(CreateRule).ToList()
             }
         };
