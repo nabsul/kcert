@@ -38,15 +38,6 @@ builder.Services.AddHostedService<ConfigMonitorService>();
 
 var app = builder.Build();
 
-if (builder.Environment.IsDevelopment())
-{
-    app.UseDeveloperExceptionPage();
-}
-else
-{
-    app.UseExceptionHandler("/error");
-}
-
 app.UseStaticFiles();
 app.UseRouting();
 app.UseEndpoints(endpoints => endpoints.MapControllers());
