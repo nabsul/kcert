@@ -18,81 +18,73 @@ KCert is a simple alternative to [cert-manager](https://github.com/jetstack/cert
 
 ## Installing KCert
 
-The following instructions assume that you will be using the included `deploy.yml` file as your template to install KCert.
-If you are customizing your setup you will likely need to modify the instructions accordingly.
+### Deploy with Helm
 
-> Note: KCert has been tested with [Ingress NGINX Controller](https://kubernetes.github.io/ingress-nginx/).
-> If you'd like to use it with a different controller and have trouble, there may be some hidden settings that need to be tweaked.
-> Please [create an issue](https://github.com/nabsul/kcert/issues) and I'd be happy to help.
+First, add the Helm repo with: `helm repo add nabsul https://nabsul.github.io/helm`.
 
-Getting started with KCert is very straigh-forward.
-Starting with the `deploy.yml` [template in this repo](https://raw.githubusercontent.com/nabsul/kcert/main/deploy.yml),
-find the `env:` section.
-Fill in all the required values (marked with `#` comments):
+Then install with the following command (filling in your details):
 
-```yaml
-        - name: ACME__DIRURL
-          value: # https://acme-staging-v02.api.letsencrypt.org/directory or https://acme-v02.api.letsencrypt.org/directory
-        - name: ACME__TERMSACCEPTED
-          value: # You must set this to "true" to indicate your acceptance of Let's Encrypt's terms of service (https://letsencrypt.org/documents/LE-SA-v1.2-November-15-2017.pdf)
-        - name: ACME__EMAIL
-          value: # Your email address for Let's Encrypt and email notifications
+```sh
+kubectl create ns kcert
+helm install kcert nabsul/kcert -n kcert --debug --set acmeAcceptTerms=true,acmeEmail=[YOUR EMAIL]
 ```
+
+Note: This defaults to running KCert against Let's Encrypt's staging environment.
+After you've tested against staging, you can swicht to production with:
+
+```sh
+helm install kcert nabsul/kcert -n kcert --debug --set acmeAcceptTerms=true,acmeEmail=[YOUR EMAIL],acmeDirUrl=https://acme-v02.api.letsencrypt.org/directory
+```
+
+For setting up SMTP email notifications and other parameters, please check the `charts/kcert/values.yaml` file.
+
+### Creating a Certificate via Ingress
+
+KCert automatically looks for ingresses that reference a certicate.
+If that certificate doesn't exist, it will create it (and renew it).
+KCert only monitors ingresses with the `kcert.dev/ingress: "managed"` label.
+You can either create your own ingress manually, or use the `kcert-ingress` chart:
+
+```sh
+helm install myingress1 nabsul/kcert-ingress -n kcert --debug --set name=[INGRESS_NAME],host=[DOMAIN],service=[SERVICE_NAME],port=[SERVICE_PORT]
+```
+
+### Creating a Certificate via ConfigMap
+
+If you want to create a certificate without creating an ingress, you can do so via a ConfigMap.
+You can create one using the  `kcert-configmap` chart as follows:
+
+```sh
+helm install myingress1 nabsul/kcert-ingress -n kcert --debug --set name=[INGRESS_NAME],host=[DOMAIN],service=[SERVICE_NAME],port=[SERVICE_PORT]
+```
+
+## Other Advice
+
+### Test in Staging First
 
 If this is your first time using KCert you should probably start out with `https://acme-staging-v02.api.letsencrypt.org/directory`.
 Experiment and make sure everything is working as expected, then switch over to `https://acme-v02.api.letsencrypt.org/directory`.
 More information this topic can be found [here](https://letsencrypt.org/docs/staging-environment/).
 
-Once you've configured your settings, deploy KCert by running `kubectl apply -f ./deploy.yml`.
-Congratulations, KCert should now be running!
+### Diagnostics
 
 To check that everything is running as expected:
 
 - Run `kubectl -n kcert logs svc/kcert` and make sure there are no error messages
 - Run `kubectl -n kcert port-forward svc/kcert 8080` and go to `http://localhost:8080` in your browser
 
-### Recommended: Email Notifications
-
-KCert can auotmatically send you an email notification when it renews a certificate or fails to do so.
-To configure email, you'll need to provide the following SMTP configuration details:
-
-- The email address, username and password of the SMTP account
-- The hostname and port of the SMTP server (SSL required)
-
-The password should be placed in a Kubernetes secret as follows:
-
-```sh
-kubectl -n kcert create secret generic kcert-smtp --from-literal=password=[...]
-```
-
-You can then add the following to the `env:` section of your deployment:
-
-```yaml
-        - name: SMTP__EMAILFROM
-          value: [...]
-        - name: SMTP__HOST
-          value: [...]
-        - name: SMTP__PORT
-          value: "[...]" # Be sure to put the port number between quotes
-        - name: SMTP__USER
-          value: [...]
-        - name: SMTP__PASS
-          valueFrom:
-            secretKeyRef:
-              name: kcert-smtp
-              key: password
-```
+### Testing SMTP Configuration
 
 To test your email configuration you can connect to the KCert dasboard by running
-`kubectl -n kcert port-forward svc/kcert 80` and opening `http://localhost` in your browser.
+`kubectl -n kcert port-forward svc/kcert 8080` and opening `http://localhost:8080` in your browser.
 From there, navigate to the configuration section.
 Check that your settings are listed there, and then click "Send Test Email" to receive a test email.
 
 ### Optional: Configure a fixed ACME Key
 
 By default KCert will generate a random secret key at startup.
-For many use cases this should be fine.
-If you would like to use a fixed key, you can provide it with an environment variable.
+For many use cases this will be fine.
+If you would like to use a fixed key, you can provide it as an environment variable.
 
 You can generate your own random key with the following:
 
@@ -119,7 +111,7 @@ Finally, add this to your deployment's environment variables:
 ## Creating Certificates
 
 KCert watches for changes to ingresses in cluster and reacts to them accordingly.
-KCert will ignore an ingress unless it is labelled with `kubernetes.io/ingress.class=nginx`.
+KCert will ignore an ingress unless it is labelled with `kcert.dev/ingress=managed`.
 For example, you could configure an ingress as follows:
 
 ```yaml
@@ -238,7 +230,7 @@ It will behave as if it is running in the cluster and you will be able to explor
 
 KCert does not create many resources,
 and most of them are restricted to the kcert namespace.
-Removing KCert from your cluster is as simple as executing `kubectl delete -f deploy.yml` or these three commands:
+Removing KCert from your cluster is as simple as executing these three commands:
 
 ```sh
 kubectl delete namespace kcert

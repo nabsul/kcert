@@ -1,0 +1,9 @@
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: {{ .Values.name }}
+  namespace: {{ .Release.Namespace | default "default" }}
+  labels:
+    kcert.dev/cert-request: request
+data:
+  hosts: {{ .Values.hosts }}

@@ -3,10 +3,18 @@ kind: RoleBinding
 metadata:
   name: {{ required "names.role is required" .Values.names.role }}
   namespace: {{ required "names.role is required" .Values.names.role }}
+{{- if .Values.forHelm }}
+  labels:
+    app.kubernetes.io/name: {{ .Chart.Name }}
+    helm.sh/chart: {{ .Chart.Name }}-{{ .Chart.Version }}
+    app.kubernetes.io/instance: {{ .Release.Name }}
+    app.kubernetes.io/version: {{ .Chart.AppVersion }}
+    app.kubernetes.io/managed-by: {{ .Release.Service }}
+{{- end }}
 subjects:
 - kind: ServiceAccount
   name: {{ required "names.serviceAccount is required" .Values.names.serviceAccount }}
-  namespace: {{ required "names.namespace is required" .Values.names.namespace }}
+  namespace: {{ .Release.Namespace | default "default" }}
 roleRef:
   kind: Role
   name: {{ required "names.role is required" .Values.names.role }}

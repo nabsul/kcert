@@ -1,0 +1,25 @@
+apiVersion: networking.k8s.io/v1
+kind: Ingress
+metadata:
+  name: {{ required "Chart requires name value" .Values.name }}
+  namespace: {{ .Release.Namespace | default "default" }}
+  labels:
+    kcert.dev/ingress: "managed"
+  annotations:
+    kubernetes.io/ingress.class: "nginx"
+spec:
+  tls:
+  - hosts:
+    - {{ required "Chart requires host value" .Values.host }}
+    secretName: {{ required "Chart requires name value" .Values.name }}
+  rules:
+  - host: {{ required "Chart requires host value" .Values.host }}
+    http:
+      paths:
+      - path: /
+        pathType: Prefix
+        backend:
+          service:
+            name: {{ required "Chart requires service value" .Values.service }}
+            port:
+              number: {{ required "Chart requires port value" .Values.port }}

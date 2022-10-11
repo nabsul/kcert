@@ -1,15 +1,25 @@
 acmeDirUrl: https://acme-staging-v02.api.letsencrypt.org/directory
 acmeEmail: null
 acmeTermsAccepted: false
+kcertImage: null
+
+smtp:
+  email: null
+  host: null
+  port: null
+  user: null
+  pass: null
 
 names:
-  namespace: kcert
   serviceAccount: kcert
   clusterRole: kcert
   clusterRoleBinding: kcert
   role: kcert
   roleBinding: kcert
+  secret: kcert-smtp
   deployment: kcert
   service: kcert
   app: kcert
-  
+
+# Set this to false in order to generate a plain yaml template without the Helm custom labels
+forHelm: true

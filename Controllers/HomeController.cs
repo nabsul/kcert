@@ -10,7 +10,7 @@ using System.Threading.Tasks;
 
 namespace KCert.Controllers;
 
-[Host("*:8080")]
+[LocalPortFilter(8080)]
 [Route("")]
 public class HomeController : Controller
 {
@@ -92,12 +92,5 @@ public class HomeController : Controller
 
         await _kcert.StartRenewalProcessAsync(ns, name, hosts, CancellationToken.None);
         return RedirectToAction("Home");
-    }
-
-    [Route("error")]
-    [ResponseCache(Duration = 0, Location = ResponseCacheLocation.None, NoStore = true)]
-    public IActionResult Error()
-    {
-        return View(new ErrorViewModel { RequestId = Activity.Current?.Id ?? HttpContext.TraceIdentifier });
     }
 }
