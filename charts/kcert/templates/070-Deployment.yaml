@@ -45,11 +45,11 @@ spec:
         - name: SMTP__EMAILFROM
           value: {{ required "smtp.email is required" .Values.smtp.email }}
         - name: SMTP__HOST
-          value: {{ required "smtp.email is required" .Values.smtp.email }}
+          value: {{ required "smtp.email is required" .Values.smtp.host }}
         - name: SMTP__PORT
-          value: "{{ required "smtp.email is required" .Values.smtp.email }}"
+          value: "{{ required "smtp.email is required" .Values.smtp.port }}"
         - name: SMTP__USER
-          value: {{ required "smtp.email is required" .Values.smtp.email }}
+          value: {{ required "smtp.email is required" .Values.smtp.user }}
         - name: SMTP__PASS
           valueFrom:
             secretKeyRef:
