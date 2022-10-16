@@ -5,3 +5,4 @@ obj
 appsettings.local.json
 .vscode
 temp
+*.tgz

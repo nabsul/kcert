@@ -2,7 +2,7 @@ apiVersion: v2
 name: kcert-ingress
 description: Deploys an Ingress for KCert to consume and create a cert for
 version: 1.0.0
-appVersion: 1.0.1
+appVersion: 1.1.0
 maintainers:
 - name: Nabeel Sulieman
   url: https://nabeel.dev
