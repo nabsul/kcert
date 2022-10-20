@@ -26,14 +26,14 @@ Then install with the following command (filling in your details):
 
 ```sh
 kubectl create ns kcert
-helm install kcert nabsul/kcert -n kcert --debug --set acmeAcceptTerms=true,acmeEmail=[YOUR EMAIL]
+helm install kcert nabsul/kcert -n kcert --debug --set acmeTermsAccepted=true,acmeEmail=[YOUR EMAIL],kcertImage=nabsul/kcert:v1.1.0
 ```
 
 Note: This defaults to running KCert against Let's Encrypt's staging environment.
 After you've tested against staging, you can swicht to production with:
 
 ```sh
-helm install kcert nabsul/kcert -n kcert --debug --set acmeAcceptTerms=true,acmeEmail=[YOUR EMAIL],acmeDirUrl=https://acme-v02.api.letsencrypt.org/directory
+helm install kcert nabsul/kcert -n kcert --debug --set acmeTermsAccepted=true,acmeEmail=[YOUR EMAIL],acmeDirUrl=https://acme-v02.api.letsencrypt.org/directory,kcertImage=nabsul/kcert:v1.1.0
 ```
 
 For setting up SMTP email notifications and other parameters, please check the `charts/kcert/values.yaml` file.
