@@ -55,8 +55,10 @@ If you want to create a certificate without creating an ingress, you can do so v
 You can create one using the  `kcert-configmap` chart as follows:
 
 ```sh
-helm install myingress1 nabsul/kcert-ingress -n kcert --debug --set name=[INGRESS_NAME],host=[DOMAIN],service=[SERVICE_NAME],port=[SERVICE_PORT]
+helm install [VERSION] nabsul/kcert-configmap -n kcert --debug --set name=kcert,hosts=[HOSTS]
 ```
+
+An example would be *helm install 1.1.0 nabsul/kcert-configmap -n kcert --debug --set name=kcert,hosts="www.yourdomain.duckdns.org"*
 
 ## Other Advice
 
