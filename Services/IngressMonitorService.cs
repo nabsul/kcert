@@ -67,7 +67,7 @@ public class IngressMonitorService : IHostedService
             }
 
             // fetch all ingresses to figure out which certs need have which hosts
-            var nsLookup = new Dictionary<(string, string), HashSet<string>>();
+            var nsLookup = new Dictionary<(string Namespace, string Name), HashSet<string>>();
             await foreach (var ing in _k8s.GetAllIngressesAsync())
             {
                 _log.LogInformation("Processing ingress {ns}:{n}", ing.Namespace(), ing.Name());
@@ -91,7 +91,7 @@ public class IngressMonitorService : IHostedService
             foreach (var ((ns, name), hosts) in nsLookup)
             {
                 _log.LogInformation("Handling cert {ns} - {name} hosts: {h}", ns, name, string.Join(",", hosts));
-                await TryUpdateSecretAsync(ns, name, hosts, tok);
+                await TryUpdateSecretAsync(ns, name, hosts.ToArray(), tok);
             }
         }
         catch (TaskCanceledException ex)
@@ -104,7 +104,7 @@ public class IngressMonitorService : IHostedService
         }
     }
 
-    private async Task TryUpdateSecretAsync(string ns, string name, IEnumerable<string> hosts, CancellationToken tok)
+    private async Task TryUpdateSecretAsync(string ns, string name, string[] hosts, CancellationToken tok)
     {
         var secret = await _k8s.GetSecretAsync(ns, name);
         tok.ThrowIfCancellationRequested();
@@ -113,7 +113,7 @@ public class IngressMonitorService : IHostedService
         {
             var cert = _cert.GetCert(secret);
             var certHosts = _cert.GetHosts(cert).ToHashSet();
-            if (hosts.All(h => certHosts.Contains(h)))
+            if (hosts.Length == certHosts.Count && hosts.All(h => certHosts.Contains(h)))
             {
                 // nothing to do, cert already has all the hosts it needs to have
                 _log.LogInformation("Certificate already has all the needed hosts configured");
@@ -121,6 +121,6 @@ public class IngressMonitorService : IHostedService
             }
         }
 
-        await _kcert.StartRenewalProcessAsync(ns, name, hosts.ToArray(), tok);
+        await _kcert.StartRenewalProcessAsync(ns, name, hosts, tok);
     }
 }
