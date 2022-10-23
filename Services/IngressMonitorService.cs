@@ -91,7 +91,7 @@ public class IngressMonitorService : IHostedService
             foreach (var ((ns, name), hosts) in nsLookup)
             {
                 _log.LogInformation("Handling cert {ns} - {name} hosts: {h}", ns, name, string.Join(",", hosts));
-                await TryUpdateSecretAsync(ns, name, hosts.ToArray(), tok);
+                await _kcert.RenewIfNeededAsync(ns, name, hosts.ToArray(), tok);
             }
         }
         catch (TaskCanceledException ex)
@@ -102,25 +102,5 @@ public class IngressMonitorService : IHostedService
         {
             _log.LogError(ex, "Ingress watch event handler failed unexpectedly");
         }
-    }
-
-    private async Task TryUpdateSecretAsync(string ns, string name, string[] hosts, CancellationToken tok)
-    {
-        var secret = await _k8s.GetSecretAsync(ns, name);
-        tok.ThrowIfCancellationRequested();
-
-        if (secret != null)
-        {
-            var cert = _cert.GetCert(secret);
-            var certHosts = _cert.GetHosts(cert).ToHashSet();
-            if (hosts.Length == certHosts.Count && hosts.All(h => certHosts.Contains(h)))
-            {
-                // nothing to do, cert already has all the hosts it needs to have
-                _log.LogInformation("Certificate already has all the needed hosts configured");
-                return;
-            }
-        }
-
-        await _kcert.StartRenewalProcessAsync(ns, name, hosts, tok);
     }
 }
