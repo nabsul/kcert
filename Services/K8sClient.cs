@@ -51,6 +51,22 @@ public class K8sClient
         while (tok != null);
     }
 
+    public async IAsyncEnumerable<V1ConfigMap> GetAllConfigMapsAsync()
+    {
+        var label = $"{K8sWatchClient.CertRequestKey}={K8sWatchClient.CertRequestValue}";
+        string tok = null;
+        do
+        {
+            var result = await _client.ListConfigMapForAllNamespacesAsync(labelSelector: label, continueParameter: tok);
+            tok = result.Continue();
+            foreach (var i in result.Items)
+            {
+                yield return i;
+            }
+        }
+        while (tok != null);
+    }
+
     public async Task<List<V1Secret>> GetManagedSecretsAsync()
     {
         var result = await _client.ListSecretForAllNamespacesAsync(fieldSelector: TlsTypeSelector, labelSelector: $"{CertLabelKey}={CertLabelValue}");

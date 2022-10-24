@@ -14,8 +14,8 @@ namespace KCert.Services;
 [Service]
 public class K8sWatchClient
 {
-    private const string CertRequestKey = "kcert.dev/cert-request";
-    private const string CertRequestValue = "request";
+    public const string CertRequestKey = "kcert.dev/cert-request";
+    public const string CertRequestValue = "request";
     public const string IngressLabelKey = "kcert.dev/ingress";
     public const string IngressLabelValue = "managed";
 

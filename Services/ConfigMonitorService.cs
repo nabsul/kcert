@@ -12,18 +12,18 @@ namespace KCert.Services;
 public class ConfigMonitorService : IHostedService
 {
     private readonly ILogger<ConfigMonitorService> _log;
-    private readonly KCertClient _kcert;
     private readonly K8sWatchClient _watch;
+    private readonly CertChangeService _certChange;
     private readonly KCertConfig _cfg;
     private readonly ExponentialBackoff _exp;
 
-    public ConfigMonitorService(ILogger<ConfigMonitorService> log, KCertClient kcert, KCertConfig cfg, ExponentialBackoff exp, K8sWatchClient k8sWatch)
+    public ConfigMonitorService(ILogger<ConfigMonitorService> log, KCertConfig cfg, ExponentialBackoff exp, K8sWatchClient k8sWatch, CertChangeService certChange)
     {
         _log = log;
-        _kcert = kcert;
         _cfg = cfg;
         _exp = exp;
         _watch = k8sWatch;
+        _certChange = certChange;
     }
 
     public Task StopAsync(CancellationToken cancellationToken) => Task.CompletedTask;
@@ -50,17 +50,11 @@ public class ConfigMonitorService : IHostedService
         await _watch.WatchConfigMapsAsync((t, c) => HandleConfigMapEventAsync(t, c, cancellationToken), cancellationToken);
     }
 
-    private async Task HandleConfigMapEventAsync(WatchEventType type, V1ConfigMap config, CancellationToken tok)
+    private Task HandleConfigMapEventAsync(WatchEventType type, V1ConfigMap config, CancellationToken tok)
     {
         try
         {
-            _log.LogInformation("ConfigMap change event [{type}] for {ns}-{name}", type, config.Namespace(), config.Name());
-            if (type != WatchEventType.Added && type != WatchEventType.Modified)
-            {
-                return;
-            }
-
-            await HandleCertificateRequestAsync(config, tok);
+            _certChange.RunCheck();
         }
         catch (TaskCanceledException ex)
         {
@@ -70,26 +64,7 @@ public class ConfigMonitorService : IHostedService
         {
             _log.LogError(ex, "ConfigMap event handler failed unexpectedly");
         }
-    }
 
-    private async Task HandleCertificateRequestAsync(V1ConfigMap config, CancellationToken tok)
-    {
-        var ns = config.Namespace();
-        var name = config.Name();
-        
-        if (!config.Data.TryGetValue("hosts", out var hostList))
-        {
-            _log.LogError("ConfigMap {ns}-{n} does not have a hosts entry", ns, name);
-            return;
-        }
-
-        var hosts = hostList.Split(',');
-        if (hosts.Length < 1)
-        {
-            _log.LogError("ConfigMap {ns}-{n} does not contain a list of hosts", ns, name);
-            return;
-        }
-
-        await _kcert.StartRenewalProcessAsync(ns, name, hosts, tok);
+        return Task.CompletedTask;
     }
 }
