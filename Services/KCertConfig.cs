@@ -28,9 +28,13 @@ public class KCertConfig
     public bool ShowRenewButton => GetBool("KCert:ShowRenewButton");
     public int InitialSleepOnFailure => GetInt("KCert:InitialSleepOnFailure");
 
-    public Dictionary<string, string> ChallengeIngressAnnotations => GetDictionary("ChallengeIngress:Annotations");
+    public bool UseChallengeIngressClassName => GetBool("ChallengeIngress:UseClassName");
     public string ChallengeIngressClassName => GetString("ChallengeIngress:ClassName");
 
+    public bool UseChallengeIngressAnnotations => GetBool("ChallengeIngress:UseAnnotations");
+    public Dictionary<string, string> ChallengeIngressAnnotations => GetDictionary("ChallengeIngress:Annotations");
+
+    public bool UseChallengeIngressLabels => GetBool("ChallengeIngress:UseLabels");
     public Dictionary<string, string> ChallengeIngressLabels => GetDictionary("ChallengeIngress:Labels");
 
     public TimeSpan AcmeWaitTime => TimeSpan.FromSeconds(_cfg.GetValue<int>("Acme:ValidationWaitTimeSeconds"));

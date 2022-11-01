@@ -116,14 +116,27 @@ public class KCertClient
             {
                 Name = _cfg.KCertIngressName,
                 NamespaceProperty = _cfg.KCertNamespace,
-                Annotations = _cfg.ChallengeIngressAnnotations,
             },
             Spec = new()
             {
-                IngressClassName = _cfg.ChallengeIngressClassName,
                 Rules = hosts.Select(CreateRule).ToList()
             }
         };
+
+        if (_cfg.UseChallengeIngressClassName)
+        {
+            kcertIngress.Spec.IngressClassName = _cfg.ChallengeIngressClassName;
+        }
+
+        if (_cfg.UseChallengeIngressAnnotations)
+        {
+            kcertIngress.Metadata.Annotations = _cfg.ChallengeIngressAnnotations;
+        }
+
+        if (_cfg.UseChallengeIngressLabels)
+        {
+            kcertIngress.Metadata.Labels = _cfg.ChallengeIngressLabels;
+        }
 
         await _kube.CreateIngressAsync(kcertIngress);
         _log.LogInformation("Giving challenge ingress time to propagate");
