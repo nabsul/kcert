@@ -19,16 +19,37 @@ public class KCertClient
     private readonly KCertConfig _cfg;
     private readonly ILogger<KCertClient> _log;
     private readonly EmailClient _email;
-
+    private readonly CertClient _cert;
     private Task _running = Task.CompletedTask;
 
-    public KCertClient(K8sClient kube, KCertConfig cfg, RenewalHandler getCert, ILogger<KCertClient> log, EmailClient email)
+    public KCertClient(K8sClient kube, KCertConfig cfg, RenewalHandler getCert, ILogger<KCertClient> log, EmailClient email, CertClient cert)
     {
         _kube = kube;
         _cfg = cfg;
         _getCert = getCert;
         _log = log;
         _email = email;
+        _cert = cert;
+    }
+
+    public async Task RenewIfNeededAsync(string ns, string name, string[] hosts, CancellationToken tok)
+    {
+        var secret = await _kube.GetSecretAsync(ns, name);
+        tok.ThrowIfCancellationRequested();
+
+        if (secret != null)
+        {
+            var cert = _cert.GetCert(secret);
+            var certHosts = _cert.GetHosts(cert).ToHashSet();
+            if (hosts.Length == certHosts.Count && hosts.All(h => certHosts.Contains(h)))
+            {
+                // nothing to do, cert already has all the hosts it needs to have
+                _log.LogInformation("Certificate already has all the needed hosts configured");
+                return;
+            }
+        }
+
+        await StartRenewalProcessAsync(ns, name, hosts, tok);
     }
 
     // Ensure that no certs are renewed in parallel
@@ -111,27 +132,27 @@ public class KCertClient
 
     private V1IngressRule CreateRule(string host)
     {
-        return new V1IngressRule
+
+        var path = new V1HTTPIngressPath
+        {
+            Path = "/.well-known/acme-challenge/",
+            PathType = "Prefix",
+            Backend = new()
+            {
+                Service = new()
+                {
+                    Name = _cfg.KCertServiceName,
+                    Port = new(number: _cfg.KCertServicePort)
+                },
+            },
+        };
+
+        return new()
         {
             Host = host,
-            Http = new V1HTTPIngressRuleValue
+            Http = new()
             {
-                Paths = new List<V1HTTPIngressPath>()
-                    {
-                        new V1HTTPIngressPath
-                        {
-                            Path = "/.well-known/acme-challenge/",
-                            PathType = "Prefix",
-                            Backend = new V1IngressBackend
-                            {
-                                Service = new V1IngressServiceBackend
-                                {
-                                    Name = _cfg.KCertServiceName,
-                                    Port = new V1ServiceBackendPort(number: _cfg.KCertServicePort)
-                                },
-                            },
-                        },
-                    },
+                Paths = new List<V1HTTPIngressPath>() { path }
             },
         };
     }
