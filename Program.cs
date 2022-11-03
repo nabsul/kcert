@@ -7,6 +7,7 @@ using Microsoft.Extensions.Hosting;
 using System;
 using System.Linq;
 using System.Reflection;
+using System.Threading.Tasks;
 
 // command line option for manually generating an ECDSA key
 if (args.Length > 0 && args[^1] == "generate-key")
@@ -38,8 +39,14 @@ builder.Services.AddHostedService<ConfigMonitorService>();
 
 var app = builder.Build();
 
-app.UseStaticFiles();
-app.UseRouting();
-app.UseEndpoints(endpoints => endpoints.MapControllers());
+app.Map(".well-known/acme-challenge", false, b =>
+{
+    b.UseRouting().UseEndpoints(e => e.MapControllers());
+});
+
+app.MapWhen(c => c.Connection.LocalPort == 8080, b => {
+    b.UseStaticFiles();
+    b.UseRouting().UseEndpoints(e => e.MapControllers());
+});
 
 app.Run();

@@ -5,7 +5,6 @@ using Microsoft.Extensions.Logging;
 
 namespace KCert.Controllers;
 
-[LocalPortFilter(80)]
 [Route(".well-known/acme-challenge")]
 public class HttpChallengeController : Controller
 {
