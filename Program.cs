@@ -39,7 +39,7 @@ builder.Services.AddHostedService<ConfigMonitorService>();
 
 var app = builder.Build();
 
-app.Map(".well-known/acme-challenge", false, b =>
+app.Map("/.well-known/acme-challenge", false, b =>
 {
     b.UseRouting().UseEndpoints(e => e.MapControllers());
 });
