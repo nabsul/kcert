@@ -14,8 +14,8 @@ public class CertChangeService
     private readonly K8sClient _k8s;
     private readonly KCertClient _kcert;
 
-    private Task _runningTask = Task.CompletedTask;
-    private Task _nextTask = null;
+    private volatile Task _runningTask = Task.CompletedTask;
+    private volatile Task _nextTask = null;
 
     public CertChangeService(ILogger<CertChangeService> log, K8sClient k8s, KCertClient kcert)
     {
