@@ -31,13 +31,16 @@ public class CertChangeService
     // - However, it will not queue up multiple checks
     public void RunCheck()
     {
+        _log.LogInformation("Preparing for RunCheck");
         lock(this)
         {
             if (_nextTask != null)
             {
+                _log.LogInformation("Check already queued. Nothing to do.");
                 return;
             }
 
+            _log.LogInformation("Queueing up a check for changes.");
             _nextTask = CheckForChangesAsync(_runningTask);
         }
     }
@@ -45,6 +48,7 @@ public class CertChangeService
     private async Task CheckForChangesAsync(Task previous)
     {
         await previous;
+        _log.LogInformation("Starting check for changes.");
 
         lock(this)
         {
@@ -74,6 +78,8 @@ public class CertChangeService
             _log.LogInformation("Handling cert {ns} - {name} hosts: {h}", ns, name, string.Join(",", hosts));
             await _kcert.RenewIfNeededAsync(ns, name, hosts.ToArray(), CancellationToken.None);
         }
+
+        _log.LogInformation("Check for changes completed.");
     }
 
     private static async IAsyncEnumerable<T> MergeAsync<T>(params IAsyncEnumerable<T>[] enumerators)
