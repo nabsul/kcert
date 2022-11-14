@@ -1,8 +1,8 @@
 apiVersion: v2
 name: kcert
 description: Deploys KCert for issuing Let's Encrypt certificates 
-version: 1.0.1
-appVersion: 1.1.0
+version: 1.0.2
+appVersion: 1.2.0
 maintainers:
 - name: Nabeel Sulieman
   url: https://nabeel.dev
