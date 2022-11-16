@@ -56,3 +56,17 @@ spec:
               name: {{ .Values.names.secret }}
               key: password
 {{- end }}
+{{- if .Values.acmeKey }}
+        - name: ACME__KEY
+          valueFrom:
+            secretKeyRef:
+              name: "{{ .Values.acmeKey.secretName }}"
+              key: "{{ .Values.acmeKey.keyName }}"
+{{- end }}
+{{- if .Values.showRenewButton }}
+        - name: KCERT__SHOWRENEWBUTTON
+          value: "{{ .Values.showRenewButton }}"
+{{- end }}
+
+
+
