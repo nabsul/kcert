@@ -1,14 +1,11 @@
-﻿using KCert.Constants;
-using KCert.Services;
+﻿using KCert.Services;
 using Microsoft.AspNetCore.Mvc;
-using Microsoft.AspNetCore.Routing;
 using Microsoft.Extensions.Logging;
 
 namespace KCert.Controllers;
 
-[Host("*:80")]
-[Route(AcmeChallengeConstants.AcmeChallengePath)]
-public class HttpChallengeController : ControllerBase
+[Route(".well-known/acme-challenge")]
+public class HttpChallengeController : Controller
 {
     private readonly CertClient _cert;
     private readonly ILogger<HttpChallengeController> _log;
@@ -27,12 +24,7 @@ public class HttpChallengeController : ControllerBase
     public IActionResult GetChallengeResults(string token)
     {
         _log.LogInformation("Received ACME Challenge: {token}", token);
-        var thumb = _cert.GetThumbprint(token);
-        if (thumb == null)
-        {
-            return NotFound();
-        }
-
+        var thumb = _cert.GetThumbprint();
         return Ok($"{token}.{thumb}");
     }
 }

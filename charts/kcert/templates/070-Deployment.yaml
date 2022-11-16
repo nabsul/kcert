@@ -1,0 +1,58 @@
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: {{ required "names.deployment is required" .Values.names.deployment }}
+  namespace: {{ .Release.Namespace | default "default" }}
+  labels:
+    app: {{ required "names.app is required" .Values.names.app }}
+{{- if .Values.forHelm }}
+    app.kubernetes.io/name: {{ .Chart.Name }}
+    helm.sh/chart: {{ .Chart.Name }}-{{ .Chart.Version }}
+    app.kubernetes.io/instance: {{ .Release.Name }}
+    app.kubernetes.io/version: {{ .Chart.AppVersion }}
+    app.kubernetes.io/managed-by: {{ .Release.Service }}
+{{- end }}
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app: {{ required "names.app is required" .Values.names.app }}
+  template:
+    metadata:
+      labels:
+        app: {{ required "names.app is required" .Values.names.app }}
+    spec:
+      serviceAccountName: {{ required "names.serviceAccount is required" .Values.names.serviceAccount }}
+      containers:
+      - name: kcert
+        image: {{ required "kcertImage is required" .Values.kcertImage }}
+        ports:
+        - containerPort: 80
+          name: http
+        - containerPort: 8080
+          name: http-admin
+        env:
+        - name: ACME__DIRURL
+          # https://acme-staging-v02.api.letsencrypt.org/directory or https://acme-v02.api.letsencrypt.org/directory
+          value: {{ required "acmeDirUrl is required" .Values.acmeDirUrl }}
+        - name: ACME__TERMSACCEPTED
+          # You must set this to "true" to indicate your acceptance of Let's Encrypt's terms of service (https://letsencrypt.org/documents/LE-SA-v1.2-November-15-2017.pdf)
+          value: {{ required "acmeTermsAccepted is required" .Values.acmeTermsAccepted | quote }}
+        - name: ACME__EMAIL
+          # Your email address for Let's Encrypt and email notifications
+          value: {{ required "acmeEmail is required" .Values.acmeEmail }}
+{{- if .Values.smtp.host }}
+        - name: SMTP__EMAILFROM
+          value: {{ required "smtp.email is required" .Values.smtp.email }}
+        - name: SMTP__HOST
+          value: {{ required "smtp.email is required" .Values.smtp.host }}
+        - name: SMTP__PORT
+          value: "{{ required "smtp.email is required" .Values.smtp.port }}"
+        - name: SMTP__USER
+          value: {{ required "smtp.email is required" .Values.smtp.user }}
+        - name: SMTP__PASS
+          valueFrom:
+            secretKeyRef:
+              name: {{ .Values.names.secret }}
+              key: password
+{{- end }}

@@ -1,0 +1,26 @@
+apiVersion: v1
+kind: Service
+metadata:
+  name: {{ required "names.service is required" .Values.names.service }}
+  namespace: {{ .Release.Namespace | default "default" }}
+  labels:
+    app: kcert
+{{- if .Values.forHelm }}
+    app.kubernetes.io/name: {{ .Chart.Name }}
+    helm.sh/chart: {{ .Chart.Name }}-{{ .Chart.Version }}
+    app.kubernetes.io/instance: {{ .Release.Name }}
+    app.kubernetes.io/version: {{ .Chart.AppVersion }}
+    app.kubernetes.io/managed-by: {{ .Release.Service }}
+{{- end }}
+spec:
+  ports:
+    - name: http
+      protocol: TCP
+      port: 80
+      targetPort: 80
+    - name: http-admin
+      protocol: TCP
+      port: 8080
+      targetPort: 8080
+  selector:
+    app: {{ required "names.app is required" .Values.names.app }}

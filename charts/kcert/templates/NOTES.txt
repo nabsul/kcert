@@ -1,0 +1,4 @@
+Congratulations! kcert should now be setup and running in your cluster.
+
+You can check out the dashboard by running `kubectl -n {{ .Release.Namespace | default "default" }} port-forward svc/{{ .Values.names.service }} 8080`
+and then opening http://localhost:8080 in your browser.

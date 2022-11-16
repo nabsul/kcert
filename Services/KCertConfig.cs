@@ -9,15 +9,17 @@ namespace KCert.Services;
 public class KCertConfig
 {
     private readonly IConfiguration _cfg;
+    private readonly string _key;
 
     public KCertConfig(IConfiguration cfg)
     {
         _cfg = cfg;
+        _key = CertClient.GenerateNewKey();
     }
 
     public bool WatchIngresses => GetBool("KCert:WatchIngresses");
+    public bool WatchConfigMaps => GetBool("KCert:WatchConfigMaps");
     public string K8sConfigFile => _cfg["Config"];
-    public bool AcceptAllChallenges => GetBool("KCert:AcceptAllChallenges");
     public string KCertNamespace => GetString("KCert:Namespace");
     public string KCertSecretName => GetString("KCert:SecretName");
     public string KCertServiceName => GetString("KCert:ServiceName");
@@ -26,8 +28,13 @@ public class KCertConfig
     public bool ShowRenewButton => GetBool("KCert:ShowRenewButton");
     public int InitialSleepOnFailure => GetInt("KCert:InitialSleepOnFailure");
 
+    public bool UseChallengeIngressClassName => GetBool("ChallengeIngress:UseClassName");
+    public string ChallengeIngressClassName => GetString("ChallengeIngress:ClassName");
+
+    public bool UseChallengeIngressAnnotations => GetBool("ChallengeIngress:UseAnnotations");
     public Dictionary<string, string> ChallengeIngressAnnotations => GetDictionary("ChallengeIngress:Annotations");
 
+    public bool UseChallengeIngressLabels => GetBool("ChallengeIngress:UseLabels");
     public Dictionary<string, string> ChallengeIngressLabels => GetDictionary("ChallengeIngress:Labels");
     
     public int PropagationWaitTimeSeconds => GetInt("ChallengeIngress:PropagationWaitTimeSeconds");
@@ -42,7 +49,7 @@ public class KCertConfig
 
     public Uri AcmeDir => new(GetString("Acme:DirUrl"));
     public string AcmeEmail => GetString("Acme:Email");
-    public string AcmeKey => GetString("Acme:Key");
+    public string AcmeKey => GetString("Acme:Key") ?? _key; // If no key is provided via configs, use generated key.
     public bool AcmeAccepted => GetBool("Acme:TermsAccepted");
 
     public string SmtpEmailFrom => GetString("Smtp:EmailFrom");

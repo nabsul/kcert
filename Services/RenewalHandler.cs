@@ -27,7 +27,6 @@ public class RenewalHandler
 
     public async Task RenewCertAsync(string ns, string secretName, string[] hosts)
     {
-        _cert.ClearChallengeTokens();
         _log.Clear();
 
         try
@@ -61,10 +60,6 @@ public class RenewalHandler
                 Logs = _log.Dump(),
             };
         }
-        finally
-        {
-            _cert.ClearChallengeTokens();
-        }
     }
 
     private async Task<(string KID, string Nonce)> InitAsync(string key, Uri acmeDir, string email, bool termsAccepted)
@@ -94,7 +89,6 @@ public class RenewalHandler
 
         var challengeUri = new Uri(auth.Challenges.FirstOrDefault(c => c.Type == "http-01")?.Url);
         var chall = await _acme.TriggerChallengeAsync(key, challengeUri, kid, nonce);
-        _cert.AddChallengeToken(chall.Token);
         nonce = chall.Nonce;
         _log.LogInformation("TriggerChallenge {challengeUri}: {status}", challengeUri, chall.Status);
 

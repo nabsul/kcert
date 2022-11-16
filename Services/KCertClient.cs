@@ -1,7 +1,7 @@
-﻿using k8s.Models;
+﻿using k8s.Autorest;
+using k8s.Models;
 using KCert.Models;
 using Microsoft.Extensions.Logging;
-using Microsoft.Rest;
 using System;
 using System.Collections.Generic;
 using System.Linq;
@@ -18,16 +18,18 @@ public class KCertClient
     private readonly KCertConfig _cfg;
     private readonly ILogger<KCertClient> _log;
     private readonly EmailClient _email;
+    private readonly CertClient _cert;
     private readonly CallbackIngressService _callbackIngressService;
 
     private Task _running = Task.CompletedTask;
-
+    
     public KCertClient(
         K8sClient kube,
         KCertConfig cfg,
         RenewalHandler getCert,
         ILogger<KCertClient> log,
         EmailClient email,
+        CertClient cert,
         CallbackIngressService callbackIngressService)
     {
         _kube = kube;
@@ -35,9 +37,30 @@ public class KCertClient
         _getCert = getCert;
         _log = log;
         _email = email;
+        _cert = cert;
         _callbackIngressService = callbackIngressService;
     }
 
+    public async Task RenewIfNeededAsync(string ns, string name, string[] hosts, CancellationToken tok)
+    {
+        var secret = await _kube.GetSecretAsync(ns, name);
+        tok.ThrowIfCancellationRequested();
+
+        if (secret != null)
+        {
+            var cert = _cert.GetCert(secret);
+            var certHosts = _cert.GetHosts(cert).ToHashSet();
+            if (hosts.Length == certHosts.Count && hosts.All(h => certHosts.Contains(h)))
+            {
+                // nothing to do, cert already has all the hosts it needs to have
+                _log.LogInformation("Certificate already has all the needed hosts configured");
+                return;
+            }
+        }
+
+        await StartRenewalProcessAsync(ns, name, hosts, tok);
+    }
+    
     // Ensure that no certs are renewed in parallel
     public Task StartRenewalProcessAsync(string ns, string secretName, string[] hosts, CancellationToken tok)
     {
@@ -103,7 +126,6 @@ public class KCertClient
             {
                 Name = _cfg.KCertIngressName,
                 NamespaceProperty = _cfg.KCertNamespace,
-                Annotations = _cfg.ChallengeIngressAnnotations,
             },
             Spec = new()
             {
@@ -111,35 +133,50 @@ public class KCertClient
             }
         };
 
+        if (_cfg.UseChallengeIngressClassName)
+        {
+            kcertIngress.Spec.IngressClassName = _cfg.ChallengeIngressClassName;
+        }
+
+        if (_cfg.UseChallengeIngressAnnotations)
+        {
+            kcertIngress.Metadata.Annotations = _cfg.ChallengeIngressAnnotations;
+        }
+
+        if (_cfg.UseChallengeIngressLabels)
+        {
+            kcertIngress.Metadata.Labels = _cfg.ChallengeIngressLabels;
+        }
+
         await _kube.CreateIngressAsync(kcertIngress);
         _log.LogInformation("Giving challenge ingress time to propagate");
 
         await _callbackIngressService.AwaitChallengeIngressPropagatedAsync(hostList);
     }
-    
+
     private V1IngressRule CreateRule(string host)
     {
-        return new V1IngressRule
+
+        var path = new V1HTTPIngressPath
+        {
+            Path = "/.well-known/acme-challenge/",
+            PathType = "Prefix",
+            Backend = new()
+            {
+                Service = new()
+                {
+                    Name = _cfg.KCertServiceName,
+                    Port = new(number: _cfg.KCertServicePort)
+                },
+            },
+        };
+
+        return new()
         {
             Host = host,
-            Http = new V1HTTPIngressRuleValue
+            Http = new()
             {
-                Paths = new List<V1HTTPIngressPath>()
-                {
-                    new V1HTTPIngressPath
-                    {
-                        Path = "/.well-known/acme-challenge/",
-                        PathType = "Prefix",
-                        Backend = new V1IngressBackend
-                        {
-                            Service = new V1IngressServiceBackend
-                            {
-                                Name = _cfg.KCertServiceName,
-                                Port = new V1ServiceBackendPort(number: _cfg.KCertServicePort)
-                            },
-                        },
-                    },
-                },
+                Paths = new List<V1HTTPIngressPath>() { path }
             },
         };
     }
