@@ -93,7 +93,7 @@ public class KCertClient
         }
         catch (HttpOperationException ex)
         {
-            _log.LogError(ex, "HTTP Operation failed with respones: {resp}", ex.Response.Content);
+            _log.LogError(ex, "HTTP Operation failed with responses: {resp}", ex.Response.Content);
             throw;
         }
         catch (Exception ex)

@@ -81,7 +81,7 @@ public class CertChangeService
         }
         catch(Exception ex)
         {
-            _log.LogError(exception: ex, "Failed to check for cert changes.");
+            _log.LogError(ex, "Failed to check for cert changes.");
         }
         finally
         {
