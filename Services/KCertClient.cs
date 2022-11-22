@@ -176,12 +176,12 @@ public class KCertClient
         var ingressNameSpace = kcertIngress.Namespace();
 
         var timeoutCancellationToken =
-            new CancellationTokenSource(delay: TimeSpan.FromSeconds(_cfg.MaxPropagationWaitTimeSeconds)).Token;
+            new CancellationTokenSource(_cfg.ChallengeIngressMaxPropagationWaitTime).Token;
         while (timeoutCancellationToken.IsCancellationRequested is false)
         {
             if (await IsIngressPropagated()) return;
 
-            await Task.Delay(millisecondsDelay: _cfg.PropagationCheckIntervalMilliseconds, cancellationToken: timeoutCancellationToken);
+            await Task.Delay(_cfg.ChallengeIngressPropagationCheckInterval, cancellationToken: timeoutCancellationToken);
             
             async Task<bool> IsIngressPropagated()
             {
@@ -194,6 +194,6 @@ public class KCertClient
         throw new Exception(
             message:
             $"Ingress {ingressNameSpace}.{ingressName} was not propagated in time "
-          + $"({nameof(KCertConfig.MaxPropagationWaitTimeSeconds)}:{_cfg.MaxPropagationWaitTimeSeconds})");
+          + $"({nameof(KCertConfig.ChallengeIngressMaxPropagationWaitTime)}:{_cfg.ChallengeIngressMaxPropagationWaitTime})");
     }
 }
