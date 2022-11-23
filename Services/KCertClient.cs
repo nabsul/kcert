@@ -93,7 +93,7 @@ public class KCertClient
         }
         catch (HttpOperationException ex)
         {
-            _log.LogError(ex, "HTTP Operation failed with responses: {resp}", ex.Response.Content);
+            _log.LogError(ex, "HTTP Operation failed with response: {resp}", ex.Response.Content);
             throw;
         }
         catch (Exception ex)
@@ -172,28 +172,25 @@ public class KCertClient
     
     private async Task AwaitIngressPropagationAsync(V1Ingress kcertIngress)
     {
-        var ingressName = kcertIngress.Name();
-        var ingressNameSpace = kcertIngress.Namespace();
-
-        var timeoutCancellationToken =
-            new CancellationTokenSource(_cfg.ChallengeIngressMaxPropagationWaitTime).Token;
+        var timeoutCancellationToken = new CancellationTokenSource(_cfg.ChallengeIngressMaxPropagationWaitTime).Token;
         while (timeoutCancellationToken.IsCancellationRequested is false)
         {
-            if (await IsIngressPropagated()) return;
+            if (await IsIngressPropagated(kcertIngress)) return;
 
             await Task.Delay(_cfg.ChallengeIngressPropagationCheckInterval, cancellationToken: timeoutCancellationToken);
-            
-            async Task<bool> IsIngressPropagated()
-            {
-                var ingress = await _kube.GetIngressAsync(ingressNameSpace, ingressName);
-                var isIngressPropagated = ingress.Status.LoadBalancer.Ingress?.Any() ?? default;
-                return isIngressPropagated;
-            }
         }
 
         throw new Exception(
             message:
-            $"Ingress {ingressNameSpace}.{ingressName} was not propagated in time "
+            $"Ingress {kcertIngress.Name()}.{kcertIngress.Namespace()} was not propagated in time "
           + $"({nameof(KCertConfig.ChallengeIngressMaxPropagationWaitTime)}:{_cfg.ChallengeIngressMaxPropagationWaitTime})");
+    }
+    
+    private async Task<bool> IsIngressPropagated(V1Ingress kcertIngress)
+    {
+        var ingress = await _kube.GetIngressAsync(kcertIngress.Name(), kcertIngress.Namespace());
+        
+        var isIngressPropagated = ingress.Status.LoadBalancer.Ingress?.Any() ?? false;
+        return isIngressPropagated;
     }
 }
