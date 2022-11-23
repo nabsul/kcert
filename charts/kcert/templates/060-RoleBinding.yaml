@@ -2,7 +2,7 @@ apiVersion: rbac.authorization.k8s.io/v1
 kind: RoleBinding
 metadata:
   name: {{ required "names.role is required" .Values.names.role }}
-  namespace: {{ required "names.role is required" .Values.names.role }}
+  namespace: {{ .Release.Namespace | default "default" }}
 {{- if .Values.forHelm }}
   labels:
     app.kubernetes.io/name: {{ .Chart.Name }}
