@@ -5,7 +5,6 @@ using Microsoft.Extensions.Logging;
 using System;
 using System.Collections.Generic;
 using System.Linq;
-using System.Text.Json;
 using System.Threading;
 using System.Threading.Tasks;
 
@@ -20,8 +19,9 @@ public class KCertClient
     private readonly ILogger<KCertClient> _log;
     private readonly EmailClient _email;
     private readonly CertClient _cert;
-    private Task _running = Task.CompletedTask;
 
+    private Task _running = Task.CompletedTask;
+    
     public KCertClient(K8sClient kube, KCertConfig cfg, RenewalHandler getCert, ILogger<KCertClient> log, EmailClient email, CertClient cert)
     {
         _kube = kube;
@@ -93,7 +93,7 @@ public class KCertClient
         }
         catch (HttpOperationException ex)
         {
-            _log.LogError(ex, "HTTP Operation failed with respones: {resp}", ex.Response.Content);
+            _log.LogError(ex, "HTTP Operation failed with response: {resp}", ex.Response.Content);
             throw;
         }
         catch (Exception ex)
@@ -140,12 +140,12 @@ public class KCertClient
 
         await _kube.CreateIngressAsync(kcertIngress);
         _log.LogInformation("Giving challenge ingress time to propagate");
-        await Task.Delay(TimeSpan.FromSeconds(5));
-    }
 
+        await AwaitIngressPropagationAsync(kcertIngress);
+    }
+    
     private V1IngressRule CreateRule(string host)
     {
-
         var path = new V1HTTPIngressPath
         {
             Path = "/.well-known/acme-challenge/",
@@ -168,5 +168,29 @@ public class KCertClient
                 Paths = new List<V1HTTPIngressPath>() { path }
             },
         };
+    }
+    
+    private async Task AwaitIngressPropagationAsync(V1Ingress kcertIngress)
+    {
+        var timeoutCancellationToken = new CancellationTokenSource(_cfg.ChallengeIngressMaxPropagationWaitTime).Token;
+        while (timeoutCancellationToken.IsCancellationRequested is false)
+        {
+            if (await IsIngressPropagated(kcertIngress)) return;
+
+            await Task.Delay(_cfg.ChallengeIngressPropagationCheckInterval, cancellationToken: timeoutCancellationToken);
+        }
+
+        throw new Exception(
+            message:
+            $"Ingress {kcertIngress.Name()}.{kcertIngress.Namespace()} was not propagated in time "
+          + $"({nameof(KCertConfig.ChallengeIngressMaxPropagationWaitTime)}:{_cfg.ChallengeIngressMaxPropagationWaitTime})");
+    }
+    
+    private async Task<bool> IsIngressPropagated(V1Ingress kcertIngress)
+    {
+        var ingress = await _kube.GetIngressAsync(kcertIngress.Name(), kcertIngress.Namespace());
+        
+        var isIngressPropagated = ingress.Status.LoadBalancer.Ingress?.Any() ?? false;
+        return isIngressPropagated;
     }
 }

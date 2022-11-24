@@ -6,3 +6,6 @@ appsettings.local.json
 .vscode
 temp
 *.tgz
+
+# Jetbrains Rider
+.idea

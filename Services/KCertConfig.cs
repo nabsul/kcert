@@ -37,6 +37,9 @@ public class KCertConfig
     public bool UseChallengeIngressLabels => GetBool("ChallengeIngress:UseLabels");
     public Dictionary<string, string> ChallengeIngressLabels => GetDictionary("ChallengeIngress:Labels");
 
+    public TimeSpan ChallengeIngressMaxPropagationWaitTime => TimeSpan.FromSeconds(GetInt("ChallengeIngress:MaxPropagationWaitTimeSeconds"));
+    public TimeSpan ChallengeIngressPropagationCheckInterval => TimeSpan.FromMilliseconds(GetInt("ChallengeIngress:PropagationCheckIntervalMilliseconds"));
+    
     public TimeSpan AcmeWaitTime => TimeSpan.FromSeconds(_cfg.GetValue<int>("Acme:ValidationWaitTimeSeconds"));
     public int AcmeNumRetries => _cfg.GetValue<int>("Acme:ValidationNumRetries");
     public bool EnableAutoRenew => GetBool("Acme:AutoRenewal");
