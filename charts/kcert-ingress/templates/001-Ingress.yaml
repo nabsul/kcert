@@ -5,9 +5,8 @@ metadata:
   namespace: {{ .Release.Namespace | default "default" }}
   labels:
     kcert.dev/ingress: "managed"
-  annotations:
-    kubernetes.io/ingress.class: "nginx"
 spec:
+  ingressClassName: nginx
   tls:
   - hosts:
     - {{ required "Chart requires host value" .Values.host }}
