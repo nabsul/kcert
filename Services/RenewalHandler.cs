@@ -1,4 +1,4 @@
-﻿using KCert.Models;
+using KCert.Models;
 using Microsoft.Extensions.Logging;
 using System;
 using System.Collections.Generic;
@@ -14,15 +14,17 @@ public class RenewalHandler
     private readonly K8sClient _kube;
     private readonly KCertConfig _cfg;
     private readonly CertClient _cert;
+    private readonly IChallengeHandler _defaultChallengeHandler;
     private readonly BufferedLogger<RenewalHandler> _log;
 
-    public RenewalHandler(BufferedLogger<RenewalHandler> log, AcmeClient acme, K8sClient kube, KCertConfig cfg, CertClient cert)
+    public RenewalHandler(BufferedLogger<RenewalHandler> log, AcmeClient acme, K8sClient kube, KCertConfig cfg, CertClient cert, ChallengeHandlerHttp challengeHandlerHttp)
     {
         _log = log;
         _acme = acme;
         _kube = kube;
         _cfg = cfg;
         _cert = cert;
+        _defaultChallengeHandler = challengeHandlerHttp;
     }
 
     public async Task RenewCertAsync(string ns, string secretName, string[] hosts)
@@ -80,14 +82,15 @@ public class RenewalHandler
         return (new Uri(order.Location), new Uri(order.Finalize), urls, order.Nonce);
     }
 
-    private async Task<string> ValidateAuthorizationAsync(string key, string kid, string nonce, Uri authUri)
+    private async Task<string> ValidateAuthorizationAsync(string key, string kid, string nonce, Uri authUri, IChallengeHandler challengeHandler = null)
     {
+        challengeHandler = challengeHandler ?? _defaultChallengeHandler;
         var (waitTime, numRetries) = (_cfg.AcmeWaitTime, _cfg.AcmeNumRetries);
         var auth = await _acme.GetAuthzAsync(key, authUri, kid, nonce);
         nonce = auth.Nonce;
         _log.LogInformation("Get Auth {authUri}: {status}", authUri, auth.Status);
 
-        var challengeUri = new Uri(auth.Challenges.FirstOrDefault(c => c.Type == "http-01")?.Url);
+        var challengeUri = new Uri(auth.Challenges.FirstOrDefault(c => c.Type == challengeHandler.ChallengeIdentifier)?.Url);
         var chall = await _acme.TriggerChallengeAsync(key, challengeUri, kid, nonce);
         nonce = chall.Nonce;
         _log.LogInformation("TriggerChallenge {challengeUri}: {status}", challengeUri, chall.Status);
