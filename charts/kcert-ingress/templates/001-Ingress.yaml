@@ -6,7 +6,7 @@ metadata:
   labels:
     kcert.dev/ingress: "managed"
 spec:
-  ingressClassName: nginx
+  ingressClassName: {{ required "Chart requires class name value" .Values.className }}
   tls:
   - hosts:
     - {{ required "Chart requires host value" .Values.host }}
