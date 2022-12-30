@@ -2,3 +2,4 @@ name: null
 host: null
 service: null
 port: null
+className: nginx
