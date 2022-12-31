@@ -32,6 +32,8 @@ spec:
         - containerPort: 8080
           name: http-admin
         env:
+        - name: KCERT__NAMESPACE
+          value: {{ .Release.Namespace | default "default" }}
         - name: ACME__DIRURL
           # https://acme-staging-v02.api.letsencrypt.org/directory or https://acme-v02.api.letsencrypt.org/directory
           value: {{ required "acmeDirUrl is required" .Values.acmeDirUrl }}
