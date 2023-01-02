@@ -12,7 +12,7 @@ metadata:
 spec:
   {{- if and (not .Values.ingressClassAnnotation) (.Values.ingressClassName) }}
   ingressClassName: {{ required "Chart requires class name value" .Values.ingressClassName }}
-  {{- if and (not .Values.ingressClassAnnotation) (not .Values.ingressClassName) }}
+  {{- else if and (not .Values.ingressClassAnnotation) (not .Values.ingressClassName) }}
   ingressClassName: {{ required "Chart requires class name value" .Values.ingressClassName }}
   {{- end }}
   tls:
