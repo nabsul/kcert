@@ -3,4 +3,5 @@ host: null
 service: null
 port: null
 ingressClassName: nginx
+# If set to true, it'll ignore ingressClassName and use the same in ingress class annotation as using both in same ingress are not supported but ingressClassName is still required to use in annotation
 ingressClassAnnotation: false
