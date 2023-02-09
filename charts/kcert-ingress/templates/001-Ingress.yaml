@@ -5,12 +5,12 @@ metadata:
   namespace: {{ .Release.Namespace | default "default" }}
   labels:
     kcert.dev/ingress: "managed"
-  {{- if and (.Values.ingressClassAnnotation) (.Values.ingressClassName) }}
+  {{- if .Values.ingressClassAnnotation }}
   annotations:
     kubernetes.io/ingress.class: {{ required "Chart requires class name value" .Values.ingressClassName | quote }}
   {{- end }}
 spec:
-  {{- if and (not .Values.ingressClassAnnotation) (.Values.ingressClassName) }}
+  {{- if not .Values.ingressClassAnnotation }}
   ingressClassName: {{ required "Chart requires class name value" .Values.ingressClassName }}
   {{- end }}
   tls:
