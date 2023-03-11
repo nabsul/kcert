@@ -2,3 +2,6 @@ name: null
 host: null
 service: null
 port: null
+ingressClassName: nginx
+# If set to true, use ingressClassName as the value for in the annotation section of the ingress (instead of the newer ingressClassName field)
+useIngressClassAnnotation: false
