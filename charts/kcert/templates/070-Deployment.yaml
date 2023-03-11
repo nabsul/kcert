@@ -69,6 +69,10 @@ spec:
         - name: KCERT__SHOWRENEWBUTTON
           value: "{{ .Values.showRenewButton }}"
 {{- end }}
+{{- range $key, $value := .Values.env }}
+        - name: "{{ $key }}"
+          value: "{{ $value }}"
+{{- end }}
 
 
 

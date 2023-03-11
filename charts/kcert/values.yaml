@@ -3,6 +3,8 @@ acmeEmail: null
 acmeTermsAccepted: false
 kcertImage: nabsul/kcert:v1.2.0
 
+env: {}
+
 acmeKey:
   secretName: null
   keyName: key
