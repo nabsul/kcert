@@ -57,6 +57,8 @@ public class KCertConfig
     public string SmtpUser => GetString("Smtp:User");
     public string SmtpPass => GetString("Smtp:Pass");
 
+    public bool LabelByClassName => GetBool("ChallengeIngress:LabelByClassName");
+
     public object AllConfigs => new
     {
         KCert = new

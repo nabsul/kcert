@@ -1,21 +1,17 @@
 apiVersion: rbac.authorization.k8s.io/v1
 kind: RoleBinding
 metadata:
-  name: {{ required "names.role is required" .Values.names.role }}
+  name: {{ include "kcert.fullname" . }}
   namespace: {{ .Release.Namespace | default "default" }}
 {{- if .Values.forHelm }}
   labels:
-    app.kubernetes.io/name: {{ .Chart.Name }}
-    helm.sh/chart: {{ .Chart.Name }}-{{ .Chart.Version }}
-    app.kubernetes.io/instance: {{ .Release.Name }}
-    app.kubernetes.io/version: {{ .Chart.AppVersion }}
-    app.kubernetes.io/managed-by: {{ .Release.Service }}
+    {{- include "kcert.labels" . | nindent 4 }}
 {{- end }}
 subjects:
 - kind: ServiceAccount
-  name: {{ required "names.serviceAccount is required" .Values.names.serviceAccount }}
+  name: {{ include "kcert.fullname" . }}
   namespace: {{ .Release.Namespace | default "default" }}
 roleRef:
   kind: Role
-  name: {{ required "names.role is required" .Values.names.role }}
+  name: {{ include "kcert.fullname" . }}
   apiGroup: rbac.authorization.k8s.io

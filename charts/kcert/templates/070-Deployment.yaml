@@ -1,30 +1,32 @@
 apiVersion: apps/v1
 kind: Deployment
 metadata:
-  name: {{ required "names.deployment is required" .Values.names.deployment }}
+  name: {{ include "kcert.fullname" . }}
   namespace: {{ .Release.Namespace | default "default" }}
   labels:
-    app: {{ required "names.app is required" .Values.names.app }}
-{{- if .Values.forHelm }}
-    app.kubernetes.io/name: {{ .Chart.Name }}
-    helm.sh/chart: {{ .Chart.Name }}-{{ .Chart.Version }}
-    app.kubernetes.io/instance: {{ .Release.Name }}
-    app.kubernetes.io/version: {{ .Chart.AppVersion }}
-    app.kubernetes.io/managed-by: {{ .Release.Service }}
-{{- end }}
+    app: {{ include "kcert.fullname" . }}
+    {{- if .Values.forHelm }}
+    {{- include "kcert.labels" . | nindent 4 }}
+    {{- end }}
 spec:
   replicas: 1
   selector:
     matchLabels:
-      app: {{ required "names.app is required" .Values.names.app }}
+      app: {{ include "kcert.fullname" . }}
+      {{- if .Values.forHelm }}
+      {{- include "kcert.selectorLabels" . | nindent 6 }}
+      {{- end }}
   template:
     metadata:
       labels:
-        app: {{ required "names.app is required" .Values.names.app }}
+        app: {{ include "kcert.fullname" . }}
+        {{- if .Values.forHelm }}
+        {{- include "kcert.selectorLabels" . | nindent 8 }}
+        {{- end }}
     spec:
-      serviceAccountName: {{ required "names.serviceAccount is required" .Values.names.serviceAccount }}
+      serviceAccountName: {{ include "kcert.fullname" . }}
       containers:
-      - name: kcert
+      - name: {{ include "kcert.fullname" . }}
         image: {{ required "kcertImage is required" .Values.kcertImage }}
         ports:
         - containerPort: 80
@@ -55,7 +57,7 @@ spec:
         - name: SMTP__PASS
           valueFrom:
             secretKeyRef:
-              name: {{ .Values.names.secret }}
+              name: {{ include "kcert.fullname" . }}-smtp
               key: password
 {{- end }}
 {{- if .Values.acmeKey.secretName }}

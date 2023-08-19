@@ -18,6 +18,7 @@ public class K8sWatchClient
     public const string CertRequestValue = "request";
     public const string IngressLabelKey = "kcert.dev/ingress";
     public const string IngressLabelValue = "managed";
+    public const string IngressClassNameLabelKey = "kcert.dev/ingressClassName";
 
     private readonly KCertConfig _cfg;
 
@@ -35,6 +36,12 @@ public class K8sWatchClient
     public async Task WatchIngressesAsync(Func<WatchEventType, V1Ingress, Task> callback, CancellationToken tok)
     {
         var label = $"{IngressLabelKey}={IngressLabelValue}";
+
+        if (_cfg.LabelByClassName)
+        {
+            label += $",{IngressClassNameLabelKey}={_cfg.ChallengeIngressClassName}";
+        }
+
         var watch = () => _client.NetworkingV1.ListIngressForAllNamespacesWithHttpMessagesAsync(watch: true, cancellationToken: tok, labelSelector: label);
         await WatchInLoopAsync(label, watch, callback);
     }

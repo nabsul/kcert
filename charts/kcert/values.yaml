@@ -18,16 +18,5 @@ smtp:
   user: null
   pass: null
 
-names:
-  serviceAccount: kcert
-  clusterRole: kcert
-  clusterRoleBinding: kcert
-  role: kcert
-  roleBinding: kcert
-  secret: kcert-smtp
-  deployment: kcert
-  service: kcert
-  app: kcert
-
 # Set this to false in order to generate a plain yaml template without the Helm custom labels
 forHelm: true
