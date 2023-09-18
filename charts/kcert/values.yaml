@@ -29,5 +29,7 @@ names:
   service: kcert
   app: kcert
 
+resources: {}
+
 # Set this to false in order to generate a plain yaml template without the Helm custom labels
 forHelm: true
