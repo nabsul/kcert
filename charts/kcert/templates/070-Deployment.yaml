@@ -33,6 +33,10 @@ spec:
           name: http
         - containerPort: 8080
           name: http-admin
+        {{- if .Values.resources }}
+        resources:
+          {{- toYaml .Values.resources | nindent 10 }}
+        {{- end }}
         env:
         - name: KCERT__NAMESPACE
           value: {{ .Release.Namespace | default "default" }}
@@ -75,6 +79,7 @@ spec:
         - name: "{{ $key }}"
           value: "{{ $value }}"
 {{- end }}
+
 
 
 
