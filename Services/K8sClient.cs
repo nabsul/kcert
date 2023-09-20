@@ -20,8 +20,6 @@ public class K8sClient
     private const string CertLabelValue = "managed";
     public const string IngressLabelKey = "kcert.dev/ingress";
     private const string TlsTypeSelector = "type=kubernetes.io/tls";
-    public const string IngressClassNameLabelKey = "kcert.dev/ingressClassName";
-
     private readonly KCertConfig _cfg;
 
     private readonly ILogger<K8sClient> _log;

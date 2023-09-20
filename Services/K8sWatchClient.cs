@@ -17,7 +17,6 @@ public class K8sWatchClient
     public const string CertRequestKey = "kcert.dev/cert-request";
     public const string CertRequestValue = "request";
     public const string IngressLabelKey = "kcert.dev/ingress";
-    public const string IngressClassNameLabelKey = "kcert.dev/ingressClassName";
 
     private readonly KCertConfig _cfg;
 
