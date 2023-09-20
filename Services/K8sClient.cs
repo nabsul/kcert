@@ -19,7 +19,6 @@ public class K8sClient
     private const string CertLabelKey = "kcert.dev/secret";
     private const string CertLabelValue = "managed";
     public const string IngressLabelKey = "kcert.dev/ingress";
-    public const string IngressLabelValue = "managed";
     private const string TlsTypeSelector = "type=kubernetes.io/tls";
     public const string IngressClassNameLabelKey = "kcert.dev/ingressClassName";
 
@@ -38,11 +37,7 @@ public class K8sClient
 
     public async IAsyncEnumerable<V1Ingress> GetAllIngressesAsync()
     {
-        var label = $"{IngressLabelKey}={IngressLabelValue}";
-        if (_cfg.LabelByClassName)
-        {
-            label += $",{IngressClassNameLabelKey}={_cfg.ChallengeIngressClassName}";
-        }
+        var label = $"{IngressLabelKey}={_cfg.IngressLabelValue}";
 
         string tok = null;
         do
