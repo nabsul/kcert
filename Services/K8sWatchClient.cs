@@ -4,7 +4,9 @@ using k8s.Exceptions;
 using k8s.Models;
 using Microsoft.Extensions.Logging;
 using System;
+using System.Collections.Generic;
 using System.IO;
+using System.Linq;
 using System.Net.Http;
 using System.Threading;
 using System.Threading.Tasks;
@@ -35,6 +37,9 @@ public class K8sWatchClient
     public async Task WatchIngressesAsync(Func<WatchEventType, V1Ingress, Task> callback, CancellationToken tok)
     {
         var label = $"{IngressLabelKey}={IngressLabelValue}";
+
+        var test = () => _client.NetworkingV1.ListNamespacedIngressWithHttpMessagesAsync("", watch: true, cancellationToken: tok, labelSelector: label);
+
         var watch = () => _client.NetworkingV1.ListIngressForAllNamespacesWithHttpMessagesAsync(watch: true, cancellationToken: tok, labelSelector: label);
         await WatchInLoopAsync(label, watch, callback);
     }
@@ -71,6 +76,13 @@ public class K8sWatchClient
                 }
             }
         }
+    }
+
+    private IEnumerable<Task<HttpOperationResponse<V1IngressList>>> GetNamespacedIngressListWithHttpMessagesAsync(List<string> namespaces, string label, CancellationToken tok)
+    {
+        var toWatch = namespaces.Select(async ns => await _client.NetworkingV1.ListNamespacedIngressWithHttpMessagesAsync(ns, watch: true, cancellationToken: tok, labelSelector: label));
+
+        return toWatch;
     }
 
     private KubernetesClientConfiguration GetConfig()
