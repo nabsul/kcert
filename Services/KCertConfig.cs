@@ -27,6 +27,9 @@ public class KCertConfig
     public int KCertServicePort => GetInt("KCert:ServicePort");
     public bool ShowRenewButton => GetBool("KCert:ShowRenewButton");
     public int InitialSleepOnFailure => GetInt("KCert:InitialSleepOnFailure");
+    public bool NamespaceConstraints => GetBool("KCert:NamespaceConstraints");
+    public List<string> NamespaceConstraintsList => GetString("KCert:NamespaceConstraintsList").Split(";").ToList();
+    
 
     public bool UseChallengeIngressClassName => GetBool("ChallengeIngress:UseClassName");
     public string ChallengeIngressClassName => GetString("ChallengeIngress:ClassName");
@@ -67,6 +70,8 @@ public class KCertConfig
             ServiceName = KCertServiceName,
             ServicePort = KCertServicePort,
             ShowRenewButton,
+            NamespaceConstraints,
+            NamespaceConstraintsList
         },
         ACME = new
         {
