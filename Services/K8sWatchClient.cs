@@ -38,17 +38,50 @@ public class K8sWatchClient
     {
         var label = $"{IngressLabelKey}={IngressLabelValue}";
 
-        var test = () => _client.NetworkingV1.ListNamespacedIngressWithHttpMessagesAsync("", watch: true, cancellationToken: tok, labelSelector: label);
+        IEnumerable<Task<HttpOperationResponse<V1IngressList>>> taskList;
 
-        var watch = () => _client.NetworkingV1.ListIngressForAllNamespacesWithHttpMessagesAsync(watch: true, cancellationToken: tok, labelSelector: label);
-        await WatchInLoopAsync(label, watch, callback);
+        if(_cfg.NamespaceConstraints)
+        {
+            taskList = _cfg.NamespaceConstraintsList.Select(ns => _client.NetworkingV1.ListNamespacedIngressWithHttpMessagesAsync(ns, watch: true, cancellationToken: tok, labelSelector: label));
+        }
+        else
+        {
+            taskList = new [] {_client.NetworkingV1.ListIngressForAllNamespacesWithHttpMessagesAsync(watch: true, cancellationToken: tok, labelSelector: label)};
+        }
+
+        // Create the Func from the Tasks list
+        var watchers = taskList.Select(t => WatchInLoopAsync(label, () => t, callback));
+        
+        await Task.WhenAll(watchers);
+
+        // var watch = () => _client.NetworkingV1.ListIngressForAllNamespacesWithHttpMessagesAsync(watch: true, cancellationToken: tok, labelSelector: label);
+        // await WatchInLoopAsync(label, watch, callback);
     }
 
     public async Task WatchConfigMapsAsync(Func<WatchEventType, V1ConfigMap, Task> callback, CancellationToken tok)
     {
         var label = $"{CertRequestKey}={CertRequestValue}";
-        var watch = () => _client.CoreV1.ListConfigMapForAllNamespacesWithHttpMessagesAsync(watch: true, cancellationToken: tok, labelSelector: label);
-        await WatchInLoopAsync(label, watch, callback);
+
+
+        IEnumerable<Task<HttpOperationResponse<V1ConfigMapList>>> taskList;
+
+        if(_cfg.NamespaceConstraints)
+        {
+            taskList = _cfg.NamespaceConstraintsList.Select(ns => _client.CoreV1.ListNamespacedConfigMapWithHttpMessagesAsync(ns, watch: true, cancellationToken: tok, labelSelector: label));
+        }
+        else
+        {
+            taskList = new [] {_client.CoreV1.ListConfigMapForAllNamespacesWithHttpMessagesAsync(watch: true, cancellationToken: tok, labelSelector: label)};
+        }
+
+
+        // Create the Func from the Tasks list
+        var watchers = taskList.Select(t => WatchInLoopAsync(label, () => t, callback));
+
+        await Task.WhenAll(watchers);
+
+        // var watch = () => _client.CoreV1.ListConfigMapForAllNamespacesWithHttpMessagesAsync(watch: true, cancellationToken: tok, labelSelector: label);
+        // await WatchInLoopAsync(label, watch, callback);
     }
 
     private async Task WatchInLoopAsync<T, L>(string label, Func<Task<HttpOperationResponse<L>>> watch, Func<WatchEventType, T, Task> callback)
