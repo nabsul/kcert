@@ -12,6 +12,16 @@ metadata:
     app.kubernetes.io/managed-by: {{ .Release.Service }}
 {{- end }}
 rules:
+{{ if .Values.names.clusterRole }}
 - apiGroups: ["networking.k8s.io"]
   resources: ["ingresses"]
   verbs: ["get", "list", "create", "delete", "update", "patch"]
+{{ else }}
+- apiGroups: [""]
+  resources: ["ingresses", "configmaps"]
+  verbs: ["get", "list", "create", "delete", "update", "patch", "watch"]
+
+- apiGroups: [""]
+  resources: ["secrets"]
+  verbs: ["get", "list", "create", "update", "patch", "watch"]
+{{ end }}

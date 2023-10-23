@@ -9,18 +9,26 @@ acmeKey:
   secretName: null
   keyName: key
 
+acmeEabKey:
+  secretName: kcert-prd-hmac-secret
+  keyIdName: keyid
+  hmacKeyName: hmac
+
+
 showRenewButton: null
 
 smtp:
   email: null
   host: null
-  port: null
+  port: 25
   user: null
-  pass: null
+  secret:
+    name: null
+    key: password
 
 names:
   serviceAccount: kcert
-  clusterRole: kcert
+  clusterRole: kcert # Set to null to disable cluster-role resources (Useful when running in a namespace-constrained environment)
   clusterRoleBinding: kcert
   role: kcert
   roleBinding: kcert
@@ -28,6 +36,14 @@ names:
   deployment: kcert
   service: kcert
   app: kcert
+
+securityContext: []
+  # capabilities:
+  #   drop:
+  #   - ALL
+  # readOnlyRootFilesystem: true
+  # runAsNonRoot: true
+  # runAsUser: 1000
 
 resources: {}
 
