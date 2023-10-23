@@ -26,6 +26,9 @@ public class K8sWatchClient
     private readonly ILogger<K8sClient> _log;
 
     private readonly Kubernetes _client;
+    
+    // In case of error in the watch loop, force all the watch services to restart by setting this global flag to true
+    private bool watchExceptionLoop = false;
 
     public K8sWatchClient(KCertConfig cfg, ILogger<K8sClient> log)
     {
@@ -67,6 +70,7 @@ public class K8sWatchClient
 
         if(_cfg.NamespaceConstraints)
         {
+            _log.LogInformation("Starting in namespaced mode and listening for the following namespaces: {ns}", String.Join("; ", _cfg.NamespaceConstraintsList));
             taskList = _cfg.NamespaceConstraintsList.Select(ns => _client.CoreV1.ListNamespacedConfigMapWithHttpMessagesAsync(ns, watch: true, cancellationToken: tok, labelSelector: label));
         }
         else
@@ -78,16 +82,14 @@ public class K8sWatchClient
         // Create the Func from the Tasks list
         var watchers = taskList.Select(t => WatchInLoopAsync(label, () => t, callback));
 
+        this.watchExceptionLoop = false;
         await Task.WhenAll(watchers);
-
-        // var watch = () => _client.CoreV1.ListConfigMapForAllNamespacesWithHttpMessagesAsync(watch: true, cancellationToken: tok, labelSelector: label);
-        // await WatchInLoopAsync(label, watch, callback);
     }
 
     private async Task WatchInLoopAsync<T, L>(string label, Func<Task<HttpOperationResponse<L>>> watch, Func<WatchEventType, T, Task> callback)
     {
         var typeName = typeof(T).Name;
-        while (true)
+        while (!watchExceptionLoop)
         {
             try
             {
@@ -101,7 +103,10 @@ public class K8sWatchClient
             {
                 if (ex.Message == "Error while copying content to a stream.")
                 {
-                    _log.LogInformation("Empty Kubernetes client result threw an exception. Retrying {type}[{label}].", typeName, label);
+                    _log.LogInformation("Empty Kubernetes client result threw an exception");
+                    _log.LogInformation("Restarting watch service.");
+
+                    watchExceptionLoop = true;
                 }
                 else
                 {

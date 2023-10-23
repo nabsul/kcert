@@ -188,7 +188,7 @@ public class KCertClient
     
     private async Task<bool> IsIngressPropagated(V1Ingress kcertIngress)
     {
-        var ingress = await _kube.GetIngressAsync(kcertIngress.Name(), kcertIngress.Namespace());
+        var ingress = await _kube.GetIngressAsync(kcertIngress.Namespace(), kcertIngress.Name());
         
         var isIngressPropagated = ingress.Status.LoadBalancer.Ingress?.Any() ?? false;
         return isIngressPropagated;

@@ -1,12 +1,18 @@
 ﻿using KCert.Models;
+using KCert.Tools;
 using Microsoft.AspNetCore.Authentication;
+using Microsoft.Extensions.Logging;
+using Microsoft.IdentityModel.Tokens;
 using System;
 using System.Collections.Generic;
 using System.Linq;
+using System.Net;
 using System.Net.Http;
 using System.Net.Http.Headers;
+using System.Security.Cryptography;
 using System.Text;
 using System.Text.Json;
+using System.Threading;
 using System.Threading.Tasks;
 
 namespace KCert.Services;
@@ -23,10 +29,18 @@ public class AcmeClient
 
     private readonly HttpClient _http = new();
     private readonly CertClient _cert;
+    private readonly BufferedLogger<RenewalHandler> _log;
 
-    public AcmeClient(CertClient cert)
+    private readonly Base64Tool _b64;
+
+    public AcmeClient(CertClient cert, BufferedLogger<RenewalHandler> log)
     {
         _cert = cert;
+        _log = log;
+
+        _b64 = new Base64Tool();
+
+        _http.Timeout = new TimeSpan(0, 1, 0);
     }
 
     private AcmeDirectoryResponse _dir;
@@ -56,12 +70,63 @@ public class AcmeClient
         return _dir.Meta.TermsOfService;
     }
 
-    public async Task<AcmeAccountResponse> CreateAccountAsync(string key, string email, string nonce, bool termsAccepted)
+    private string GetSignatureUsingHMAC(string text, string key)
     {
-        var contact = new[] { $"mailto:{email}" };
-        var payloadObject = new { contact, termsOfServiceAgreed = termsAccepted };
+        var symKey = _b64.UrlDecode(key);
+
+        using (var hmacSha256 = new HMACSHA256(symKey))
+        {
+            var sig = hmacSha256.ComputeHash(Encoding.UTF8.GetBytes(text));
+            return _b64.UrlEncode(sig);
+        }
+    }
+
+    public async Task<AcmeAccountResponse> CreateAccountAsync(string key, string email, string nonce, bool termsOfServiceAgreed, string eabKid = null, string eabHmacKey = null)
+    {
+        var contact = new[] {$"mailto:{email}"};
         var uri = new Uri(_dir.NewAccount);
-        return await PostAsync<AcmeAccountResponse>(key, uri, payloadObject, nonce);
+
+        if(eabKid == null || eabHmacKey == null)
+        {
+            var payloadObject = new {contact, termsOfServiceAgreed };
+            return await PostAsync<AcmeAccountResponse>(key, uri, payloadObject, nonce);
+        }
+        else
+        {
+            var eabProtected = new 
+                {
+                    alg = "HS256",
+                    kid = eabKid,
+                    url = uri
+                };
+            
+            var eabUrlEncoded = _b64.UrlEncode(JsonSerializer.Serialize(eabProtected));
+
+
+            // Re-use the same JWK as the outer protected section
+            var sign = _cert.GetSigner(key);
+            var jwk =_cert.GetJwk(sign);
+
+            var innerPayload = _b64.UrlEncode(JsonSerializer.Serialize(jwk));
+            
+
+            var signature = GetSignatureUsingHMAC(eabUrlEncoded + "." + innerPayload, eabHmacKey);            
+
+            var payloadObject = new 
+                {
+                    contact,
+                    termsOfServiceAgreed,
+                    externalAccountBinding = new 
+                        {
+                            @protected = eabUrlEncoded,
+                            payload = innerPayload,
+                            signature
+                        },
+                };
+            
+            return await PostAsync<AcmeAccountResponse>(key, uri, payloadObject, nonce);
+
+        }
     }
 
     public async Task<AcmeOrderResponse> CreateOrderAsync(string key, string kid, IEnumerable<string> hosts, string nonce)
@@ -118,7 +183,31 @@ public class AcmeClient
 
         var content = new StringContent(bodyJson, Encoding.UTF8);
         content.Headers.ContentType = new MediaTypeHeaderValue(ContentType);
-        return await _http.PostAsync(uri, content);
+
+        // Small retry wrapper in case of HTTP failure
+        int maxRetries = 3;
+        while(maxRetries >= 0)
+        {
+            try
+            {
+                return await _http.PostAsync(uri, content);
+            }
+            catch (Exception e)
+            {
+                if(maxRetries == 0)
+                {
+                    throw e;
+                }
+
+                _log.LogInformation("HTTP request failed. Retrying in 3 seconds.");
+                Thread.Sleep(3000);
+            }
+
+            maxRetries--;
+        }
+        
+        // Should never be reached
+        return null;
     }
 
     private static async Task<T> ParseJsonAsync<T>(HttpResponseMessage resp) where T : AcmeResponse

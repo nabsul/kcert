@@ -36,9 +36,6 @@ public class K8sClient
         _log = log;
         _client = new Kubernetes(GetConfig());
 
-        if(_cfg.NamespaceConstraints){
-            var namespaces = _cfg.NamespaceConstraintsList;
-        }
     }
 
     public async IAsyncEnumerable<V1Ingress> GetAllIngressesAsync()

@@ -54,6 +54,9 @@ public class KCertConfig
     public string AcmeKey => GetString("Acme:Key") ?? _key; // If no key is provided via configs, use generated key.
     public bool AcmeAccepted => GetBool("Acme:TermsAccepted");
 
+    public string AcmeEabKeyId => GetString("Acme:EabKeyId");
+    public string AcmeHmacKey => GetString("Acme:EabHmacKey");
+
     public string SmtpEmailFrom => GetString("Smtp:EmailFrom");
     public string SmtpHost => GetString("Smtp:Host");
     public int SmtpPort => GetInt("Smtp:Port");
