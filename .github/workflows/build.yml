@@ -30,7 +30,7 @@ jobs:
         id: meta_ghcr
         uses: docker/metadata-action@v4
         with:
-          images: ghcr.io/zegorax/kcert
+          images: ghcr.io/nabsul/kcert,nabsul/kcert
           tags: |
             type=ref,event=branch
             type=ref,event=pr
@@ -41,9 +41,15 @@ jobs:
       - name: Log in to the GHCR registry
         uses: docker/login-action@v2
         with:
-          registry: ghcr.io/zegorax/kcert
+          registry: ghcr.io/nabsul/kcert
           username: ${{ github.actor }}
           password: ${{ secrets.GITHUB_TOKEN }}
+
+      - name: Login to Docker Hub
+        uses: docker/login-action@v2
+        with:
+          username: ${{ secrets.DOCKER_USER }}
+          password: ${{ secrets.DOCKER_TOKEN }}
 
       - name: Build and push image
         uses: docker/build-push-action@v3
