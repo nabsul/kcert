@@ -8,7 +8,7 @@ namespace KCert;
 
 public static class Helpers
 {
-    public static async IAsyncEnumerable<TItem> K8sEnumAsync<TItem, TList>(Func<string, Task<TList>> callback) where TList: IKubernetesObject<V1ListMeta>, IItems<TItem>
+    public static async IAsyncEnumerable<TItem> K8sEnumerateAsync<TItem, TList>(Func<string, Task<TList>> callback) where TList: IKubernetesObject<V1ListMeta>, IItems<TItem>
     {
         string tok = null;
         do

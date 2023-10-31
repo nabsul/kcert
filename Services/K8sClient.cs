@@ -34,28 +34,28 @@ public class K8sClient
 
     public async IAsyncEnumerable<V1Ingress> GetAllIngressesAsync()
     {
-        foreach (var callback in GetIngressRequestsAsync())
+        var label = $"{IngressLabelKey}={_cfg.IngressLabelValue}";
+        List<string> namespaces = new List<string>(); //get from config
+
+        var requests = new List<Func<string, Task<V1IngressList>>>();
+        if (namespaces == null)
         {
-            await foreach(var ing in Helpers.K8sEnumAsync<V1Ingress, V1IngressList>(callback))
+            requests.Add((tok) => _client.ListIngressForAllNamespacesAsync(labelSelector: label, continueParameter: tok));
+        }
+        else
+        {
+            foreach (var n in namespaces)
+            {
+                requests.Add((tok) => _client.ListNamespacedIngressAsync(n, labelSelector: label, continueParameter: tok));
+            }
+        }
+
+        foreach (var callback in requests)
+        {
+            await foreach(var ing in Helpers.K8sEnumerateAsync<V1Ingress, V1IngressList>(callback))
             {
                 yield return ing;
             }
-        }
-    }
-
-    private IEnumerable<Func<string, Task<V1IngressList>>> GetIngressRequestsAsync()
-    {
-        var label = $"{IngressLabelKey}={_cfg.IngressLabelValue}";
-        List<string> namespaces = null; //get from config
-        if (namespaces == null)
-        {
-            yield return (tok) => _client.ListIngressForAllNamespacesAsync(labelSelector: label, continueParameter: tok);
-            yield break;
-        }
-
-        foreach (var n in namespaces)
-        {
-            yield return (tok) => _client.ListNamespacedIngressAsync(n, labelSelector: label, continueParameter: tok);
         }
     }
 
