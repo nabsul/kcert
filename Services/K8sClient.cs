@@ -36,17 +36,35 @@ public class K8sClient
     {
         var label = $"{IngressLabelKey}={_cfg.IngressLabelValue}";
 
-        string tok = null;
-        do
+        List<string> namespaces = null;
+        List<Func<Task<V1IngressList>>> requests = new();
+
+        if (namespaces == null)
         {
-            var result = await _client.ListIngressForAllNamespacesAsync(labelSelector: label, continueParameter: tok);
-            tok = result.Continue();
-            foreach (var i in result.Items)
+            requests.Add(() => _client.ListIngressForAllNamespacesAsync(labelSelector: label, continueParameter: tok));
+        }
+        else
+        {
+            foreach (var n in namespaces)
             {
-                yield return i;
+                requests.Add(() => _client.ListNamespacedIngressAsync(n));
             }
         }
-        while (tok != null);
+
+        foreach(var f in requests)
+        {
+            string tok = null;
+            do
+            {
+                var result = await f();
+                tok = result.Continue();
+                foreach (var i in result.Items)
+                {
+                    yield return i;
+                }
+            }
+            while (tok != null);
+        }
     }
 
     public async IAsyncEnumerable<V1ConfigMap> GetAllConfigMapsAsync()
