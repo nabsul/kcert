@@ -2,6 +2,7 @@
 using k8s.Autorest;
 using k8s.Exceptions;
 using k8s.Models;
+using Microsoft.AspNetCore.Mvc.TagHelpers;
 using Microsoft.Extensions.Logging;
 using System;
 using System.Collections.Generic;
@@ -34,26 +35,18 @@ public class K8sClient
 
     public async IAsyncEnumerable<V1Ingress> GetAllIngressesAsync()
     {
-        foreach(var f in GetIngressRequestsAsync())
+        foreach (var callback in GetIngressRequestsAsync())
         {
-            string tok = null;
-            do
+            await foreach(var ing in Helpers.K8sEnumAsync<V1Ingress, V1IngressList>(callback))
             {
-                var result = await f(tok);
-                tok = result.Continue();
-                foreach (var i in result.Items)
-                {
-                    yield return i;
-                }
+                yield return ing;
             }
-            while (tok != null);
         }
     }
 
     private IEnumerable<Func<string, Task<V1IngressList>>> GetIngressRequestsAsync()
     {
         var label = $"{IngressLabelKey}={_cfg.IngressLabelValue}";
-
         List<string> namespaces = null; //get from config
         if (namespaces == null)
         {
