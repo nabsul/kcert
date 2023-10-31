@@ -36,7 +36,7 @@ public class K8sClient
     {
         var label = $"{IngressLabelKey}={_cfg.IngressLabelValue}";
 
-        List<string> namespaces = null;
+        List<string> namespaces = null; // replace with namespaces from configuration
         List<Func<Task<V1IngressList>>> requests = new();
 
         if (namespaces == null)
