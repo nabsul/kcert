@@ -2,7 +2,6 @@
 using k8s.Autorest;
 using k8s.Exceptions;
 using k8s.Models;
-using Microsoft.AspNetCore.Mvc.TagHelpers;
 using Microsoft.Extensions.Logging;
 using System;
 using System.Collections.Generic;
