@@ -7,6 +7,7 @@ using System;
 using System.Collections.Generic;
 using System.Linq;
 using System.Net;
+using System.Reflection.Emit;
 using System.Text;
 using System.Threading.Tasks;
 
@@ -34,29 +35,12 @@ public class K8sClient
 
     public async IAsyncEnumerable<V1Ingress> GetAllIngressesAsync()
     {
-        var label = $"{IngressLabelKey}={_cfg.IngressLabelValue}";
-
-        List<string> namespaces = null; // replace with namespaces from configuration
-        List<Func<Task<V1IngressList>>> requests = new();
-
-        if (namespaces == null)
-        {
-            requests.Add(() => _client.ListIngressForAllNamespacesAsync(labelSelector: label, continueParameter: tok));
-        }
-        else
-        {
-            foreach (var n in namespaces)
-            {
-                requests.Add(() => _client.ListNamespacedIngressAsync(n));
-            }
-        }
-
-        foreach(var f in requests)
+        foreach(var f in GetIngressRequestsAsync())
         {
             string tok = null;
             do
             {
-                var result = await f();
+                var result = await f(tok);
                 tok = result.Continue();
                 foreach (var i in result.Items)
                 {
@@ -64,6 +48,23 @@ public class K8sClient
                 }
             }
             while (tok != null);
+        }
+    }
+
+    private IEnumerable<Func<string, Task<V1IngressList>>> GetIngressRequestsAsync()
+    {
+        var label = $"{IngressLabelKey}={_cfg.IngressLabelValue}";
+
+        List<string> namespaces = null; //get from config
+        if (namespaces == null)
+        {
+            yield return (tok) => _client.ListIngressForAllNamespacesAsync(labelSelector: label, continueParameter: tok);
+            yield break;
+        }
+
+        foreach (var n in namespaces)
+        {
+            yield return (tok) => _client.ListNamespacedIngressAsync(n, labelSelector: label, continueParameter: tok);
         }
     }
 
