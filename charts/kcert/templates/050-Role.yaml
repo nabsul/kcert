@@ -11,7 +11,7 @@ rules:
 {{ if .Values.allowClusterWide }}
 - apiGroups: ["networking.k8s.io"]
   resources: ["ingresses"]
-  verbs: ["get", "list", "create", "delete", "update", "patch"]
+  verbs: ["get", "list", "create", "delete", "update", "patch", "watch"]
 {{ else }}
 - apiGroups: [""]
   resources: ["ingresses", "configmaps"]
