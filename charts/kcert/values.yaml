@@ -1,9 +1,11 @@
 acmeDirUrl: https://acme-staging-v02.api.letsencrypt.org/directory
-acmeEmail: null
+acmeEmail: asdfs
 acmeTermsAccepted: false
 kcertImage: nabsul/kcert:v1.2.0
 
 env: {}
+
+allowClusterWide: true
 
 acmeKey:
   secretName: null
@@ -20,24 +22,13 @@ showRenewButton: null
 smtp:
   email: null
   host: null
-  port: 25
+  port: null
   user: null
   secret:
     name: null
     key: password
 
-names:
-  serviceAccount: kcert
-  clusterRole: kcert # Set to null to disable cluster-role resources (Useful when running in a namespace-constrained environment)
-  clusterRoleBinding: kcert
-  role: kcert
-  roleBinding: kcert
-  secret: kcert-smtp
-  deployment: kcert
-  service: kcert
-  app: kcert
-
-securityContext: []
+securityContext: {}
   # capabilities:
   #   drop:
   #   - ALL

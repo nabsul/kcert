@@ -8,7 +8,7 @@ metadata:
     {{- include "kcert.labels" . | nindent 4 }}
 {{- end }}
 rules:
-{{ if .Values.names.clusterRole }}
+{{ if .Values.allowClusterWide }}
 - apiGroups: ["networking.k8s.io"]
   resources: ["ingresses"]
   verbs: ["get", "list", "create", "delete", "update", "patch"]

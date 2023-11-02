@@ -37,6 +37,8 @@ helm install kcert nabsul/kcert -n kcert --debug --set acmeTermsAccepted=true,ac
 ```
 
 For setting up SMTP email notifications and other parameters, please check the `charts/kcert/values.yaml` file.
+The SMTP password must be stored in an already created secret and the secret name + field key must be specified in the `values` file.
+An empty credentials section will enable unauthenticated email sending.
 
 ### Creating a Certificate via Ingress
 
@@ -77,8 +79,8 @@ More information this topic can be found [here](https://letsencrypt.org/docs/sta
 ### Using EAB (External Account Binding)
 KCert supports the EAB authentication protocol for providers requiring it. To set it up, fill the following environment variables:
 ```
-ACME_EABKEYID: Key identifier given by your ACME provider
-ACME_EABHMACKEY: HMAC key given by your ACME provider
+ACME__EABKEYID: Key identifier given by your ACME provider
+ACME__EABHMACKEY: HMAC key given by your ACME provider
 ```
 
 It is also possible to set those variables in `appsettings.json` under the "Acme" field.

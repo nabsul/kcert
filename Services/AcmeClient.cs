@@ -29,18 +29,18 @@ public class AcmeClient
 
     private readonly HttpClient _http = new();
     private readonly CertClient _cert;
+    private readonly KCertConfig _cfg;
     private readonly BufferedLogger<RenewalHandler> _log;
 
-    private readonly Base64Tool _b64;
+    private readonly Base64Tool _b64 = new Base64Tool();
 
-    public AcmeClient(CertClient cert, BufferedLogger<RenewalHandler> log)
+    public AcmeClient(CertClient cert, BufferedLogger<RenewalHandler> log, KCertConfig cfg)
     {
         _cert = cert;
         _log = log;
+        _cfg = cfg;
 
-        _b64 = new Base64Tool();
-
-        _http.Timeout = new TimeSpan(0, 1, 0);
+        _http.Timeout = _cfg.HttpTimeout;
     }
 
     private AcmeDirectoryResponse _dir;
@@ -70,16 +70,6 @@ public class AcmeClient
         return _dir.Meta.TermsOfService;
     }
 
-    private string GetSignatureUsingHMAC(string text, string key)
-    {
-        var symKey = _b64.UrlDecode(key);
-
-        using (var hmacSha256 = new HMACSHA256(symKey))
-        {
-            var sig = hmacSha256.ComputeHash(Encoding.UTF8.GetBytes(text));
-            return _b64.UrlEncode(sig);
-        }
-    }
 
     public async Task<AcmeAccountResponse> CreateAccountAsync(string key, string email, string nonce, bool termsOfServiceAgreed, string eabKid = null, string eabHmacKey = null)
     {
@@ -88,45 +78,51 @@ public class AcmeClient
 
         if(eabKid == null || eabHmacKey == null)
         {
-            var payloadObject = new {contact, termsOfServiceAgreed };
-            return await PostAsync<AcmeAccountResponse>(key, uri, payloadObject, nonce);
+            var payloadObj = new {contact, termsOfServiceAgreed };
+            return await PostAsync<AcmeAccountResponse>(key, uri, payloadObj, nonce);
         }
-        else
-        {
-            var eabProtected = new 
-                {
-                    alg = "HS256",
-                    kid = eabKid,
-                    url = uri
-                };
-            
-            var eabUrlEncoded = _b64.UrlEncode(JsonSerializer.Serialize(eabProtected));
+        
+        
+        var eabProtected = new 
+            {
+                alg = "HS256",
+                kid = eabKid,
+                url = uri
+            };
+        
+        var eabUrlEncoded = _b64.UrlEncode(JsonSerializer.Serialize(eabProtected));
 
+        // Re-use the same JWK as the outer protected section
+        var sign = _cert.GetSigner(key);
+        var jwk =_cert.GetJwk(sign);
+        var innerPayload = _b64.UrlEncode(JsonSerializer.Serialize(jwk));
 
-            // Re-use the same JWK as the outer protected section
-            var sign = _cert.GetSigner(key);
-            var jwk =_cert.GetJwk(sign);
+        var signature = GetSignatureUsingHMAC(eabUrlEncoded + "." + innerPayload, eabHmacKey);            
 
-            var innerPayload = _b64.UrlEncode(JsonSerializer.Serialize(jwk));
-            
+        var payloadObject = new 
+            {
+                contact,
+                termsOfServiceAgreed,
+                externalAccountBinding = new 
+                    {
+                        @protected = eabUrlEncoded,
+                        payload = innerPayload,
+                        signature
+                    },
+            };
+        
+        return await PostAsync<AcmeAccountResponse>(key, uri, payloadObject, nonce);
 
-            var signature = GetSignatureUsingHMAC(eabUrlEncoded + "." + innerPayload, eabHmacKey);            
+        
+    }
 
-            var payloadObject = new 
-                {
-                    contact,
-                    termsOfServiceAgreed,
-                    externalAccountBinding = new 
-                        {
-                            @protected = eabUrlEncoded,
-                            payload = innerPayload,
-                            signature
-                        },
-                };
-            
-            return await PostAsync<AcmeAccountResponse>(key, uri, payloadObject, nonce);
+    private string GetSignatureUsingHMAC(string text, string key)
+    {
+        var symKey = _b64.UrlDecode(key);
 
-        }
+        using var hmacSha256 = new HMACSHA256(symKey);
+        var sig = hmacSha256.ComputeHash(Encoding.UTF8.GetBytes(text));
+        return _b64.UrlEncode(sig);
     }
 
     public async Task<AcmeOrderResponse> CreateOrderAsync(string key, string kid, IEnumerable<string> hosts, string nonce)
@@ -186,7 +182,7 @@ public class AcmeClient
 
         // Small retry wrapper in case of HTTP failure
         int maxRetries = 3;
-        while(maxRetries >= 0)
+        while(_cfg.EnableHttpRetry && maxRetries >= 0)
         {
             try
             {

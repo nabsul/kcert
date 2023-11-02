@@ -27,8 +27,9 @@ public class KCertConfig
     public int KCertServicePort => GetInt("KCert:ServicePort");
     public bool ShowRenewButton => GetBool("KCert:ShowRenewButton");
     public int InitialSleepOnFailure => GetInt("KCert:InitialSleepOnFailure");
-    public bool NamespaceConstraints => GetBool("KCert:NamespaceConstraints");
     public List<string> NamespaceConstraintsList => GetString("KCert:NamespaceConstraintsList").Split(";").ToList();
+    public TimeSpan HttpTimeout => TimeSpan.FromSeconds(GetOptionalInt("KCert:HttpTimeoutSeconds") ?? 60);
+    public bool EnableHttpRetry => GetOptionalBool("KCert:EnableHttpRetry") ?? false;
     
 
     public bool UseChallengeIngressClassName => GetBool("ChallengeIngress:UseClassName");
@@ -75,8 +76,9 @@ public class KCertConfig
             ServiceName = KCertServiceName,
             ServicePort = KCertServicePort,
             ShowRenewButton,
-            NamespaceConstraints,
-            NamespaceConstraintsList
+            NamespaceConstraintsList,
+            HttpTimeout,
+            EnableHttpRetry
         },
         ACME = new
         {
@@ -103,11 +105,14 @@ public class KCertConfig
     private static string HideString(string val) => string.IsNullOrEmpty(val) ? null : "[REDACTED]";
     private string GetString(string key) => _cfg.GetValue<string>(key);
     private int GetInt(string key) => _cfg.GetValue<int>(key);
+    private int? GetOptionalInt(string key) => _cfg.GetValue<int?>(key);
     private bool GetBool(string key) => _cfg.GetValue<bool>(key);
+    private bool? GetOptionalBool(string key) => _cfg.GetValue<bool?>(key);
 
     private Dictionary<string, string> GetDictionary(string key)
     {
         var data = _cfg.GetSection(key)?.GetChildren() ?? Enumerable.Empty<IConfigurationSection>();
         return data.ToDictionary(s => s.Key, s => s.Value);
     }
+    
 }
