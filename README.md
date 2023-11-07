@@ -60,6 +60,14 @@ helm install [VERSION] nabsul/kcert-configmap -n kcert --debug --set name=kcert,
 
 An example would be *helm install 1.1.0 nabsul/kcert-configmap -n kcert --debug --set name=kcert,hosts="www.yourdomain.duckdns.org"*
 
+### Helm Charts
+
+Check resulting yaml files without deploying:
+
+```sh
+helm template kcert-test .\charts\kcert --values .\temp\kcert-values.yaml
+```
+
 ## Other Advice
 
 ### Test in Staging First
