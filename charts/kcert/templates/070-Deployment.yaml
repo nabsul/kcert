@@ -42,6 +42,10 @@ spec:
         env:
         - name: KCERT__NAMESPACE
           value: {{ .Release.Namespace | default "default" }}
+        - name: KCERT__SERVICENAME
+          value: {{ include "kcert.fullname" .}}
+        - name: KCERT__INGRESSNAME
+          value: {{ include "kcert.fullname" .}}
         - name: ACME__DIRURL
           # https://acme-staging-v02.api.letsencrypt.org/directory or https://acme-v02.api.letsencrypt.org/directory
           value: {{ required "acmeDirUrl is required" .Values.acmeDirUrl }}
