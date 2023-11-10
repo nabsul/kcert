@@ -180,9 +180,9 @@ public class AcmeClient
         var content = new StringContent(bodyJson, Encoding.UTF8);
         content.Headers.ContentType = new MediaTypeHeaderValue(ContentType);
 
-        // Small retry wrapper in case of HTTP failure
-        int maxRetries = 3;
-        while(_cfg.EnableHttpRetry && maxRetries >= 0)
+        // Small retry wrapper in case of HTTP failure.
+        int maxRetries = _cfg.EnableHttpRetry ? 3 : 0;
+        while (maxRetries >= 0)
         {
             try
             {
@@ -194,8 +194,7 @@ public class AcmeClient
                 {
                     throw e;
                 }
-
-                _log.LogInformation("HTTP request failed. Retrying in 3 seconds.");
+                _log.LogInformation("HTTP request failed. Retrying in 3 seconds. Reason: {message}", e.Message);
                 Thread.Sleep(3000);
             }
 
