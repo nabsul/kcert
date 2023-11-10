@@ -67,6 +67,13 @@ If you are using Rancher clusters and are assigned a specific namespace without 
 
 To enable the namespace-constrained mode, set the variable `KCERT__NamespaceConstraints` to `true`. Then, set the variable `KCERT__NamespaceConstraintsList` to a list of namespaces, separated by ";". Example: `KCERT__NamespaceConstraintsList=ns-1;ns-2;ns-3`.
 
+### Helm Charts
+
+Check resulting yaml files without deploying:
+
+```sh
+helm template kcert-test .\charts\kcert --values .\temp\kcert-values.yaml
+```
 
 ## Other Advice
 
