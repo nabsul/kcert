@@ -27,7 +27,7 @@ public class K8sClient
 
     private readonly Kubernetes _client;
 
-    private readonly bool _namespaceConstraigned;
+    private readonly bool _namespaceConstrained;
 
     public K8sClient(KCertConfig cfg, ILogger<K8sClient> log)
     {
@@ -35,7 +35,7 @@ public class K8sClient
         _log = log;
         _client = new Kubernetes(GetConfig());
 
-        _namespaceConstraigned = _cfg.NamespaceConstraintsList.Count > 0;
+        _namespaceConstrained = _cfg.NamespaceConstraintsList.Count > 0;
     }
 
     public async IAsyncEnumerable<V1Ingress> GetAllIngressesAsync()
@@ -43,7 +43,7 @@ public class K8sClient
         var label = $"{IngressLabelKey}={_cfg.IngressLabelValue}";
 
         var requests = new List<Func<string, Task<V1IngressList>>>();
-        if (!_namespaceConstraigned)
+        if (!_namespaceConstrained)
         {
             requests.Add((tok) => _client.ListIngressForAllNamespacesAsync(labelSelector: label, continueParameter: tok));
         }
@@ -69,7 +69,7 @@ public class K8sClient
         var label = $"{K8sWatchClient.CertRequestKey}={K8sWatchClient.CertRequestValue}";
 
         var requests = new List<Func<string, Task<V1ConfigMapList>>>();
-        if(!_namespaceConstraigned)
+        if(!_namespaceConstrained)
         {
             requests.Add((tok) => _client.ListConfigMapForAllNamespacesAsync(labelSelector: label, continueParameter: tok));
         }
@@ -91,7 +91,7 @@ public class K8sClient
 
     public async Task<List<V1Secret>> GetManagedSecretsAsync()
     {
-        if(_namespaceConstraigned)
+        if(_namespaceConstrained)
         {
             return await GetNamespacedManagedSecretsAsync(_cfg.NamespaceConstraintsList);
         }
@@ -103,7 +103,7 @@ public class K8sClient
 
     public async Task<List<V1Secret>> GetUnManagedSecretsAsync()
     {
-        if(_namespaceConstraigned)
+        if(_namespaceConstrained)
         {
             return await GetNamespacedUnmanagedSecretsAsync(_cfg.NamespaceConstraintsList);
         }

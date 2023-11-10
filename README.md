@@ -62,10 +62,10 @@ helm install [VERSION] nabsul/kcert-configmap -n kcert --debug --set name=kcert,
 
 An example would be *helm install 1.1.0 nabsul/kcert-configmap -n kcert --debug --set name=kcert,hosts="www.yourdomain.duckdns.org"*
 
-### Namespace-constraigned installations
+### Namespace-constrained installations
 If you are using Rancher clusters and are assigned a specific namespace without access to cluster-wide resources, it is possible to instruct KCert to query only a list of namespaces.
 
-To enable the namespace-constraigned mode, set the variable `KCERT__NamespaceConstraints` to `true`. Then, set the variable `KCERT__NamespaceConstraintsList` to a list of namespaces, separated by ";". Example: `KCERT__NamespaceConstraintsList=ns-1;ns-2;ns-3`.
+To enable the namespace-constrained mode, set the variable `KCERT__NamespaceConstraints` to `true`. Then, set the variable `KCERT__NamespaceConstraintsList` to a list of namespaces, separated by ";". Example: `KCERT__NamespaceConstraintsList=ns-1;ns-2;ns-3`.
 
 
 ## Other Advice
