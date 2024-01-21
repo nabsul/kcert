@@ -66,7 +66,7 @@ public class RenewalHandler
     {
         await _acme.ReadDirectoryAsync(acmeDir);
         var nonce = await _acme.GetNonceAsync();
-        var account = await _acme.CreateAccountAsync(key, email, nonce, termsAccepted);
+        var account = await _acme.CreateAccountAsync(key, email, nonce, termsAccepted, _cfg.AcmeEabKeyId, _cfg.AcmeHmacKey);
         var kid = account.Location;
         nonce = account.Nonce;
         return (kid, nonce);

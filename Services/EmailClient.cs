@@ -63,8 +63,12 @@ public class EmailClient
 
     private bool CanSendEmails()
     {
-        var allFields = new[] { _cfg.SmtpHost, _cfg.SmtpUser, _cfg.SmtpPass, _cfg.SmtpEmailFrom, _cfg.AcmeEmail };
-        return !allFields.Any(string.IsNullOrWhiteSpace);
+        var smtpFields = new[] { _cfg.SmtpHost, _cfg.SmtpEmailFrom, _cfg.AcmeEmail };
+        
+        // To allow anonymous SMTP communication, credentials fields are explicitely removed from the below check.
+        // If username and password are null, KCertConfig will convert it to ""
+
+        return !smtpFields.Any(string.IsNullOrWhiteSpace);
     }
 
     private static string RenewalSubject(string secretNamespace, string secretName, RenewalException ex = null)

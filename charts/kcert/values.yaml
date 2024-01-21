@@ -1,13 +1,21 @@
 acmeDirUrl: https://acme-staging-v02.api.letsencrypt.org/directory
-acmeEmail: null
+acmeEmail: asdfs
 acmeTermsAccepted: false
 kcertImage: nabsul/kcert:v1.2.0
 
 env: {}
 
+allowClusterWide: true
+
 acmeKey:
   secretName: null
   keyName: key
+
+acmeEabKey:
+  secretName: kcert-prd-hmac-secret
+  keyIdName: keyid
+  hmacKeyName: hmac
+
 
 showRenewButton: null
 
@@ -16,7 +24,17 @@ smtp:
   host: null
   port: null
   user: null
-  pass: null
+  secret:
+    name: null
+    key: password
+
+securityContext: {}
+  # capabilities:
+  #   drop:
+  #   - ALL
+  # readOnlyRootFilesystem: true
+  # runAsNonRoot: true
+  # runAsUser: 1000
 
 resources: {}
 
