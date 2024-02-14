@@ -25,7 +25,7 @@ smtp:
   port: null
   user: null
   secret:
-    name: null
+    name: kcert-smpt-secret
     key: password
 
 securityContext: {}
