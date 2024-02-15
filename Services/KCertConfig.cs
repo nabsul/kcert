@@ -107,5 +107,4 @@ public class KCertConfig
         var data = _cfg.GetSection(key)?.GetChildren() ?? Enumerable.Empty<IConfigurationSection>();
         return data.ToDictionary(s => s.Key, s => s.Value);
     }
-    
 }
