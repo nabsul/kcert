@@ -3,6 +3,7 @@ using k8s.Autorest;
 using k8s.Exceptions;
 using k8s.Models;
 using Microsoft.Extensions.Logging;
+using Microsoft.Extensions.Primitives;
 using System;
 using System.Collections.Generic;
 using System.Linq;
@@ -21,45 +22,45 @@ public class K8sClient
     private const string CertLabelKey = "kcert.dev/secret";
     public const string IngressLabelKey = "kcert.dev/ingress";
     private const string TlsTypeSelector = "type=kubernetes.io/tls";
+    
     private readonly KCertConfig _cfg;
-
-    private readonly ILogger<K8sClient> _log;
-
     private readonly Kubernetes _client;
 
-    private readonly bool _namespaceConstrained;
-
-    public K8sClient(KCertConfig cfg, ILogger<K8sClient> log)
+    public K8sClient(KCertConfig cfg)
     {
         _cfg = cfg;
-        _log = log;
         _client = new Kubernetes(GetConfig());
-
-        _namespaceConstrained = _cfg.NamespaceConstraints != null && _cfg.NamespaceConstraints.Count > 0;
     }
 
     public async IAsyncEnumerable<V1Ingress> GetAllIngressesAsync()
     {
         var label = $"{IngressLabelKey}={_cfg.IngressLabelValue}";
-
-        var requests = new List<Func<string, Task<V1IngressList>>>();
-        if (!_namespaceConstrained)
+        string tok = null;
+        if (_cfg.NamespaceConstraints.Length == 0)
         {
-            requests.Add((tok) => _client.ListIngressForAllNamespacesAsync(labelSelector: label, continueParameter: tok));
+            do
+            {
+                var result = await _client.ListIngressForAllNamespacesAsync(labelSelector: label, continueParameter: tok);
+                tok = result.Continue();
+                foreach (var ing in result.Items)
+                {
+                    yield return ing;
+                }
+            } while (tok != null);
         }
         else
         {
             foreach (var n in _cfg.NamespaceConstraints)
             {
-                requests.Add((tok) => _client.ListNamespacedIngressAsync(n, labelSelector: label, continueParameter: tok));
-            }
-        }
-
-        foreach (var callback in requests)
-        {
-            await foreach(var ing in Helpers.K8sEnumerateAsync<V1Ingress, V1IngressList>(callback))
-            {
-                yield return ing;
+                do
+                {
+                    var result = await _client.ListNamespacedIngressAsync(n, labelSelector: label, continueParameter: tok);
+                    tok = result.Continue();
+                    foreach (var ing in result.Items)
+                    {
+                        yield return ing;
+                    }
+                } while (tok != null);
             }
         }
     }
@@ -67,33 +68,42 @@ public class K8sClient
     public async IAsyncEnumerable<V1ConfigMap> GetAllConfigMapsAsync()
     {
         var label = $"{K8sWatchClient.CertRequestKey}={K8sWatchClient.CertRequestValue}";
+        string tok = null;
 
-        var requests = new List<Func<string, Task<V1ConfigMapList>>>();
-        if(!_namespaceConstrained)
+        if (_cfg.NamespaceConstraints.Length == 0)
         {
-            requests.Add((tok) => _client.ListConfigMapForAllNamespacesAsync(labelSelector: label, continueParameter: tok));
-        }
-        else {
-            foreach (var n in _cfg.NamespaceConstraints)
+            do
             {
-                requests.Add((tok) => _client.ListNamespacedConfigMapAsync(n, labelSelector: label, continueParameter: tok));
-            }
+                var result = await _client.ListConfigMapForAllNamespacesAsync(labelSelector: label, continueParameter: tok);
+                tok = result.Continue();
+                foreach (var cm in result.Items)
+                {
+                    yield return cm;
+                }
+            } while (tok != null);
         }
-
-        foreach(var callback in requests)
+        else
         {
-            await foreach(var ing in Helpers.K8sEnumerateAsync<V1ConfigMap, V1ConfigMapList>(callback))
+            foreach (var ns in _cfg.NamespaceConstraints)
             {
-                yield return ing;
+                do
+                {
+                    var result = await _client.ListNamespacedConfigMapAsync(ns, labelSelector: label, continueParameter: tok);
+                    tok = result.Continue();
+                    foreach (var cm in result.Items)
+                    {
+                        yield return cm;
+                    }
+                } while (tok != null);
             }
         }
     }
 
     public async Task<List<V1Secret>> GetManagedSecretsAsync()
     {
-        if(_namespaceConstrained)
+        if (_cfg.NamespaceConstraints.Length != 0)
         {
-            return await GetNamespacedManagedSecretsAsync(_cfg.NamespaceConstraints);
+            return await GetNamespacedManagedSecretsAsync().ToListAsync();
         }
         else
         {
@@ -103,7 +113,7 @@ public class K8sClient
 
     public async Task<List<V1Secret>> GetUnManagedSecretsAsync()
     {
-        if(_namespaceConstrained)
+        if(_cfg.NamespaceConstraints.Any())
         {
             return await GetNamespacedUnmanagedSecretsAsync(_cfg.NamespaceConstraints);
         }
@@ -125,15 +135,25 @@ public class K8sClient
         return result.Items.ToList();
     }
 
-    public async Task<List<V1Secret>> GetNamespacedManagedSecretsAsync(List<string> namespaces)
+    public async IAsyncEnumerable<V1Secret> GetNamespacedManagedSecretsAsync()
     {
         var label = $"{CertLabelKey}={_cfg.IngressLabelValue}";
-        var results = await GetNamespacedSecretsAsync(namespaces, label, "");
-
-        return results.Items.ToList();
+        foreach (var ns in _cfg.NamespaceConstraints)
+        {
+            string tok = null;
+            do
+            {
+                var result = await _client.ListNamespacedSecretAsync(ns, labelSelector: label, continueParameter: tok);
+                tok = result.Continue();
+                foreach (var secret in result.Items)
+                {
+                    yield return secret;
+                }
+            } while (tok != null);
+        }
     }
 
-    public async Task<List<V1Secret>> GetNamespacedUnmanagedSecretsAsync(List<string> namespaces)
+    public async Task<List<V1Secret>> GetNamespacedUnmanagedSecretsAsync(IEnumerable<string> namespaces)
     {
         var label = $"!{CertLabelKey}";
         var results = await GetNamespacedSecretsAsync(namespaces, label, "");
@@ -141,7 +161,7 @@ public class K8sClient
         return results.Items.ToList();
     }
 
-    public async Task<V1SecretList> GetNamespacedSecretsAsync(List<string> namespaces, string label, string tok)
+    public async Task<V1SecretList> GetNamespacedSecretsAsync(IEnumerable<string> namespaces, string label, string tok)
     {
         return await namespaces
                     .Select(async ns => await _client.ListNamespacedSecretAsync(ns, labelSelector: label, continueParameter: tok))

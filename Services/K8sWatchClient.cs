@@ -5,7 +5,6 @@ using k8s.Models;
 using Microsoft.Extensions.Logging;
 using System;
 using System.Collections.Generic;
-using System.IO;
 using System.Linq;
 using System.Net.Http;
 using System.Threading;
@@ -29,15 +28,11 @@ public class K8sWatchClient
     // In case of error in the watch loop, force all the watch services to restart by setting this global flag to true
     private bool watchExceptionLoop = false;
 
-    private bool _namespaceConstrained;
-
     public K8sWatchClient(KCertConfig cfg, ILogger<K8sClient> log)
     {
         _cfg = cfg;
         _log = log;
         _client = new Kubernetes(GetConfig());
-
-        _namespaceConstrained = _cfg.NamespaceConstraints.Count > 0;
     }
 
     public async Task WatchIngressesAsync(Func<WatchEventType, V1Ingress, Task> callback, CancellationToken tok)
@@ -46,7 +41,7 @@ public class K8sWatchClient
 
         IEnumerable<Task<HttpOperationResponse<V1IngressList>>> taskList;
 
-        if(_namespaceConstrained)
+        if(_cfg.NamespaceConstraints.Length > 0)
         {
             taskList = _cfg.NamespaceConstraints.Select(ns => _client.NetworkingV1.ListNamespacedIngressWithHttpMessagesAsync(ns, watch: true, cancellationToken: tok, labelSelector: label));
         }
@@ -68,7 +63,7 @@ public class K8sWatchClient
 
         IEnumerable<Task<HttpOperationResponse<V1ConfigMapList>>> taskList;
 
-        if(_namespaceConstrained)
+        if(_cfg.NamespaceConstraints.Length > 0)
         {
             _log.LogInformation("Starting in namespaced mode and listening for the following namespaces: {ns}", String.Join("; ", _cfg.NamespaceConstraints));
             taskList = _cfg.NamespaceConstraints.Select(ns => _client.CoreV1.ListNamespacedConfigMapWithHttpMessagesAsync(ns, watch: true, cancellationToken: tok, labelSelector: label));
