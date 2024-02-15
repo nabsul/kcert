@@ -1,12 +1,9 @@
 ﻿using KCert.Models;
-using KCert.Tools;
 using Microsoft.AspNetCore.Authentication;
 using Microsoft.Extensions.Logging;
-using Microsoft.IdentityModel.Tokens;
 using System;
 using System.Collections.Generic;
 using System.Linq;
-using System.Net;
 using System.Net.Http;
 using System.Net.Http.Headers;
 using System.Security.Cryptography;
@@ -31,8 +28,6 @@ public class AcmeClient
     private readonly CertClient _cert;
     private readonly KCertConfig _cfg;
     private readonly BufferedLogger<RenewalHandler> _log;
-
-    private readonly Base64Tool _b64 = new Base64Tool();
 
     public AcmeClient(CertClient cert, BufferedLogger<RenewalHandler> log, KCertConfig cfg)
     {
@@ -90,12 +85,12 @@ public class AcmeClient
                 url = uri
             };
         
-        var eabUrlEncoded = _b64.UrlEncode(JsonSerializer.Serialize(eabProtected));
+        var eabUrlEncoded = Base64UrlTextEncoder.Encode(JsonSerializer.SerializeToUtf8Bytes(eabProtected));
 
         // Re-use the same JWK as the outer protected section
         var sign = _cert.GetSigner(key);
         var jwk =_cert.GetJwk(sign);
-        var innerPayload = _b64.UrlEncode(JsonSerializer.Serialize(jwk));
+        var innerPayload = Base64UrlTextEncoder.Encode(JsonSerializer.SerializeToUtf8Bytes(jwk));
 
         var signature = GetSignatureUsingHMAC(eabUrlEncoded + "." + innerPayload, eabHmacKey);            
 
@@ -118,11 +113,11 @@ public class AcmeClient
 
     private string GetSignatureUsingHMAC(string text, string key)
     {
-        var symKey = _b64.UrlDecode(key);
+        var symKey = Base64UrlTextEncoder.Decode(key);
 
         using var hmacSha256 = new HMACSHA256(symKey);
         var sig = hmacSha256.ComputeHash(Encoding.UTF8.GetBytes(text));
-        return _b64.UrlEncode(sig);
+        return Base64UrlTextEncoder.Encode(sig);
     }
 
     public async Task<AcmeOrderResponse> CreateOrderAsync(string key, string kid, IEnumerable<string> hosts, string nonce)
