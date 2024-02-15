@@ -196,4 +196,3 @@ public class K8sClient(KCertConfig cfg, Kubernetes client)
         }
     }
 }
-
