@@ -100,9 +100,7 @@ public class KCertConfig
     private static string HideString(string val) => string.IsNullOrEmpty(val) ? null : "[REDACTED]";
     private string GetString(string key) => _cfg.GetValue<string>(key);
     private int GetInt(string key) => _cfg.GetValue<int>(key);
-    private int? GetOptionalInt(string key) => _cfg.GetValue<int?>(key);
     private bool GetBool(string key) => _cfg.GetValue<bool>(key);
-    private bool? GetOptionalBool(string key) => _cfg.GetValue<bool?>(key);
 
     private Dictionary<string, string> GetDictionary(string key)
     {
