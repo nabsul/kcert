@@ -17,7 +17,7 @@ public class RenewalHandler(ILogger<RenewalHandler> log, AcmeClient acme, K8sCli
 
         try
         {
-            var (kid, initNonce) = await InitAsync(cfg.AcmeKey, cfg.AcmeDir, cfg.AcmeEmail, cfg.AcmeAccepted);
+            var (kid, initNonce) = await InitAsync();
             logbuf.LogInformation("Initialized renewal process for secret {ns}/{secretName} - hosts {hosts} - kid {kid}",
                 ns, secretName, string.Join(",", hosts), kid);
 
@@ -48,11 +48,11 @@ public class RenewalHandler(ILogger<RenewalHandler> log, AcmeClient acme, K8sCli
         }
     }
 
-    private async Task<(string KID, string Nonce)> InitAsync(string key, Uri acmeDir, string email, bool termsAccepted)
+    private async Task<(string KID, string Nonce)> InitAsync()
     {
-        await acme.ReadDirectoryAsync(acmeDir);
+        await acme.ReadDirectoryAsync(cfg.AcmeDir);
         var nonce = await acme.GetNonceAsync();
-        var account = await acme.CreateAccountAsync(key, email, nonce, termsAccepted, cfg.AcmeEabKeyId, cfg.AcmeHmacKey);
+        var account = await acme.CreateAccountAsync(nonce);
         var kid = account.Location;
         nonce = account.Nonce;
         return (kid, nonce);

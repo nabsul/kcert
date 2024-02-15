@@ -9,11 +9,12 @@ using System.Security.Cryptography;
 using System.Text;
 using System.Text.Json;
 using System.Threading.Tasks;
+using YamlDotNet.Core.Tokens;
 
 namespace KCert.Services;
 
 [Service]
-public class AcmeClient(CertClient cert)
+public class AcmeClient(CertClient cert, KCertConfig cfg)
 {
     private const string HeaderReplayNonce = "Replay-Nonce";
     private const string HeaderLocation = "Location";
@@ -51,56 +52,54 @@ public class AcmeClient(CertClient cert)
         return _dir.Meta.TermsOfService;
     }
 
-
-    public async Task<AcmeAccountResponse> CreateAccountAsync(string key, string email, string nonce, bool termsOfServiceAgreed, string eabKid = null, string eabHmacKey = null)
+    public async Task<AcmeAccountResponse> CreateAccountAsync(string nonce)
     {
-        var contact = new[] {$"mailto:{email}"};
         var uri = new Uri(_dir.NewAccount);
+        var payload = GetAccountRequestPayload(uri);
+        return await PostAsync<AcmeAccountResponse>(cfg.AcmeKey, uri, payload, nonce);
+    }
 
-        if(eabKid == null || eabHmacKey == null)
+    private object GetAccountRequestPayload(Uri uri)
+    {
+        var contact = new[] { $"mailto:{cfg.AcmeEmail}" };
+        
+        if (cfg.AcmeEabKeyId == null || cfg.AcmeHmacKey == null)
         {
-            var payloadObj = new {contact, termsOfServiceAgreed };
-            return await PostAsync<AcmeAccountResponse>(key, uri, payloadObj, nonce);
+            return new { contact, termsOfServiceAgreed = cfg.AcmeAccepted };
         }
-        
-        
-        var eabProtected = new 
-            {
-                alg = "HS256",
-                kid = eabKid,
-                url = uri
-            };
-        
+
+        var eabProtected = new
+        {
+            alg = "HS256",
+            kid = cfg.AcmeEabKeyId,
+            url = uri
+        };
+
         var eabUrlEncoded = Base64UrlTextEncoder.Encode(JsonSerializer.SerializeToUtf8Bytes(eabProtected));
 
         // Re-use the same JWK as the outer protected section
-        var sign = cert.GetSigner(key);
-        var jwk =cert.GetJwk(sign);
+        var sign = cert.GetSigner(cfg.AcmeKey);
+        var jwk = cert.GetJwk(sign);
         var innerPayload = Base64UrlTextEncoder.Encode(JsonSerializer.SerializeToUtf8Bytes(jwk));
 
-        var signature = GetSignatureUsingHMAC(eabUrlEncoded + "." + innerPayload, eabHmacKey);            
+        var signature = GetSignatureUsingHMAC(eabUrlEncoded + "." + innerPayload, cfg.AcmeHmacKey);
 
-        var payloadObject = new 
+        return new
+        {
+            contact,
+            termsOfServiceAgreed = cfg.AcmeAccepted,
+            externalAccountBinding = new
             {
-                contact,
-                termsOfServiceAgreed,
-                externalAccountBinding = new 
-                    {
-                        @protected = eabUrlEncoded,
-                        payload = innerPayload,
-                        signature
-                    },
-            };
-        
-        return await PostAsync<AcmeAccountResponse>(key, uri, payloadObject, nonce);
-
-        
+                @protected = eabUrlEncoded,
+                payload = innerPayload,
+                signature
+            },
+        };
     }
 
-    private string GetSignatureUsingHMAC(string text, string key)
+    private static string GetSignatureUsingHMAC(string text, string key)
     {
         var symKey = Base64UrlTextEncoder.Decode(key);
-
         using var hmacSha256 = new HMACSHA256(symKey);
         var sig = hmacSha256.ComputeHash(Encoding.UTF8.GetBytes(text));
         return Base64UrlTextEncoder.Encode(sig);
