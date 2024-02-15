@@ -27,10 +27,7 @@ public class KCertConfig
     public int KCertServicePort => GetInt("KCert:ServicePort");
     public bool ShowRenewButton => GetBool("KCert:ShowRenewButton");
     public int InitialSleepOnFailure => GetInt("KCert:InitialSleepOnFailure");
-    public List<string> NamespaceConstraintsList => GetString("KCert:NamespaceConstraintsList").Split(";").ToList();
-    public TimeSpan HttpTimeout => TimeSpan.FromSeconds(GetOptionalInt("KCert:HttpTimeoutSeconds") ?? 60);
-    public bool EnableHttpRetry => GetOptionalBool("KCert:EnableHttpRetry") ?? false;
-    
+    public List<string> NamespaceConstraints => GetString("KCert:NamespaceConstraints")?.Split(",")?.ToList();
 
     public bool UseChallengeIngressClassName => GetBool("ChallengeIngress:UseClassName");
     public string ChallengeIngressClassName => GetString("ChallengeIngress:ClassName");
@@ -76,9 +73,7 @@ public class KCertConfig
             ServiceName = KCertServiceName,
             ServicePort = KCertServicePort,
             ShowRenewButton,
-            NamespaceConstraintsList,
-            HttpTimeout,
-            EnableHttpRetry
+            NamespaceConstraints,
         },
         ACME = new
         {

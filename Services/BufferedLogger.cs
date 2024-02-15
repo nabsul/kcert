@@ -5,7 +5,6 @@ using System.Linq;
 
 namespace KCert.Services;
 
-[Service]
 public class BufferedLogger<TT> : ILogger<TT>
 {
     private readonly ILogger<TT> _inner;

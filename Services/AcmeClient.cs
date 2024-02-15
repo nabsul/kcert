@@ -1,6 +1,5 @@
 ﻿using KCert.Models;
 using Microsoft.AspNetCore.Authentication;
-using Microsoft.Extensions.Logging;
 using System;
 using System.Collections.Generic;
 using System.Linq;
@@ -9,13 +8,12 @@ using System.Net.Http.Headers;
 using System.Security.Cryptography;
 using System.Text;
 using System.Text.Json;
-using System.Threading;
 using System.Threading.Tasks;
 
 namespace KCert.Services;
 
 [Service]
-public class AcmeClient
+public class AcmeClient(CertClient cert)
 {
     private const string HeaderReplayNonce = "Replay-Nonce";
     private const string HeaderLocation = "Location";
@@ -25,18 +23,6 @@ public class AcmeClient
     private static readonly JsonSerializerOptions options = new() { PropertyNameCaseInsensitive = true };
 
     private readonly HttpClient _http = new();
-    private readonly CertClient _cert;
-    private readonly KCertConfig _cfg;
-    private readonly BufferedLogger<RenewalHandler> _log;
-
-    public AcmeClient(CertClient cert, BufferedLogger<RenewalHandler> log, KCertConfig cfg)
-    {
-        _cert = cert;
-        _log = log;
-        _cfg = cfg;
-
-        _http.Timeout = _cfg.HttpTimeout;
-    }
 
     private AcmeDirectoryResponse _dir;
 
@@ -88,8 +74,8 @@ public class AcmeClient
         var eabUrlEncoded = Base64UrlTextEncoder.Encode(JsonSerializer.SerializeToUtf8Bytes(eabProtected));
 
         // Re-use the same JWK as the outer protected section
-        var sign = _cert.GetSigner(key);
-        var jwk =_cert.GetJwk(sign);
+        var sign = cert.GetSigner(key);
+        var jwk =cert.GetJwk(sign);
         var innerPayload = Base64UrlTextEncoder.Encode(JsonSerializer.SerializeToUtf8Bytes(jwk));
 
         var signature = GetSignatureUsingHMAC(eabUrlEncoded + "." + innerPayload, eabHmacKey);            
@@ -138,14 +124,14 @@ public class AcmeClient
 
     public async Task<AcmeOrderResponse> FinalizeOrderAsync(string key, Uri uri, IEnumerable<string> hosts, string kid, string nonce)
     {
-        var csr = _cert.GetCsr(hosts);
+        var csr = cert.GetCsr(hosts);
         return await PostAsync<AcmeOrderResponse>(key, uri, new { csr }, kid, nonce);
     }
 
     private async Task<T> PostAsync<T>(string key, Uri uri, object payloadObject, string nonce) where T : AcmeResponse
     {
-        var sign = _cert.GetSigner(key);
-        var protectedObject = new { alg = Alg, jwk = _cert.GetJwk(sign), nonce, url = uri.AbsoluteUri };
+        var sign = cert.GetSigner(key);
+        var protectedObject = new { alg = Alg, jwk = cert.GetJwk(sign), nonce, url = uri.AbsoluteUri };
         using var resp = await PostAsync(key, uri, payloadObject, protectedObject);
         return await ParseJsonAsync<T>(resp);
     }
@@ -166,7 +152,7 @@ public class AcmeClient
         var @protected = Base64UrlTextEncoder.Encode(Encoding.UTF8.GetBytes(protectedJson));
 
         var toSignbytes = Encoding.UTF8.GetBytes($"{@protected}.{payload}");
-        var signatureBytes = _cert.SignData(key, toSignbytes);
+        var signatureBytes = cert.SignData(key, toSignbytes);
         var signature = Base64UrlTextEncoder.Encode(signatureBytes);
 
         var body = new { @protected, payload, signature };
@@ -175,29 +161,7 @@ public class AcmeClient
         var content = new StringContent(bodyJson, Encoding.UTF8);
         content.Headers.ContentType = new MediaTypeHeaderValue(ContentType);
 
-        // Small retry wrapper in case of HTTP failure.
-        int maxRetries = _cfg.EnableHttpRetry ? 3 : 0;
-        while (maxRetries >= 0)
-        {
-            try
-            {
-                return await _http.PostAsync(uri, content);
-            }
-            catch (Exception e)
-            {
-                if(maxRetries == 0)
-                {
-                    throw e;
-                }
-                _log.LogInformation("HTTP request failed. Retrying in 3 seconds. Reason: {message}", e.Message);
-                Thread.Sleep(3000);
-            }
-
-            maxRetries--;
-        }
-        
-        // Should never be reached
-        return null;
+        return await _http.PostAsync(uri, content);
     }
 
     private static async Task<T> ParseJsonAsync<T>(HttpResponseMessage resp) where T : AcmeResponse

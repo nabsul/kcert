@@ -37,7 +37,7 @@ public class K8sWatchClient
         _log = log;
         _client = new Kubernetes(GetConfig());
 
-        _namespaceConstrained = _cfg.NamespaceConstraintsList.Count > 0;
+        _namespaceConstrained = _cfg.NamespaceConstraints.Count > 0;
     }
 
     public async Task WatchIngressesAsync(Func<WatchEventType, V1Ingress, Task> callback, CancellationToken tok)
@@ -48,7 +48,7 @@ public class K8sWatchClient
 
         if(_namespaceConstrained)
         {
-            taskList = _cfg.NamespaceConstraintsList.Select(ns => _client.NetworkingV1.ListNamespacedIngressWithHttpMessagesAsync(ns, watch: true, cancellationToken: tok, labelSelector: label));
+            taskList = _cfg.NamespaceConstraints.Select(ns => _client.NetworkingV1.ListNamespacedIngressWithHttpMessagesAsync(ns, watch: true, cancellationToken: tok, labelSelector: label));
         }
         else
         {
@@ -70,8 +70,8 @@ public class K8sWatchClient
 
         if(_namespaceConstrained)
         {
-            _log.LogInformation("Starting in namespaced mode and listening for the following namespaces: {ns}", String.Join("; ", _cfg.NamespaceConstraintsList));
-            taskList = _cfg.NamespaceConstraintsList.Select(ns => _client.CoreV1.ListNamespacedConfigMapWithHttpMessagesAsync(ns, watch: true, cancellationToken: tok, labelSelector: label));
+            _log.LogInformation("Starting in namespaced mode and listening for the following namespaces: {ns}", String.Join("; ", _cfg.NamespaceConstraints));
+            taskList = _cfg.NamespaceConstraints.Select(ns => _client.CoreV1.ListNamespacedConfigMapWithHttpMessagesAsync(ns, watch: true, cancellationToken: tok, labelSelector: label));
         }
         else
         {

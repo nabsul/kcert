@@ -35,7 +35,7 @@ public class K8sClient
         _log = log;
         _client = new Kubernetes(GetConfig());
 
-        _namespaceConstrained = _cfg.NamespaceConstraintsList.Count > 0;
+        _namespaceConstrained = _cfg.NamespaceConstraints != null && _cfg.NamespaceConstraints.Count > 0;
     }
 
     public async IAsyncEnumerable<V1Ingress> GetAllIngressesAsync()
@@ -49,7 +49,7 @@ public class K8sClient
         }
         else
         {
-            foreach (var n in _cfg.NamespaceConstraintsList)
+            foreach (var n in _cfg.NamespaceConstraints)
             {
                 requests.Add((tok) => _client.ListNamespacedIngressAsync(n, labelSelector: label, continueParameter: tok));
             }
@@ -74,7 +74,7 @@ public class K8sClient
             requests.Add((tok) => _client.ListConfigMapForAllNamespacesAsync(labelSelector: label, continueParameter: tok));
         }
         else {
-            foreach (var n in _cfg.NamespaceConstraintsList)
+            foreach (var n in _cfg.NamespaceConstraints)
             {
                 requests.Add((tok) => _client.ListNamespacedConfigMapAsync(n, labelSelector: label, continueParameter: tok));
             }
@@ -93,7 +93,7 @@ public class K8sClient
     {
         if(_namespaceConstrained)
         {
-            return await GetNamespacedManagedSecretsAsync(_cfg.NamespaceConstraintsList);
+            return await GetNamespacedManagedSecretsAsync(_cfg.NamespaceConstraints);
         }
         else
         {
@@ -105,7 +105,7 @@ public class K8sClient
     {
         if(_namespaceConstrained)
         {
-            return await GetNamespacedUnmanagedSecretsAsync(_cfg.NamespaceConstraintsList);
+            return await GetNamespacedUnmanagedSecretsAsync(_cfg.NamespaceConstraints);
         }
         else
         {
