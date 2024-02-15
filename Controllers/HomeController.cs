@@ -3,6 +3,7 @@ using KCert.Services;
 using Microsoft.AspNetCore.Mvc;
 using Microsoft.AspNetCore.Routing;
 using System.Collections.Generic;
+using System.Linq;
 using System.Threading;
 using System.Threading.Tasks;
 
@@ -33,7 +34,7 @@ public class HomeController : Controller
     [HttpGet("")]
     public async Task<IActionResult> HomeAsync()
     {
-        var secrets = await _kube.GetManagedSecretsAsync();
+        var secrets = await _kube.GetManagedSecretsAsync().ToListAsync();
         return View(secrets);
     }
 

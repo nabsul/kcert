@@ -99,7 +99,7 @@ public class RenewalService : IHostedService
         }
 
         _log.LogInformation("Checking for certs that need renewals...");
-        foreach (var secret in await _k8s.GetManagedSecretsAsync())
+        await foreach (var secret in _k8s.GetManagedSecretsAsync())
         {
             tok.ThrowIfCancellationRequested();
             await TryRenewAsync(secret, tok);
