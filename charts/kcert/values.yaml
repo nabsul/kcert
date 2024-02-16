@@ -5,18 +5,35 @@ kcertImage: nabsul/kcert:v1.2.0
 
 env: {}
 
+# set to null to allow managing all namespaces, or limit with array of namespaces
+allowedNamespaces: null #["namespace1", "namespace2", ...]
+
 acmeKey:
   secretName: null
   keyName: key
 
+acmeEabKey:
+  secretName: null
+  keyIdName: keyid
+  hmacKeyName: hmac
+
 showRenewButton: null
 
 smtp:
-  email: null
-  host: null
-  port: null
-  user: null
-  pass: null
+  secretName: null # set this to the secret containing the smtp credentials in keys as defined below
+  emailName: email
+  hostName: host
+  portName: port
+  userName: user
+  passName: password
+
+securityContext: {}
+  # capabilities:
+  #   drop:
+  #   - ALL
+  # readOnlyRootFilesystem: true
+  # runAsNonRoot: true
+  # runAsUser: 1000
 
 resources: {}
 

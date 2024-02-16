@@ -51,10 +51,10 @@ public class IngressMonitorService : IHostedService
     private async Task WatchIngressesAsync(CancellationToken tok)
     {
         _log.LogInformation("Watching for ingress changes");
-        await _watch.WatchIngressesAsync((t, i) => HandleIngressEventAsync(t, i, tok), tok);
+        await _watch.WatchIngressesAsync(HandleIngressEventAsync, tok);
     }
 
-    private Task HandleIngressEventAsync(WatchEventType type, V1Ingress ingress, CancellationToken tok)
+    private Task HandleIngressEventAsync(WatchEventType type, V1Ingress ingress)
     {
         try
         {

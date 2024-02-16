@@ -28,6 +28,8 @@ spec:
       containers:
       - name: {{ include "kcert.fullname" . }}
         image: {{ required "kcertImage is required" .Values.kcertImage }}
+        securityContext:
+          {{- toYaml .Values.securityContext | nindent 10 }}
         ports:
         - containerPort: 80
           name: http
@@ -40,6 +42,10 @@ spec:
         env:
         - name: KCERT__NAMESPACE
           value: {{ .Release.Namespace | default "default" }}
+        - name: KCERT__SERVICENAME
+          value: {{ include "kcert.fullname" .}}
+        - name: KCERT__INGRESSNAME
+          value: {{ include "kcert.fullname" .}}
         - name: ACME__DIRURL
           # https://acme-staging-v02.api.letsencrypt.org/directory or https://acme-v02.api.letsencrypt.org/directory
           value: {{ required "acmeDirUrl is required" .Values.acmeDirUrl }}
@@ -49,27 +55,51 @@ spec:
         - name: ACME__EMAIL
           # Your email address for Let's Encrypt and email notifications
           value: {{ required "acmeEmail is required" .Values.acmeEmail }}
-{{- if .Values.smtp.host }}
+{{- if .Values.smtp.secretName }}
         - name: SMTP__EMAILFROM
-          value: {{ required "smtp.email is required" .Values.smtp.email }}
+          valueFrom:
+            secretKeyRef:
+              name: {{ .Values.smtp.secretName }}
+              key: {{ required "smtp.emailName is required" .Values.smtp.emailName }}
         - name: SMTP__HOST
-          value: {{ required "smtp.email is required" .Values.smtp.host }}
+          valueFrom:
+            secretKeyRef:
+              name: {{ .Values.smtp.secretName }}
+              key: {{ required "smtp.hostName is required" .Values.smtp.hostName }}
         - name: SMTP__PORT
-          value: "{{ required "smtp.email is required" .Values.smtp.port }}"
+          valueFrom:
+            secretKeyRef:
+              name: {{ .Values.smtp.secretName }}
+              key: {{ required "smtp.portName is required" .Values.smtp.portName }}
         - name: SMTP__USER
-          value: {{ required "smtp.email is required" .Values.smtp.user }}
+          valueFrom:
+            secretKeyRef:
+              name: {{ .Values.smtp.secretName }}
+              key: {{ required "smtp.userName is required" .Values.smtp.userName }}
         - name: SMTP__PASS
           valueFrom:
             secretKeyRef:
-              name: {{ include "kcert.fullname" . }}-smtp
-              key: password
+              name: {{ .Values.smtp.secretName }}
+              key: {{ required "smtp.passName is required" .Values.smtp.passName }}
 {{- end }}
 {{- if .Values.acmeKey.secretName }}
         - name: ACME__KEY
           valueFrom:
             secretKeyRef:
               name: "{{ .Values.acmeKey.secretName }}"
-              key: "{{ .Values.acmeKey.keyName }}"
+              key: "{{ required "acmeKey.keyName is required" .Values.acmeKey.keyName }}"
+{{- end }}
+{{- if .Values.acmeEabKey.secretName }}
+        - name: ACME__EABKEYID
+          valueFrom:
+            secretKeyRef:
+              name: "{{ .Values.acmeEabKey.secretName }}"
+              key: "{{ required "acmeEabKey.keyIdName is required" .Values.acmeEabKey.keyIdName }}"
+        - name: ACME__EABHMACKEY
+          valueFrom:
+            secretKeyRef:
+              name: "{{ .Values.acmeEabKey.secretName }}"
+              key: "{{ required "acmeEabKey.hmacKeyName is required" .Values.acmeEabKey.hmacKeyName }}"
 {{- end }}
 {{- if .Values.showRenewButton }}
         - name: KCERT__SHOWRENEWBUTTON
@@ -79,7 +109,3 @@ spec:
         - name: "{{ $key }}"
           value: "{{ $value }}"
 {{- end }}
-
-
-
-

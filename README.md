@@ -30,13 +30,18 @@ helm install kcert nabsul/kcert -n kcert --debug --set acmeTermsAccepted=true,ac
 ```
 
 Note: This defaults to running KCert against Let's Encrypt's staging environment.
-After you've tested against staging, you can swicht to production with:
+After you've tested against staging, you can switch to production with:
 
 ```sh
 helm install kcert nabsul/kcert -n kcert --debug --set acmeTermsAccepted=true,acmeEmail=[YOUR EMAIL],acmeDirUrl=https://acme-v02.api.letsencrypt.org/directory
 ```
 
-For setting up SMTP email notifications and other parameters, please check the `charts/kcert/values.yaml` file.
+For setting up SMTP email notifications and other parameters, please check the `charts/kcert/values.yaml` file and set the values under `smtp` accordingly.
+The SMTP password must be stored in a secret. If you stick with the defaults, you can simply create that secret with the following command:
+
+```sh
+kubectl create secret -n [YOUR NAMESPACE] generic kcert-smpt-secret --from-literal=password=[YOUR PASSWORD]
+```
 
 ### Creating a Certificate via Ingress
 
@@ -60,6 +65,14 @@ helm install [VERSION] nabsul/kcert-configmap -n kcert --debug --set name=kcert,
 
 An example would be *helm install 1.1.0 nabsul/kcert-configmap -n kcert --debug --set name=kcert,hosts="www.yourdomain.duckdns.org"*
 
+### Namespace-constrained installations
+
+If you are using Rancher clusters and are assigned a specific namespace without access to cluster-wide resources,
+it is possible to instruct KCert to query only a list of namespaces.
+
+To enable the namespace-constrained mode, set the environment variable `KCERT__NAMESPACECONSTRAINTS` to a list of namespaces, separated by ",".
+Example: `KCERT__NAMESPACECONSTRAINTS=ns-1,ns-2,ns-3`.
+
 ### Helm Charts
 
 Check resulting yaml files without deploying:
@@ -75,6 +88,15 @@ helm template kcert-test .\charts\kcert --values .\temp\kcert-values.yaml
 If this is your first time using KCert you should probably start out with `https://acme-staging-v02.api.letsencrypt.org/directory`.
 Experiment and make sure everything is working as expected, then switch over to `https://acme-v02.api.letsencrypt.org/directory`.
 More information this topic can be found [here](https://letsencrypt.org/docs/staging-environment/).
+
+### Using EAB (External Account Binding)
+
+KCert supports the EAB authentication protocol for providers requiring it. To set it up, set the following environment variables:
+
+```
+ACME__EABKEYID: Key identifier given by your ACME provider
+ACME__EABHMACKEY: HMAC key given by your ACME provider
+```
 
 ### Diagnostics
 

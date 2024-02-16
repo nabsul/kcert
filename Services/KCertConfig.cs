@@ -27,6 +27,7 @@ public class KCertConfig
     public int KCertServicePort => GetInt("KCert:ServicePort");
     public bool ShowRenewButton => GetBool("KCert:ShowRenewButton");
     public int InitialSleepOnFailure => GetInt("KCert:InitialSleepOnFailure");
+    public string[] NamespaceConstraints => GetString("KCert:NamespaceConstraints")?.Split(",") ?? [];
 
     public bool UseChallengeIngressClassName => GetBool("ChallengeIngress:UseClassName");
     public string ChallengeIngressClassName => GetString("ChallengeIngress:ClassName");
@@ -51,6 +52,9 @@ public class KCertConfig
     public string AcmeKey => GetString("Acme:Key") ?? _key; // If no key is provided via configs, use generated key.
     public bool AcmeAccepted => GetBool("Acme:TermsAccepted");
 
+    public string AcmeEabKeyId => GetString("Acme:EabKeyId");
+    public string AcmeHmacKey => GetString("Acme:EabHmacKey");
+
     public string SmtpEmailFrom => GetString("Smtp:EmailFrom");
     public string SmtpHost => GetString("Smtp:Host");
     public int SmtpPort => GetInt("Smtp:Port");
@@ -69,6 +73,7 @@ public class KCertConfig
             ServiceName = KCertServiceName,
             ServicePort = KCertServicePort,
             ShowRenewButton,
+            NamespaceConstraints,
         },
         ACME = new
         {

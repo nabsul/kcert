@@ -5,14 +5,16 @@ using System.Collections.Generic;
 using System.Linq;
 using System.Net.Http;
 using System.Net.Http.Headers;
+using System.Security.Cryptography;
 using System.Text;
 using System.Text.Json;
 using System.Threading.Tasks;
+using YamlDotNet.Core.Tokens;
 
 namespace KCert.Services;
 
 [Service]
-public class AcmeClient
+public class AcmeClient(CertClient cert, KCertConfig cfg)
 {
     private const string HeaderReplayNonce = "Replay-Nonce";
     private const string HeaderLocation = "Location";
@@ -22,12 +24,6 @@ public class AcmeClient
     private static readonly JsonSerializerOptions options = new() { PropertyNameCaseInsensitive = true };
 
     private readonly HttpClient _http = new();
-    private readonly CertClient _cert;
-
-    public AcmeClient(CertClient cert)
-    {
-        _cert = cert;
-    }
 
     private AcmeDirectoryResponse _dir;
 
@@ -56,12 +52,57 @@ public class AcmeClient
         return _dir.Meta.TermsOfService;
     }
 
-    public async Task<AcmeAccountResponse> CreateAccountAsync(string key, string email, string nonce, bool termsAccepted)
+    public async Task<AcmeAccountResponse> CreateAccountAsync(string nonce)
     {
-        var contact = new[] { $"mailto:{email}" };
-        var payloadObject = new { contact, termsOfServiceAgreed = termsAccepted };
         var uri = new Uri(_dir.NewAccount);
-        return await PostAsync<AcmeAccountResponse>(key, uri, payloadObject, nonce);
+        var payload = GetAccountRequestPayload(uri);
+        return await PostAsync<AcmeAccountResponse>(cfg.AcmeKey, uri, payload, nonce);
+    }
+
+    private object GetAccountRequestPayload(Uri uri)
+    {
+        var contact = new[] { $"mailto:{cfg.AcmeEmail}" };
+        
+        if (cfg.AcmeEabKeyId == null || cfg.AcmeHmacKey == null)
+        {
+            return new { contact, termsOfServiceAgreed = cfg.AcmeAccepted };
+        }
+
+        var eabProtected = new
+        {
+            alg = "HS256",
+            kid = cfg.AcmeEabKeyId,
+            url = uri
+        };
+
+        var eabUrlEncoded = Base64UrlTextEncoder.Encode(JsonSerializer.SerializeToUtf8Bytes(eabProtected));
+
+        // Re-use the same JWK as the outer protected section
+        var sign = cert.GetSigner(cfg.AcmeKey);
+        var jwk = cert.GetJwk(sign);
+        var innerPayload = Base64UrlTextEncoder.Encode(JsonSerializer.SerializeToUtf8Bytes(jwk));
+
+        var signature = GetSignatureUsingHMAC(eabUrlEncoded + "." + innerPayload, cfg.AcmeHmacKey);
+
+        return new
+        {
+            contact,
+            termsOfServiceAgreed = cfg.AcmeAccepted,
+            externalAccountBinding = new
+            {
+                @protected = eabUrlEncoded,
+                payload = innerPayload,
+                signature
+            },
+        };
+    }
+
+    private static string GetSignatureUsingHMAC(string text, string key)
+    {
+        var symKey = Base64UrlTextEncoder.Decode(key);
+        using var hmacSha256 = new HMACSHA256(symKey);
+        var sig = hmacSha256.ComputeHash(Encoding.UTF8.GetBytes(text));
+        return Base64UrlTextEncoder.Encode(sig);
     }
 
     public async Task<AcmeOrderResponse> CreateOrderAsync(string key, string kid, IEnumerable<string> hosts, string nonce)
@@ -82,14 +123,14 @@ public class AcmeClient
 
     public async Task<AcmeOrderResponse> FinalizeOrderAsync(string key, Uri uri, IEnumerable<string> hosts, string kid, string nonce)
     {
-        var csr = _cert.GetCsr(hosts);
+        var csr = cert.GetCsr(hosts);
         return await PostAsync<AcmeOrderResponse>(key, uri, new { csr }, kid, nonce);
     }
 
     private async Task<T> PostAsync<T>(string key, Uri uri, object payloadObject, string nonce) where T : AcmeResponse
     {
-        var sign = _cert.GetSigner(key);
-        var protectedObject = new { alg = Alg, jwk = _cert.GetJwk(sign), nonce, url = uri.AbsoluteUri };
+        var sign = cert.GetSigner(key);
+        var protectedObject = new { alg = Alg, jwk = cert.GetJwk(sign), nonce, url = uri.AbsoluteUri };
         using var resp = await PostAsync(key, uri, payloadObject, protectedObject);
         return await ParseJsonAsync<T>(resp);
     }
@@ -110,7 +151,7 @@ public class AcmeClient
         var @protected = Base64UrlTextEncoder.Encode(Encoding.UTF8.GetBytes(protectedJson));
 
         var toSignbytes = Encoding.UTF8.GetBytes($"{@protected}.{payload}");
-        var signatureBytes = _cert.SignData(key, toSignbytes);
+        var signatureBytes = cert.SignData(key, toSignbytes);
         var signature = Base64UrlTextEncoder.Encode(signatureBytes);
 
         var body = new { @protected, payload, signature };
@@ -118,6 +159,7 @@ public class AcmeClient
 
         var content = new StringContent(bodyJson, Encoding.UTF8);
         content.Headers.ContentType = new MediaTypeHeaderValue(ContentType);
+
         return await _http.PostAsync(uri, content);
     }
 

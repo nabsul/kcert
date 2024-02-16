@@ -23,6 +23,7 @@ Assembly.GetExecutingAssembly().GetTypes()
     .Where(t => t.GetCustomAttribute<ServiceAttribute>() != null)
     .ToList().ForEach(t => builder.Services.AddSingleton(t));
 
+builder.Services.AddSingleton(s => s.GetRequiredService<KubernetesFactory>().GetClient());
 builder.Services.AddConnections();
 builder.Services.AddControllersWithViews();
 

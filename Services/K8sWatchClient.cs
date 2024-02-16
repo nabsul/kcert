@@ -1,10 +1,9 @@
 ﻿using k8s;
 using k8s.Autorest;
-using k8s.Exceptions;
 using k8s.Models;
 using Microsoft.Extensions.Logging;
 using System;
-using System.IO;
+using System.Linq;
 using System.Net.Http;
 using System.Threading;
 using System.Threading.Tasks;
@@ -12,49 +11,71 @@ using System.Threading.Tasks;
 namespace KCert.Services;
 
 [Service]
-public class K8sWatchClient
+public class K8sWatchClient(KCertConfig cfg, ILogger<K8sClient> log, Kubernetes client)
 {
     public const string CertRequestKey = "kcert.dev/cert-request";
     public const string CertRequestValue = "request";
     public const string IngressLabelKey = "kcert.dev/ingress";
 
-    private readonly KCertConfig _cfg;
+    public string IngressLabel => $"{IngressLabelKey}={cfg.IngressLabelValue}";
+    public string ConfigLabel => $"{CertRequestKey}={CertRequestValue}";
 
-    private readonly ILogger<K8sClient> _log;
+    public delegate Task ChangeCallback<T>(WatchEventType type, T item);
 
-    private readonly Kubernetes _client;
-
-    public K8sWatchClient(KCertConfig cfg, ILogger<K8sClient> log)
+    public Task WatchIngressesAsync(ChangeCallback<V1Ingress> callback, CancellationToken tok)
     {
-        _cfg = cfg;
-        _log = log;
-        _client = new Kubernetes(GetConfig());
+        return WatchInLoopAsync(callback, WatchAllIngressAsync, WatchNsIngressAsync, tok);
     }
 
-    public async Task WatchIngressesAsync(Func<WatchEventType, V1Ingress, Task> callback, CancellationToken tok)
+    private Task<HttpOperationResponse<V1IngressList>> WatchAllIngressAsync(CancellationToken tok)
     {
-        var label = $"{IngressLabelKey}={_cfg.IngressLabelValue}";
-
-        var watch = () => _client.NetworkingV1.ListIngressForAllNamespacesWithHttpMessagesAsync(watch: true, cancellationToken: tok, labelSelector: label);
-        await WatchInLoopAsync(label, watch, callback);
+        return client.NetworkingV1.ListIngressForAllNamespacesWithHttpMessagesAsync(watch: true, cancellationToken: tok, labelSelector: IngressLabel);
     }
 
-    public async Task WatchConfigMapsAsync(Func<WatchEventType, V1ConfigMap, Task> callback, CancellationToken tok)
+    private Task<HttpOperationResponse<V1IngressList>> WatchNsIngressAsync(string ns, CancellationToken tok)
     {
-        var label = $"{CertRequestKey}={CertRequestValue}";
-        var watch = () => _client.CoreV1.ListConfigMapForAllNamespacesWithHttpMessagesAsync(watch: true, cancellationToken: tok, labelSelector: label);
-        await WatchInLoopAsync(label, watch, callback);
+        return client.NetworkingV1.ListNamespacedIngressWithHttpMessagesAsync(ns, watch: true, cancellationToken: tok, labelSelector: IngressLabel);
     }
 
-    private async Task WatchInLoopAsync<T, L>(string label, Func<Task<HttpOperationResponse<L>>> watch, Func<WatchEventType, T, Task> callback)
+    public Task WatchConfigMapsAsync(ChangeCallback<V1ConfigMap> callback, CancellationToken tok)
+    {
+       return WatchInLoopAsync(callback, WatchAllConfigMapsAsync, WatchNsConfigMapsAsync, tok);
+    }
+
+    private Task<HttpOperationResponse<V1ConfigMapList>> WatchAllConfigMapsAsync(CancellationToken tok)
+    {
+        return client.CoreV1.ListConfigMapForAllNamespacesWithHttpMessagesAsync(watch: true, cancellationToken: tok, labelSelector: ConfigLabel);
+    }
+
+    private Task<HttpOperationResponse<V1ConfigMapList>> WatchNsConfigMapsAsync(string ns, CancellationToken tok)
+    {
+        return client.CoreV1.ListNamespacedConfigMapWithHttpMessagesAsync(ns, watch: true, cancellationToken: tok, labelSelector: ConfigLabel);
+    }
+
+    delegate Task<HttpOperationResponse<L>> WatchAllFunc<L>(CancellationToken tok);
+    delegate Task<HttpOperationResponse<L>> WatchNsFunc<L>(string ns, CancellationToken tok);
+
+    private Task WatchInLoopAsync<L, T>(ChangeCallback<T> callback, WatchAllFunc<L> all, WatchNsFunc<L> ns, CancellationToken tok)
+    {
+        return cfg.NamespaceConstraints.Length == 0 ? WatchInLoopAsync(typeof(T).Name, callback, all, tok) : WatchInLoopAsync(callback, ns, tok);
+    }
+
+    private Task WatchInLoopAsync<L, T>(ChangeCallback<T> callback, WatchNsFunc<L> func, CancellationToken tok)
+    {
+        return Task.WhenAll(cfg.NamespaceConstraints
+            .Select(ns => WatchInLoopAsync($"{ns}:{typeof(T).Name}", callback, (t) => func(ns, t), tok))
+            .ToArray()
+        );
+    }
+
+    private async Task WatchInLoopAsync<L, T>(string id, ChangeCallback<T> callback, WatchAllFunc<L> watch, CancellationToken tok)
     {
         var typeName = typeof(T).Name;
         while (true)
         {
             try
             {
-                _log.LogInformation("Starting watch request for {type}[{label}]", typeName, label);
-                await foreach (var (type, item) in watch().WatchAsync<T, L>())
+                await foreach (var (type, item) in watch(tok).WatchAsync<T, L>())
                 {
                     await callback(type, item);
                 }
@@ -63,25 +84,15 @@ public class K8sWatchClient
             {
                 if (ex.Message == "Error while copying content to a stream.")
                 {
-                    _log.LogInformation("Empty Kubernetes client result threw an exception. Retrying {type}[{label}].", typeName, label);
+                    log.LogInformation("Empty Kubernetes client result threw an exception watching [{id}]. Trying again after 5 seconds.", id);
+                    await Task.Delay(TimeSpan.FromSeconds(5), tok);
                 }
                 else
                 {
+                    log.LogError("Unexpected error watching [{id}]", id);
                     throw;
                 }
             }
-        }
-    }
-
-    private KubernetesClientConfiguration GetConfig()
-    {
-        try
-        {
-            return KubernetesClientConfiguration.InClusterConfig();
-        }
-        catch (KubeConfigException)
-        {
-            return KubernetesClientConfiguration.BuildConfigFromConfigFile(_cfg.K8sConfigFile);
         }
     }
 }
