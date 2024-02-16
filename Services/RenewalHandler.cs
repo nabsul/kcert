@@ -1,9 +1,4 @@
 ﻿using KCert.Models;
-using Microsoft.Extensions.Logging;
-using System;
-using System.Collections.Generic;
-using System.Linq;
-using System.Threading.Tasks;
 
 namespace KCert.Services;
 
@@ -73,7 +68,8 @@ public class RenewalHandler(ILogger<RenewalHandler> log, AcmeClient acme, K8sCli
         nonce = auth.Nonce;
         logbuf.LogInformation("Get Auth {authUri}: {status}", authUri, auth.Status);
 
-        var challengeUri = new Uri(auth.Challenges.FirstOrDefault(c => c.Type == "http-01")?.Url);
+        var url = auth.Challenges.FirstOrDefault(c => c.Type == "http-01")?.Url;
+        var challengeUri = new Uri(url ?? throw new Exception("No http-01 url found in challenge"));
         var chall = await acme.TriggerChallengeAsync(key, challengeUri, kid, nonce);
         nonce = chall.Nonce;
         logbuf.LogInformation("TriggerChallenge {challengeUri}: {status}", challengeUri, chall.Status);

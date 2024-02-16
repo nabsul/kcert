@@ -1,15 +1,9 @@
 ﻿using KCert.Models;
 using Microsoft.AspNetCore.Authentication;
-using System;
-using System.Collections.Generic;
-using System.Linq;
-using System.Net.Http;
 using System.Net.Http.Headers;
 using System.Security.Cryptography;
 using System.Text;
 using System.Text.Json;
-using System.Threading.Tasks;
-using YamlDotNet.Core.Tokens;
 
 namespace KCert.Services;
 
@@ -25,7 +19,7 @@ public class AcmeClient(CertClient cert, KCertConfig cfg)
 
     private readonly HttpClient _http = new();
 
-    private AcmeDirectoryResponse _dir;
+    private AcmeDirectoryResponse? _dir = null;
 
     public Task<AcmeAccountResponse> DeactivateAccountAsync(string key, string kid, string nonce) => PostAsync<AcmeAccountResponse>(key, new Uri(kid), new { status = "deactivated" }, kid, nonce);
     public Task<AcmeOrderResponse> GetOrderAsync(string key, Uri uri, string kid, string nonce) => PostAsync<AcmeOrderResponse>(key, uri, null, kid, nonce);
@@ -49,12 +43,12 @@ public class AcmeClient(CertClient cert, KCertConfig cfg)
     public async Task<string> GetTermsOfServiceUrlAsync()
     {
         await ReadDirectoryAsync(new Uri("https://acme-v02.api.letsencrypt.org/directory"));
-        return _dir.Meta.TermsOfService;
+        return _dir?.Meta?.TermsOfService ?? throw new Exception("_dir should be defined here");
     }
 
     public async Task<AcmeAccountResponse> CreateAccountAsync(string nonce)
     {
-        var uri = new Uri(_dir.NewAccount);
+        var uri = new Uri(_dir?.NewAccount ?? throw new Exception("_dir should be defined here"));
         var payload = GetAccountRequestPayload(uri);
         return await PostAsync<AcmeAccountResponse>(cfg.AcmeKey, uri, payload, nonce);
     }
@@ -62,7 +56,7 @@ public class AcmeClient(CertClient cert, KCertConfig cfg)
     private object GetAccountRequestPayload(Uri uri)
     {
         var contact = new[] { $"mailto:{cfg.AcmeEmail}" };
-        
+
         if (cfg.AcmeEabKeyId == null || cfg.AcmeHmacKey == null)
         {
             return new { contact, termsOfServiceAgreed = cfg.AcmeAccepted };
@@ -109,7 +103,7 @@ public class AcmeClient(CertClient cert, KCertConfig cfg)
     {
         var identifiers = hosts.Select(h => new { type = "dns", value = h }).ToArray();
         var payload = new { identifiers };
-        var uri = new Uri(_dir.NewOrder);
+        var uri = new Uri(_dir?.NewOrder ?? throw new Exception("_dir should be defined here"));
         return await PostAsync<AcmeOrderResponse>(key, uri, payload, kid, nonce);
     }
 
@@ -135,14 +129,14 @@ public class AcmeClient(CertClient cert, KCertConfig cfg)
         return await ParseJsonAsync<T>(resp);
     }
 
-    private async Task<T> PostAsync<T>(string key, Uri uri, object payloadObject, string kid, string nonce) where T : AcmeResponse
+    private async Task<T> PostAsync<T>(string key, Uri uri, object? payloadObject, string kid, string nonce) where T : AcmeResponse
     {
         var protectedObject = new { alg = Alg, kid, nonce, url = uri.AbsoluteUri };
         using var resp = await PostAsync(key, uri, payloadObject, protectedObject);
         return await ParseJsonAsync<T>(resp);
     }
 
-    private async Task<HttpResponseMessage> PostAsync(string key, Uri uri, object payloadObject, object protectedObject)
+    private async Task<HttpResponseMessage> PostAsync(string key, Uri uri, object? payloadObject, object protectedObject)
     {
         var payloadJson = payloadObject != null ? JsonSerializer.Serialize(payloadObject) : "";
         var payload = Base64UrlTextEncoder.Encode(Encoding.UTF8.GetBytes(payloadJson));
@@ -166,7 +160,7 @@ public class AcmeClient(CertClient cert, KCertConfig cfg)
     private static async Task<T> ParseJsonAsync<T>(HttpResponseMessage resp) where T : AcmeResponse
     {
         var content = await GetContentAsync(resp);
-        var result = JsonSerializer.Deserialize<T>(content, options);
+        var result = JsonSerializer.Deserialize<T>(content, options) ?? throw new Exception($"Invalid content: {content}");
         result.Nonce = GetHeader(resp, HeaderReplayNonce);
         result.Location = GetHeader(resp, HeaderLocation);
         return result;
@@ -174,7 +168,7 @@ public class AcmeClient(CertClient cert, KCertConfig cfg)
 
     public async Task<string> GetNonceAsync()
     {
-        var uri = new Uri(_dir.NewNonce);
+        var uri = new Uri(_dir?.NewNonce ?? throw new Exception("_dir should be defined here"));
         using var message = new HttpRequestMessage(HttpMethod.Head, uri);
         using var resp = await _http.SendAsync(message);
 
@@ -206,9 +200,9 @@ public class AcmeClient(CertClient cert, KCertConfig cfg)
     {
         if (!message.Headers.TryGetValues(header, out var headers))
         {
-            return null;
+            headers = [];
         }
 
-        return headers.FirstOrDefault();
+        return headers.First();
     }
 }

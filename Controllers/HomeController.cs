@@ -1,40 +1,18 @@
 ﻿using k8s.Models;
 using KCert.Services;
 using Microsoft.AspNetCore.Mvc;
-using Microsoft.AspNetCore.Routing;
-using System.Collections.Generic;
-using System.Linq;
-using System.Threading;
-using System.Threading.Tasks;
 
 namespace KCert.Controllers;
 
 [Route("")]
-public class HomeController : Controller
+public class HomeController(KCertClient kcert, K8sClient kube, KCertConfig cfg, EmailClient email, AcmeClient acme, CertClient cert) : Controller
 {
-    private readonly KCertClient _kcert;
-    private readonly K8sClient _kube;
-    private readonly KCertConfig _cfg;
-    private readonly EmailClient _email;
-    private readonly AcmeClient _acme;
-    private readonly CertClient _cert;
-
-    private static string TermsOfServiceUrl;
-
-    public HomeController(KCertClient kcert, K8sClient kube, KCertConfig cfg, EmailClient email, AcmeClient acme, CertClient cert)
-    {
-        _kcert = kcert;
-        _kube = kube;
-        _cfg = cfg;
-        _email = email;
-        _acme = acme;
-        _cert = cert;
-    }
+    private static string? TermsOfServiceUrl = null;
 
     [HttpGet("")]
     public async Task<IActionResult> HomeAsync()
     {
-        var secrets = await _kube.GetManagedSecretsAsync().ToListAsync();
+        var secrets = await kube.GetManagedSecretsAsync().ToListAsync();
         return View(secrets);
     }
 
@@ -42,7 +20,7 @@ public class HomeController : Controller
     public async Task<IActionResult> IngressesAsync()
     {
         var ingresses = new List<V1Ingress>();
-        await foreach (var i in _kube.GetAllIngressesAsync())
+        await foreach (var i in kube.GetAllIngressesAsync())
         {
             ingresses.Add(i);
         }
@@ -53,7 +31,7 @@ public class HomeController : Controller
     [HttpGet("challenge")]
     public async Task<IActionResult> ChallengeAsync()
     {
-        var ingress = await _kube.GetIngressAsync(_cfg.KCertNamespace, _cfg.KCertIngressName);
+        var ingress = await kube.GetIngressAsync(cfg.KCertNamespace, cfg.KCertIngressName);
         return View(ingress);
     }
 
@@ -62,7 +40,7 @@ public class HomeController : Controller
     {
         if (TermsOfServiceUrl == null)
         {
-            TermsOfServiceUrl = await _acme.GetTermsOfServiceUrlAsync();
+            TermsOfServiceUrl = await acme.GetTermsOfServiceUrlAsync();
         }
 
         ViewBag.TermsOfService = TermsOfServiceUrl;
@@ -72,23 +50,23 @@ public class HomeController : Controller
     [HttpGet("test-email")]
     public async Task<IActionResult> TestEmailAsync()
     {
-        await _email.SendTestEmailAsync();
+        await email.SendTestEmailAsync();
         return RedirectToAction("Configuration");
     }
 
     [HttpGet("renew/{ns}/{name}")]
     public async Task<IActionResult> RenewAsync(string ns, string name)
     {
-        var secret = await _kube.GetSecretAsync(ns, name);
+        var secret = await kube.GetSecretAsync(ns, name);
         if (secret == null)
         {
             return NotFound();
         }
 
-        var cert = _cert.GetCert(secret);
-        var hosts = _cert.GetHosts(cert).ToArray();
+        var certVal = cert.GetCert(secret);
+        var hosts = cert.GetHosts(certVal).ToArray();
 
-        await _kcert.StartRenewalProcessAsync(ns, name, hosts, CancellationToken.None);
+        await kcert.StartRenewalProcessAsync(ns, name, hosts, CancellationToken.None);
         return RedirectToAction("Home");
     }
 }

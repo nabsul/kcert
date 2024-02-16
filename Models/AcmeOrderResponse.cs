@@ -2,10 +2,10 @@
 
 public class AcmeOrderResponse : AcmeResponse
 {
-    public string Status { get; set; }
-    public string Expires { get; set; }
-    public AcmeIdentifier[] Identifiers { get; set; }
-    public string[] Authorizations { get; set; }
-    public string Finalize { get; set; }
-    public string Certificate { get; set; }
+    public string Status { get; set; } = default!;
+    public string Expires { get; set; } = default!;
+    public AcmeIdentifier[] Identifiers { get; set; } = default!;
+    public string[] Authorizations { get; set; } = default!;
+    public string Finalize { get; set; } = default!;
+    public string Certificate { get; set; } = default!;
 }
