@@ -57,18 +57,18 @@ public class K8sWatchClient(KCertConfig cfg, ILogger<K8sClient> log, Kubernetes 
 
     private Task WatchInLoopAsync<L, T>(ChangeCallback<T> callback, WatchAllFunc<L> all, WatchNsFunc<L> ns, CancellationToken tok)
     {
-        return cfg.NamespaceConstraints.Length == 0 ? WatchInLoopAsync(callback, all, tok) : WatchInLoopAsync(callback, ns, tok);
+        return cfg.NamespaceConstraints.Length == 0 ? WatchInLoopAsync(typeof(T).Name, callback, all, tok) : WatchInLoopAsync(callback, ns, tok);
     }
 
     private Task WatchInLoopAsync<L, T>(ChangeCallback<T> callback, WatchNsFunc<L> func, CancellationToken tok)
     {
         return Task.WhenAll(cfg.NamespaceConstraints
-            .Select(ns => WatchInLoopAsync(callback, (t) => func(ns, t), tok))
+            .Select(ns => WatchInLoopAsync($"{ns}:{typeof(T).Name}", callback, (t) => func(ns, t), tok))
             .ToArray()
         );
     }
 
-    private async Task WatchInLoopAsync<L, T>(ChangeCallback<T> callback, WatchAllFunc<L> watch, CancellationToken tok)
+    private async Task WatchInLoopAsync<L, T>(string id, ChangeCallback<T> callback, WatchAllFunc<L> watch, CancellationToken tok)
     {
         var typeName = typeof(T).Name;
         while (true)
@@ -84,11 +84,12 @@ public class K8sWatchClient(KCertConfig cfg, ILogger<K8sClient> log, Kubernetes 
             {
                 if (ex.Message == "Error while copying content to a stream.")
                 {
-                    log.LogInformation("Empty Kubernetes client result threw an exception. Trying again after 5 seconds.");
+                    log.LogInformation("Empty Kubernetes client result threw an exception watching [{id}]. Trying again after 5 seconds.", id);
                     await Task.Delay(TimeSpan.FromSeconds(5), tok);
                 }
                 else
                 {
+                    log.LogError("Unexpected error watching [{id}]", id);
                     throw;
                 }
             }
