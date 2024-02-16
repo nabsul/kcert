@@ -1,36 +1,22 @@
 ﻿using KCert.Models;
-using Microsoft.Extensions.Logging;
-using System;
-using System.Collections.Generic;
-using System.Linq;
 using System.Net;
 using System.Net.Mail;
-using System.Threading.Tasks;
 
 namespace KCert.Services;
 
 [Service]
-public class EmailClient
+public class EmailClient(ILogger<EmailClient> log, KCertConfig cfg)
 {
     private const string TestSubject = "KCert Test Email";
     private const string TestMessage = "If you received this, then KCert is able to send emails!";
 
-    private readonly ILogger<EmailClient> _log;
-    private readonly KCertConfig _cfg;
-
-    public EmailClient(ILogger<EmailClient> log, KCertConfig cfg)
-    {
-        _log = log;
-        _cfg = cfg;
-    }
-
     public async Task SendTestEmailAsync()
     {
-        _log.LogInformation("Attempting to send a test email.");
+        log.LogInformation("Attempting to send a test email.");
         await SendAsync(TestSubject, TestMessage);
     }
 
-    public async Task NotifyRenewalResultAsync(string secretNamespace, string secretName, RenewalException ex)
+    public async Task NotifyRenewalResultAsync(string secretNamespace, string secretName, RenewalException? ex)
     {
         await SendAsync(RenewalSubject(secretNamespace, secretName, ex), RenewalMessage(secretNamespace, secretName, ex));
     }
@@ -44,41 +30,34 @@ public class EmailClient
 
     private async Task SendAsync(string subject, string text)
     {
-        if (!CanSendEmails())
+        if (cfg.SmtpHost == null || cfg.SmtpUser == null || cfg.SmtpPass == null || cfg.SmtpEmailFrom == null)
         {
-            _log.LogInformation("Cannot send email email because it's not configured correctly");
+            log.LogInformation("Cannot send email email because it's not configured correctly");
             return;
         }
 
-        var client = new SmtpClient(_cfg.SmtpHost, _cfg.SmtpPort)
+        var client = new SmtpClient(cfg.SmtpHost, cfg.SmtpPort)
         {
             EnableSsl = true,
-            Credentials = new NetworkCredential(_cfg.SmtpUser, _cfg.SmtpPass),
+            Credentials = new NetworkCredential(cfg.SmtpUser, cfg.SmtpPass),
         };
 
-        var message = new MailMessage(_cfg.SmtpEmailFrom, _cfg.AcmeEmail, subject, text);
+        var message = new MailMessage(cfg.SmtpEmailFrom, cfg.AcmeEmail, subject, text);
 
         await client.SendMailAsync(message);
     }
 
-    private bool CanSendEmails()
-    {
-        var allFields = new[] { _cfg.SmtpHost, _cfg.SmtpUser, _cfg.SmtpPass, _cfg.SmtpEmailFrom, _cfg.AcmeEmail };
-        return !allFields.Any(string.IsNullOrWhiteSpace);
-    }
-
-    private static string RenewalSubject(string secretNamespace, string secretName, RenewalException ex = null)
+    private static string RenewalSubject(string secretNamespace, string secretName, RenewalException? ex = null)
     {
         var isSuccess = ex == null;
         var status = isSuccess ? "succeeded" : "failed";
         return $"KCert Renewal of secret [{secretNamespace}:{secretName}] {status}";
     }
 
-    private static string RenewalMessage(string secretNamespace, string secretName, RenewalException ex = null)
+    private static string RenewalMessage(string secretNamespace, string secretName, RenewalException? ex = null)
     {
-        var isSuccess = ex == null;
-        var lines = new List<string>() { $"Renewal of secret [{secretNamespace}:{secretName}] completed with status: " + (isSuccess ? "Success" : "Failure") };
-        if (!isSuccess)
+        var lines = new List<string>() { $"Renewal of secret [{secretNamespace}:{secretName}] completed with status: " + (ex == null ? "Success" : "Failure") };
+        if (ex != null)
         {
             lines.Add("\nLogs:\n");
             lines.Add(string.Join('\n', ex.Logs));

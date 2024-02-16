@@ -1,6 +1,5 @@
 ﻿using KCert.Services;
 using Microsoft.AspNetCore.Mvc;
-using Microsoft.Extensions.Logging;
 
 namespace KCert.Controllers;
 

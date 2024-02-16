@@ -1,12 +1,6 @@
 ﻿using k8s.Autorest;
 using k8s.Models;
 using KCert.Models;
-using Microsoft.Extensions.Logging;
-using System;
-using System.Collections.Generic;
-using System.Linq;
-using System.Threading;
-using System.Threading.Tasks;
 
 namespace KCert.Services;
 
@@ -21,7 +15,7 @@ public class KCertClient
     private readonly CertClient _cert;
 
     private Task _running = Task.CompletedTask;
-    
+
     public KCertClient(K8sClient kube, KCertConfig cfg, RenewalHandler getCert, ILogger<KCertClient> log, EmailClient email, CertClient cert)
     {
         _kube = kube;
@@ -143,7 +137,7 @@ public class KCertClient
 
         await AwaitIngressPropagationAsync(kcertIngress);
     }
-    
+
     private V1IngressRule CreateRule(string host)
     {
         var path = new V1HTTPIngressPath
@@ -169,7 +163,7 @@ public class KCertClient
             },
         };
     }
-    
+
     private async Task AwaitIngressPropagationAsync(V1Ingress kcertIngress)
     {
         var timeoutCancellationToken = new CancellationTokenSource(_cfg.ChallengeIngressMaxPropagationWaitTime).Token;
@@ -185,12 +179,10 @@ public class KCertClient
             $"Ingress {kcertIngress.Name()}.{kcertIngress.Namespace()} was not propagated in time "
           + $"({nameof(KCertConfig.ChallengeIngressMaxPropagationWaitTime)}:{_cfg.ChallengeIngressMaxPropagationWaitTime})");
     }
-    
+
     private async Task<bool> IsIngressPropagated(V1Ingress kcertIngress)
     {
         var ingress = await _kube.GetIngressAsync(kcertIngress.Namespace(), kcertIngress.Name());
-        
-        var isIngressPropagated = ingress.Status.LoadBalancer.Ingress?.Any() ?? false;
-        return isIngressPropagated;
+        return ingress?.Status.LoadBalancer.Ingress?.Any() ?? false;
     }
 }

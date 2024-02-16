@@ -1,9 +1,5 @@
 ﻿using k8s.Models;
 using Microsoft.AspNetCore.Authentication;
-using Microsoft.Extensions.Logging;
-using System;
-using System.Collections.Generic;
-using System.Linq;
 using System.Security.Cryptography;
 using System.Security.Cryptography.X509Certificates;
 using System.Text;
@@ -12,7 +8,7 @@ using System.Text.Json;
 namespace KCert.Services;
 
 [Service]
-public class CertClient
+public class CertClient(KCertConfig cfg)
 {
     private const int PEMLineLen = 64;
     private const string PEMStart = "-----BEGIN PRIVATE KEY-----";
@@ -20,14 +16,6 @@ public class CertClient
     private const string SanOid = "2.5.29.17";
 
     private readonly RSA _rsa = RSA.Create(2048);
-    private readonly KCertConfig _cfg;
-    private readonly ILogger<CertClient> _log;
-
-    public CertClient(KCertConfig cfg, ILogger<CertClient> log)
-    {
-        _cfg = cfg;
-        _log = log;
-    }
 
     public X509Certificate2 GetCert(V1Secret secret) => new(secret.Data["tls.crt"]);
 
@@ -36,10 +24,11 @@ public class CertClient
         var simpleName = cert.GetNameInfo(X509NameType.SimpleName, false);
 
         var sans = cert.Extensions.Cast<X509Extension>()
-            .Where(e => e.Oid.Value == SanOid)
+            .Where(e => e.Oid?.Value == SanOid)
             .SelectMany(ext => ext.Format(false).Split(','))
             .Select(s => s.Trim().Split(':', '=').Skip(1).FirstOrDefault())
-            .Where(h => !string.IsNullOrWhiteSpace(h));
+            .Where(h => !string.IsNullOrWhiteSpace(h))
+            .Cast<string>();
 
         return new[] { simpleName }.Concat(sans).Distinct().ToList();
     }
@@ -51,8 +40,8 @@ public class CertClient
         {
             crv = "P-256",
             kty = "EC",
-            x = Base64UrlTextEncoder.Encode(p.Q.X),
-            y = Base64UrlTextEncoder.Encode(p.Q.Y),
+            x = Base64UrlTextEncoder.Encode(p.Q.X ?? throw new Exception("ECC X parameter not defined")),
+            y = Base64UrlTextEncoder.Encode(p.Q.Y ?? throw new Exception("ECC Y parameter not defined")),
         };
     }
 
@@ -66,7 +55,7 @@ public class CertClient
 
     public string GetThumbprint()
     {
-        var sign = GetSigner(_cfg.AcmeKey);
+        var sign = GetSigner(cfg.AcmeKey);
         var jwk = GetJwk(sign);
         var jwkJson = JsonSerializer.Serialize(jwk);
         var jwkBytes = Encoding.UTF8.GetBytes(jwkJson);

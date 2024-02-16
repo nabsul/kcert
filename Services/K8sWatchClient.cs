@@ -1,12 +1,6 @@
 ﻿using k8s;
 using k8s.Autorest;
 using k8s.Models;
-using Microsoft.Extensions.Logging;
-using System;
-using System.Linq;
-using System.Net.Http;
-using System.Threading;
-using System.Threading.Tasks;
 
 namespace KCert.Services;
 
@@ -39,7 +33,7 @@ public class K8sWatchClient(KCertConfig cfg, ILogger<K8sClient> log, Kubernetes 
 
     public Task WatchConfigMapsAsync(ChangeCallback<V1ConfigMap> callback, CancellationToken tok)
     {
-       return WatchInLoopAsync(callback, WatchAllConfigMapsAsync, WatchNsConfigMapsAsync, tok);
+        return WatchInLoopAsync(callback, WatchAllConfigMapsAsync, WatchNsConfigMapsAsync, tok);
     }
 
     private Task<HttpOperationResponse<V1ConfigMapList>> WatchAllConfigMapsAsync(CancellationToken tok)
