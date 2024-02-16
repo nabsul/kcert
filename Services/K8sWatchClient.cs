@@ -1,10 +1,8 @@
 ﻿using k8s;
 using k8s.Autorest;
-using k8s.Exceptions;
 using k8s.Models;
 using Microsoft.Extensions.Logging;
 using System;
-using System.Collections.Generic;
 using System.Linq;
 using System.Net.Http;
 using System.Threading;
@@ -19,64 +17,65 @@ public class K8sWatchClient(KCertConfig cfg, ILogger<K8sClient> log, Kubernetes 
     public const string CertRequestValue = "request";
     public const string IngressLabelKey = "kcert.dev/ingress";
 
-    // In case of error in the watch loop, force all the watch services to restart by setting this global flag to true
-    private bool watchExceptionLoop = false;
+    public string IngressLabel => $"{IngressLabelKey}={cfg.IngressLabelValue}";
+    public string ConfigLabel => $"{CertRequestKey}={CertRequestValue}";
 
-    public async Task WatchIngressesAsync(Func<WatchEventType, V1Ingress, Task> callback, CancellationToken tok)
+    public delegate Task ChangeCallback<T>(WatchEventType type, T item);
+
+    public Task WatchIngressesAsync(ChangeCallback<V1Ingress> callback, CancellationToken tok)
     {
-        var label = $"{IngressLabelKey}={cfg.IngressLabelValue}";
-
-        IEnumerable<Task<HttpOperationResponse<V1IngressList>>> taskList;
-
-        if(cfg.NamespaceConstraints.Length > 0)
-        {
-            taskList = cfg.NamespaceConstraints.Select(ns => client.NetworkingV1.ListNamespacedIngressWithHttpMessagesAsync(ns, watch: true, cancellationToken: tok, labelSelector: label));
-        }
-        else
-        {
-            taskList = new [] {client.NetworkingV1.ListIngressForAllNamespacesWithHttpMessagesAsync(watch: true, cancellationToken: tok, labelSelector: label)};
-        }
-
-        // Create the Func from the Tasks list
-        var watchers = taskList.Select(t => WatchInLoopAsync(label, () => t, callback));
-        
-        await Task.WhenAll(watchers);
+        return WatchInLoopAsync(callback, WatchAllIngressAsync, WatchNsIngressAsync, tok);
     }
 
-    public async Task WatchConfigMapsAsync(Func<WatchEventType, V1ConfigMap, Task> callback, CancellationToken tok)
+    private Task<HttpOperationResponse<V1IngressList>> WatchAllIngressAsync(CancellationToken tok)
     {
-        var label = $"{CertRequestKey}={CertRequestValue}";
-
-
-        IEnumerable<Task<HttpOperationResponse<V1ConfigMapList>>> taskList;
-
-        if(cfg.NamespaceConstraints.Length > 0)
-        {
-            log.LogInformation("Starting in namespaced mode and listening for the following namespaces: {ns}", String.Join("; ", cfg.NamespaceConstraints));
-            taskList = cfg.NamespaceConstraints.Select(ns => client.CoreV1.ListNamespacedConfigMapWithHttpMessagesAsync(ns, watch: true, cancellationToken: tok, labelSelector: label));
-        }
-        else
-        {
-            taskList = new [] {client.CoreV1.ListConfigMapForAllNamespacesWithHttpMessagesAsync(watch: true, cancellationToken: tok, labelSelector: label)};
-        }
-
-
-        // Create the Func from the Tasks list
-        var watchers = taskList.Select(t => WatchInLoopAsync(label, () => t, callback));
-
-        this.watchExceptionLoop = false;
-        await Task.WhenAll(watchers);
+        return client.NetworkingV1.ListIngressForAllNamespacesWithHttpMessagesAsync(watch: true, cancellationToken: tok, labelSelector: IngressLabel);
     }
 
-    private async Task WatchInLoopAsync<T, L>(string label, Func<Task<HttpOperationResponse<L>>> watch, Func<WatchEventType, T, Task> callback)
+    private Task<HttpOperationResponse<V1IngressList>> WatchNsIngressAsync(string ns, CancellationToken tok)
+    {
+        return client.NetworkingV1.ListNamespacedIngressWithHttpMessagesAsync(ns, watch: true, cancellationToken: tok, labelSelector: IngressLabel);
+    }
+
+    public Task WatchConfigMapsAsync(ChangeCallback<V1ConfigMap> callback, CancellationToken tok)
+    {
+       return WatchInLoopAsync(callback, WatchAllConfigMapsAsync, WatchNsConfigMapsAsync, tok);
+    }
+
+    private Task<HttpOperationResponse<V1ConfigMapList>> WatchAllConfigMapsAsync(CancellationToken tok)
+    {
+        return client.CoreV1.ListConfigMapForAllNamespacesWithHttpMessagesAsync(watch: true, cancellationToken: tok, labelSelector: ConfigLabel);
+    }
+
+    private Task<HttpOperationResponse<V1ConfigMapList>> WatchNsConfigMapsAsync(string ns, CancellationToken tok)
+    {
+        return client.CoreV1.ListNamespacedConfigMapWithHttpMessagesAsync(ns, watch: true, cancellationToken: tok, labelSelector: ConfigLabel);
+    }
+
+    delegate Task<HttpOperationResponse<L>> WatchAllFunc<L>(CancellationToken tok);
+    delegate Task<HttpOperationResponse<L>> WatchNsFunc<L>(string ns, CancellationToken tok);
+
+    private Task WatchInLoopAsync<L, T>(ChangeCallback<T> callback, WatchAllFunc<L> all, WatchNsFunc<L> ns, CancellationToken tok)
+    {
+        return cfg.NamespaceConstraints.Length == 0 ? WatchInLoopAsync(callback, all, tok) : WatchInLoopAsync(callback, ns, tok);
+    }
+
+    private Task WatchInLoopAsync<L, T>(ChangeCallback<T> callback, WatchNsFunc<L> func, CancellationToken tok)
+    {
+        return Task.WhenAll(cfg.NamespaceConstraints
+            .Select(ns => WatchInLoopAsync(callback, (t) => func(ns, t), tok))
+            .ToArray()
+        );
+    }
+
+    private async Task WatchInLoopAsync<L, T>(ChangeCallback<T> callback, WatchAllFunc<L> watch, CancellationToken tok)
     {
         var typeName = typeof(T).Name;
-        while (!watchExceptionLoop)
+        while (true)
         {
             try
             {
-                log.LogInformation("Starting watch request for {type}[{label}]", typeName, label);
-                await foreach (var (type, item) in watch().WatchAsync<T, L>())
+                await foreach (var (type, item) in watch(tok).WatchAsync<T, L>())
                 {
                     await callback(type, item);
                 }
@@ -85,10 +84,8 @@ public class K8sWatchClient(KCertConfig cfg, ILogger<K8sClient> log, Kubernetes 
             {
                 if (ex.Message == "Error while copying content to a stream.")
                 {
-                    log.LogInformation("Empty Kubernetes client result threw an exception");
-                    log.LogInformation("Restarting watch service.");
-
-                    watchExceptionLoop = true;
+                    log.LogInformation("Empty Kubernetes client result threw an exception. Trying again after 5 seconds.");
+                    await Task.Delay(TimeSpan.FromSeconds(5), tok);
                 }
                 else
                 {
@@ -96,12 +93,5 @@ public class K8sWatchClient(KCertConfig cfg, ILogger<K8sClient> log, Kubernetes 
                 }
             }
         }
-    }
-
-    private IEnumerable<Task<HttpOperationResponse<V1IngressList>>> GetNamespacedIngressListWithHttpMessagesAsync(List<string> namespaces, string label, CancellationToken tok)
-    {
-        var toWatch = namespaces.Select(async ns => await client.NetworkingV1.ListNamespacedIngressWithHttpMessagesAsync(ns, watch: true, cancellationToken: tok, labelSelector: label));
-
-        return toWatch;
     }
 }
