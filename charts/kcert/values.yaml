@@ -1,32 +1,31 @@
 acmeDirUrl: https://acme-staging-v02.api.letsencrypt.org/directory
-acmeEmail: asdfs
+acmeEmail: null
 acmeTermsAccepted: false
 kcertImage: nabsul/kcert:v1.2.0
 
 env: {}
 
-allowClusterWide: true
+# set to null to allow managing all namespaces, or limit with array of namespaces
+allowedNamespaces: null #["namespace1", "namespace2", ...]
 
 acmeKey:
   secretName: null
   keyName: key
 
 acmeEabKey:
-  secretName: kcert-prd-hmac-secret
+  secretName: null
   keyIdName: keyid
   hmacKeyName: hmac
-
 
 showRenewButton: null
 
 smtp:
-  email: null
-  host: null
-  port: null
-  user: null
-  secret:
-    name: kcert-smpt-secret
-    key: password
+  secretName: null # set this to the secret containing the smtp credentials in keys as defined below
+  emailName: email
+  hostName: host
+  portName: port
+  userName: user
+  passName: password
 
 securityContext: {}
   # capabilities:

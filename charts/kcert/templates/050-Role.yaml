@@ -8,16 +8,6 @@ metadata:
     {{- include "kcert.labels" . | nindent 4 }}
 {{- end }}
 rules:
-{{ if .Values.allowClusterWide }}
 - apiGroups: ["networking.k8s.io"]
   resources: ["ingresses"]
-  verbs: ["get", "list", "create", "delete", "update", "patch", "watch"]
-{{ else }}
-- apiGroups: [""]
-  resources: ["ingresses", "configmaps"]
-  verbs: ["get", "list", "create", "delete", "update", "patch", "watch"]
-
-- apiGroups: [""]
-  resources: ["secrets"]
-  verbs: ["get", "list", "create", "update", "patch", "watch"]
-{{ end }}
+  verbs: ["get", "list", "create", "delete", "update", "patch"]

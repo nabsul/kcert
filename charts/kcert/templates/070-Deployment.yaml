@@ -55,43 +55,51 @@ spec:
         - name: ACME__EMAIL
           # Your email address for Let's Encrypt and email notifications
           value: {{ required "acmeEmail is required" .Values.acmeEmail }}
-{{- if .Values.smtp.host }}
+{{- if .Values.smtp.secretName }}
         - name: SMTP__EMAILFROM
-          value: {{ required "smtp.emailFrom is required" .Values.smtp.emailFrom }}
+          valueFrom:
+            secretKeyRef:
+              name: {{ .Values.smtp.secretName }}
+              key: {{ required "smtp.emailName is required" .Values.smtp.emailName }}
         - name: SMTP__HOST
-          value: {{ required "smtp.host is required" .Values.smtp.host }}
+          valueFrom:
+            secretKeyRef:
+              name: {{ .Values.smtp.secretName }}
+              key: {{ required "smtp.hostName is required" .Values.smtp.hostName }}
         - name: SMTP__PORT
-          value: "{{ required "smtp.port is required" .Values.smtp.port }}"
-  {{- if .Values.smtp.user }}
+          valueFrom:
+            secretKeyRef:
+              name: {{ .Values.smtp.secretName }}
+              key: {{ required "smtp.portName is required" .Values.smtp.portName }}
         - name: SMTP__USER
-          value: {{ required "smtp.user is required" .Values.smtp.user }}
-  {{- end}}
-  {{- if .Values.smtp.secret.name}}
+          valueFrom:
+            secretKeyRef:
+              name: {{ .Values.smtp.secretName }}
+              key: {{ required "smtp.userName is required" .Values.smtp.userName }}
         - name: SMTP__PASS
           valueFrom:
             secretKeyRef:
-              name: {{ .Values.smtp.secret.name }}
-              key: {{ .Values.smtp.secret.key }}
-  {{- end}}
+              name: {{ .Values.smtp.secretName }}
+              key: {{ required "smtp.passName is required" .Values.smtp.passName }}
 {{- end }}
 {{- if .Values.acmeKey.secretName }}
         - name: ACME__KEY
           valueFrom:
             secretKeyRef:
               name: "{{ .Values.acmeKey.secretName }}"
-              key: "{{ .Values.acmeKey.keyName }}"
+              key: "{{ required "acmeKey.keyName is required" .Values.acmeKey.keyName }}"
 {{- end }}
 {{- if .Values.acmeEabKey.secretName }}
         - name: ACME__EABKEYID
           valueFrom:
             secretKeyRef:
               name: "{{ .Values.acmeEabKey.secretName }}"
-              key: "{{ .Values.acmeEabKey.keyIdName }}"
+              key: "{{ required "acmeEabKey.keyIdName is required" .Values.acmeEabKey.keyIdName }}"
         - name: ACME__EABHMACKEY
           valueFrom:
             secretKeyRef:
               name: "{{ .Values.acmeEabKey.secretName }}"
-              key: "{{ .Values.acmeEabKey.hmacKeyName }}"
+              key: "{{ required "acmeEabKey.hmacKeyName is required" .Values.acmeEabKey.hmacKeyName }}"
 {{- end }}
 {{- if .Values.showRenewButton }}
         - name: KCERT__SHOWRENEWBUTTON
