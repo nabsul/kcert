@@ -15,4 +15,27 @@ roleRef:
   kind: ClusterRole
   name: {{ include "kcert.fullname" . }}
   apiGroup: rbac.authorization.k8s.io
+{{ else }}
+{{- range $index, $value := .Values.allowedNamespaces }}
+{{- if ne $index 0 }}
+---
+{{- end }}
+apiVersion: rbac.authorization.k8s.io/v1
+kind: RoleBinding
+metadata:
+  name: {{ include "kcert.fullname" . }}
+  namespace: {{ $value }}
+{{- if .Values.forHelm }}
+  labels:
+    {{- include "kcert.labels" . | nindent 4 }}
+{{- end }}
+subjects:
+- kind: ServiceAccount
+  name: {{ include "kcert.fullname" . }}
+  namespace: {{ .Release.Namespace | default "default" }}
+roleRef:
+  kind: Role
+  name: {{ include "kcert.fullname" . }}
+  apiGroup: rbac.authorization.k8s.io
+{{- end }}
 {{ end }}
