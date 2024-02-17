@@ -1,10 +1,111 @@
 ﻿using KCert.Models;
+using System.Security.Cryptography;
+using System.Text.Json;
+using System.Text;
+using Microsoft.AspNetCore.Authentication;
+using System.Collections.Concurrent;
 
 namespace KCert.Services;
 
 [Service]
 public class RenewalHandler(ILogger<RenewalHandler> log, AcmeClient acme, K8sClient kube, KCertConfig cfg, CertClient cert)
 {
+    private readonly TimeSpan WaitTime = TimeSpan.FromSeconds(10);
+    private readonly int NumRetries = 3;
+    private readonly ConcurrentDictionary<Guid, Action> DnsChallenges = [];
+
+    public void TryDnsChallenge(Guid challengeId)
+    {
+        if (DnsChallenges.TryRemove(challengeId, out var callback))
+        {
+            callback();
+        }
+    }
+
+    public async Task<(Guid, string, string)> StartDnsChallengeAsync(string ns, string secretName, string domain, CancellationToken tok)
+    {
+        var hosts = new[] { domain };
+        var rsa = RSA.Create();
+        var key = cfg.AcmeKey;
+        var logbuf = new BufferedLogger<RenewalHandler>(log);
+
+        var (kid, nonce) = await InitAsync();
+        log.LogInformation("Initialized renewal process for hosts {hosts} - kid {kid}", string.Join(",", hosts), kid);
+
+        var order = await acme.CreateOrderAsync(key, kid, hosts, nonce);
+        var orderUri = new Uri(order.Location);
+        var finalizeUri = new Uri(order.Finalize);
+        var authorizations = order.Authorizations.Select(a => new Uri(a)).ToList();
+        var ids = order.Identifiers;
+        var orderNonce = order.Nonce;
+        nonce = orderNonce;
+
+        log.LogInformation("Order {orderUri} created with finalizeUri {finalizeUri}", orderUri, finalizeUri);
+
+        var thumb = cert.GetThumbprint();
+        var auths = new List<AcmeAuthzResponse>();
+        foreach (var (authUrl, host) in authorizations.Zip(ids))
+        {
+            var auth = await acme.GetAuthzAsync(key, authUrl, kid, nonce);
+            auths.Add(auth);
+            nonce = auth.Nonce;
+        }
+
+        var token = auths.SelectMany(a => a.Challenges).First(a => a.Type == "dns-01").Token;
+
+        var challengeId = Guid.NewGuid();
+        var wait = new TaskCompletionSource();
+        DnsChallenges[challengeId] = () => _ = ContinueDnsChallengeAsync();
+
+        var code = Base64UrlTextEncoder.Encode(SHA256.HashData(Encoding.UTF8.GetBytes($"{token}.{thumb}")));
+        var dnsEntry = "_acme-challenge" + (domain.StartsWith("*.") ? domain[2..] : domain);
+
+        log.LogInformation("Waiting for DNS to be setup...");
+        return (challengeId, dnsEntry, code);
+
+        async Task ContinueDnsChallengeAsync()
+        {
+            foreach (var (auth, uri) in auths.Zip(authorizations))
+            {
+                nonce = await ValidateDnsAuthorizationAsync(key, kid, nonce, uri, auth, tok);
+            }
+
+            var (certUri, finalizeNonce) = await FinalizeOrderAsync(key, orderUri, finalizeUri, hosts, kid, nonce, logbuf);
+            log.LogInformation("Finalized order and received cert URI: {certUri}", certUri);
+
+            await SaveCertAsync(cfg.AcmeKey, ns, secretName, certUri, kid, finalizeNonce);
+            logbuf.LogInformation("Saved cert");
+        }
+    }
+
+
+    private async Task<string> ValidateDnsAuthorizationAsync(string key, string kid, string nonce, Uri authUri, AcmeAuthzResponse auth, CancellationToken tok)
+    {
+        var challengeUri = new Uri(auth.Challenges.First(c => c.Type == "dns-01").Url);
+        var chall = await acme.TriggerChallengeAsync(key, challengeUri, kid, nonce);
+        nonce = chall.Nonce;
+        log.LogInformation("TriggerChallenge {challengeUri}: {status}", challengeUri, chall.Status);
+
+        var numRetries = NumRetries;
+        do
+        {
+            log.LogInformation("Waiting for challenge to complete.");
+            await Task.Delay(WaitTime, tok);
+            auth = await acme.GetAuthzAsync(key, authUri, kid, nonce);
+            nonce = auth.Nonce;
+            log.LogInformation("Get Auth {authUri}: {status}", authUri, auth.Status);
+
+        } while (numRetries-- >= 0 && !auth.Challenges.Any(c => c.Status == "valid"));
+
+
+        if (!auth.Challenges.Any(c => c.Status == "valid"))
+        {
+            throw new Exception($"Auth {authUri} did not complete in time. Last Response: {JsonSerializer.Serialize(auth)}");
+        }
+
+        return nonce;
+    }
+
     public async Task RenewCertAsync(string ns, string secretName, string[] hosts)
     {
         var logbuf = new BufferedLogger<RenewalHandler>(log);
