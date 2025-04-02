@@ -28,6 +28,7 @@ public class KCertConfig(IConfiguration cfg)
 
     public TimeSpan ChallengeIngressMaxPropagationWaitTime => TimeSpan.FromSeconds(GetInt("ChallengeIngress:MaxPropagationWaitTimeSeconds"));
     public TimeSpan ChallengeIngressPropagationCheckInterval => TimeSpan.FromMilliseconds(GetInt("ChallengeIngress:PropagationCheckIntervalMilliseconds"));
+    public bool ChallengeIngressUsesLoadBalancer => GetBool("ChallengeIngress:UseLoadBalancer");
 
     public TimeSpan AcmeWaitTime => TimeSpan.FromSeconds(cfg.GetValue<int>("Acme:ValidationWaitTimeSeconds"));
     public int AcmeNumRetries => cfg.GetValue<int>("Acme:ValidationNumRetries");
@@ -84,6 +85,7 @@ public class KCertConfig(IConfiguration cfg)
             Pass = HideString(SmtpPass)
         },
     };
+
 
     private static string HideString(string? val) => string.IsNullOrEmpty(val) ? "" : "[REDACTED]";
     private string? GetString(string key) => cfg.GetValue<string>(key);

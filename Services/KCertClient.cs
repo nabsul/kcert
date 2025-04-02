@@ -133,9 +133,16 @@ public class KCertClient
         }
 
         await _kube.CreateIngressAsync(kcertIngress);
-        _log.LogInformation("Giving challenge ingress time to propagate");
 
-        await AwaitIngressPropagationAsync(kcertIngress);
+            _log.LogInformation("Giving challenge ingress time to propagate");
+        if (_cfg.ChallengeIngressUsesLoadBalancer)
+        {
+            await AwaitIngressPropagationAsync(kcertIngress);
+        }
+        else
+        {
+            await Task.Delay(_cfg.ChallengeIngressMaxPropagationWaitTime);
+        }
     }
 
     private V1IngressRule CreateRule(string host)
