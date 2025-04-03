@@ -1,4 +1,4 @@
-﻿using KCert.Models;
+using KCert.Models;
 using Microsoft.AspNetCore.Authentication;
 using System.Net.Http.Headers;
 using System.Security.Cryptography;
@@ -49,8 +49,17 @@ public class AcmeClient(CertClient cert, KCertConfig cfg)
     public async Task<AcmeAccountResponse> CreateAccountAsync(string nonce)
     {
         var uri = new Uri(_dir?.NewAccount ?? throw new Exception("_dir should be defined here"));
-        var payload = GetAccountRequestPayload(uri);
-        return await PostAsync<AcmeAccountResponse>(cfg.AcmeKey, uri, payload, nonce);
+
+        try
+        {
+            return await PostAsync<AcmeAccountResponse>(cfg.AcmeKey, uri, new { onlyReturnExisting = true }, nonce);
+        }
+        catch (AcmeException e) when (e.Type == "urn:ietf:params:acme:error:accountDoesNotExist")
+        {
+            nonce = await GetNonceAsync();
+            var payload = GetAccountRequestPayload(uri);
+            return await PostAsync<AcmeAccountResponse>(cfg.AcmeKey, uri, payload, nonce);
+        }
     }
 
     private object GetAccountRequestPayload(Uri uri)
@@ -192,10 +201,19 @@ public class AcmeClient(CertClient cert, KCertConfig cfg)
         if (!resp.IsSuccessStatusCode)
         {
             var content = await resp.Content.ReadAsStringAsync();
+            try
+            {
+                if (JsonSerializer.Deserialize<AcmeException>(content, options) is { } acmeException)
+                    throw acmeException;
+            }
+            catch
+            {
+                // ignored
+            }
             throw new Exception($"Request failed with status {resp.StatusCode} and content: {content}");
         }
     }
-
+    
     private static string GetHeader(HttpResponseMessage message, string header)
     {
         if (!message.Headers.TryGetValues(header, out var headers))
@@ -204,5 +222,12 @@ public class AcmeClient(CertClient cert, KCertConfig cfg)
         }
 
         return headers.First();
+    }
+
+    public class AcmeException : Exception
+    {
+        public required string Type { get; init; }
+        public required string Detail { get; init; }
+        public int Status { get; init; }
     }
 }
