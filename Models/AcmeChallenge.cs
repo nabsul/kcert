@@ -1,10 +1,14 @@
-﻿namespace KCert.Models;
+﻿using System.Text.Json.Nodes;
+
+namespace KCert.Models;
 
 public class AcmeChallenge
 {
-    public string Url { get; set; } = default!;
-    public string Type { get; set; } = default!;
-    public string Status { get; set; } = default!;
-    public string Token { get; set; } = default!;
-    public string Validated { get; set; } = default!;
+    public required string Url { get; init; }
+    public required string Type { get; init; }
+    public required string Status { get; init; }
+    public required string Token { get; init; }
+    public required string Validated { get; init; } 
+    
+    public JsonObject? Error { get; init; }
 }
