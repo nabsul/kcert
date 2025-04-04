@@ -161,8 +161,12 @@ public class AcmeClient(CertClient cert, KCertConfig cfg)
     {
         var content = await GetContentAsync(resp);
         var result = JsonSerializer.Deserialize<T>(content, options) ?? throw new Exception($"Invalid content: {content}");
-        result.Nonce = GetHeader(resp, HeaderReplayNonce);
-        result.Location = GetHeader(resp, HeaderLocation);
+        result.Nonce = GetHeader(resp, HeaderReplayNonce)!;
+        if (result is IHasLocationHeader locationHeader)
+        {
+            locationHeader.Location = GetHeader(resp, HeaderLocation);
+        }
+        
         return result;
     }
 

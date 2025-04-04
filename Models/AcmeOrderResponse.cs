@@ -1,6 +1,8 @@
-﻿namespace KCert.Models;
+﻿using System.Text.Json.Serialization;
 
-public class AcmeOrderResponse : AcmeResponse
+namespace KCert.Models;
+
+public class AcmeOrderResponse : AcmeResponse, IHasLocationHeader
 {
     public string Status { get; set; } = default!;
     public string Expires { get; set; } = default!;
@@ -8,4 +10,8 @@ public class AcmeOrderResponse : AcmeResponse
     public string[] Authorizations { get; set; } = default!;
     public string Finalize { get; set; } = default!;
     public string Certificate { get; set; } = default!;
+
+    [JsonIgnore] 
+    public string Location { get; set; } = default!;
 }
+
