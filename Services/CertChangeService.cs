@@ -54,6 +54,12 @@ public class CertChangeService(ILogger<CertChangeService> log, K8sClient k8s, KC
                 }
             }
 
+            log.LogInformation("Found {count} certificate definitions to process.", nsLookup.Count);
+            foreach (var ((ns, name), hosts) in nsLookup)
+            {
+                log.LogInformation("Queued for processing: Secret '{ns}/{name}', Hosts: [{hostList}]", ns, name, string.Join(", ", hosts));
+            }
+
             foreach (var ((ns, name), hosts) in nsLookup)
             {
                 log.LogInformation("Handling cert {ns} - {name} hosts: {h}", ns, name, string.Join(",", hosts));
@@ -101,15 +107,23 @@ public class CertChangeService(ILogger<CertChangeService> log, K8sClient k8s, KC
     {
         await foreach (var config in k8s.GetAllConfigMapsAsync())
         {
-            log.LogInformation("Processing configmap {ns}:{n}", config.Namespace(), config.Name());
+            log.LogDebug("Scanning ConfigMap {ns}/{name} for certificate definitions.", config.Namespace(), config.Name());
             var ns = config.Namespace();
             var name = config.Name();
+
+            if (config.Data == null)
+            {
+                log.LogDebug("ConfigMap {ns}/{name} has no Data section, skipping.", ns, name);
+                continue;
+            }
 
             if (!config.Data.TryGetValue("hosts", out var hostList))
             {
                 log.LogError("ConfigMap {ns}-{n} does not have a hosts entry", ns, name);
                 continue;
             }
+            
+            log.LogDebug("ConfigMap {ns}/{name} found hosts key. Raw value: '{hostListValue}'", ns, name, hostList);
 
             var hosts = hostList.Split(',');
             if (hosts.Length < 1)
