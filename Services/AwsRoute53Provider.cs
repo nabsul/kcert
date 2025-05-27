@@ -24,15 +24,29 @@ public class AwsRoute53Provider : IDnsProvider
 
         if (_cfg.EnableRoute53)
         {
-            if (string.IsNullOrWhiteSpace(_cfg.Route53AccessKeyId) ||
-                string.IsNullOrWhiteSpace(_cfg.Route53SecretAccessKey) ||
-                string.IsNullOrWhiteSpace(_cfg.Route53Region))
+            bool configError = false;
+            if (string.IsNullOrWhiteSpace(_cfg.Route53AccessKeyId))
             {
-                _log.LogError("AWS Route53 is enabled, but one or more required configuration fields (AccessKeyId, SecretAccessKey, Region) are missing.");
-                _route53Client = null; // Ensure client is null if config is incomplete
+                _log.LogError("AWS Route53 is enabled, but Route53AccessKeyId is missing.");
+                configError = true;
+            }
+            if (string.IsNullOrWhiteSpace(_cfg.Route53SecretAccessKey))
+            {
+                _log.LogError("AWS Route53 is enabled, but Route53SecretAccessKey is missing.");
+                configError = true;
+            }
+            if (string.IsNullOrWhiteSpace(_cfg.Route53Region))
+            {
+                _log.LogError("AWS Route53 is enabled, but Route53Region is missing.");
+                configError = true;
+            }
+
+            if (configError)
+            {
+                _route53Client = null;
                 return;
             }
-            
+
             try
             {
                 var awsCredentials = new Amazon.Runtime.BasicAWSCredentials(_cfg.Route53AccessKeyId, _cfg.Route53SecretAccessKey);
@@ -53,9 +67,14 @@ public class AwsRoute53Provider : IDnsProvider
 
     private async Task<string?> GetHostedZoneIdAsync(string domainName)
     {
-        if (_route53Client == null || !_cfg.EnableRoute53)
+        if (_route53Client == null)
         {
-            _log.LogWarning("Route53 client not available or provider disabled. Cannot get hosted zone ID.");
+            _log.LogError($"Route53 client is not initialized due to configuration errors. Cannot get hosted zone ID for {domainName}.");
+            return null;
+        }
+        if (!_cfg.EnableRoute53)
+        {
+            _log.LogWarning($"Route53 provider is disabled. Cannot get hosted zone ID for {domainName}.");
             return null;
         }
 
@@ -85,9 +104,14 @@ public class AwsRoute53Provider : IDnsProvider
 
     public async Task CreateTxtRecordAsync(string domainName, string recordName, string recordValue)
     {
-        if (_route53Client == null || !_cfg.EnableRoute53)
+        if (_route53Client == null)
         {
-            _log.LogWarning("Route53 client not available or provider disabled. Cannot create TXT record.");
+            _log.LogError($"Route53 client is not initialized due to configuration errors. Cannot create TXT record for {recordName}.");
+            return;
+        }
+        if (!_cfg.EnableRoute53)
+        {
+            _log.LogWarning($"Route53 provider is disabled. Cannot create TXT record for {recordName}.");
             return;
         }
 
@@ -134,9 +158,14 @@ public class AwsRoute53Provider : IDnsProvider
 
     public async Task DeleteTxtRecordAsync(string domainName, string recordName, string recordValue)
     {
-        if (_route53Client == null || !_cfg.EnableRoute53)
+        if (_route53Client == null)
         {
-            _log.LogWarning("Route53 client not available or provider disabled. Cannot delete TXT record.");
+            _log.LogError($"Route53 client is not initialized due to configuration errors. Cannot delete TXT record for {recordName}.");
+            return;
+        }
+        if (!_cfg.EnableRoute53)
+        {
+            _log.LogWarning($"Route53 provider is disabled. Cannot delete TXT record for {recordName}.");
             return;
         }
 
