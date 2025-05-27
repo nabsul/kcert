@@ -253,4 +253,167 @@ public class RenewalHandlerDnsTests
             null,
             It.IsAny<Func<It.IsAnyType, Exception?, string>>()), Times.Once);
     }
+
+    // Wildcard Tests
+    [TestMethod]
+    public async Task Wildcard_DNS01_Success_Route53()
+    {
+        var wildcardDomain = "*.example.com";
+        var baseDomain = "example.com";
+        _mockConfig.Setup(c => c.EnableRoute53).Returns(true);
+        _mockConfig.Setup(c => c.EnableCloudflare).Returns(false);
+        // PreferredChallengeType is irrelevant for wildcards, DNS-01 is mandatory
+
+        var authzInitial = CreateAuthzResponse(wildcardDomain, true, false, "dnsTokenWildcardR53"); // No http-01 for wildcards usually
+        _mockAcmeClient.Setup(ac => ac.GetAuthzAsync(It.IsAny<string>(), It.IsAny<Uri>(), It.IsAny<string>(), "nonceWildR53_0"))
+            .ReturnsAsync(authzInitial);
+        
+        _mockCertClient.Setup(cc => cc.GetKeyAuthorization("dnsTokenWildcardR53")).Returns("keyAuthWildcardR53");
+
+        _mockAwsProvider.Setup(ap => ap.CreateTxtRecordAsync(baseDomain, $"_acme-challenge.{baseDomain}", It.IsAny<string>()))
+            .Returns(Task.CompletedTask).Verifiable();
+        _mockAwsProvider.Setup(ap => ap.DeleteTxtRecordAsync(baseDomain, $"_acme-challenge.{baseDomain}", It.IsAny<string>()))
+            .Returns(Task.CompletedTask).Verifiable();
+
+        _mockAcmeClient.Setup(ac => ac.TriggerChallengeAsync(It.IsAny<string>(), new Uri(authzInitial.Challenges.First(c=>c.Type=="dns-01").Url), It.IsAny<string>(), authzInitial.Nonce))
+            .ReturnsAsync(CreateChallengeResponse("dns-01", "dnsTokenWildcardR53", "pending"));
+
+        var authzValid = CreateAuthzResponse(wildcardDomain, true, false, "dnsTokenWildcardR53");
+        authzValid.Challenges.First(c => c.Type == "dns-01").Status = "valid";
+        authzValid.Status = "valid";
+        authzValid.Nonce = "nonceWildR53Validated";
+        _mockAcmeClient.Setup(ac => ac.GetAuthzAsync(It.IsAny<string>(), It.IsAny<Uri>(), It.IsAny<string>(), "nonceAfterChallenge"))
+            .ReturnsAsync(authzValid);
+
+        var resultNonce = await _renewalHandler.ValidateAuthorizationAsync("keyWildR53", "kidWildR53", "nonceWildR53_0", new Uri("https://auth.example.com/wildr53"), _mockLogger.Object);
+
+        Assert.AreEqual("nonceWildR53Validated", resultNonce);
+        _mockAwsProvider.Verify(); // Verifies all .Verifiable() setups
+        _mockCloudflareProvider.VerifyNoOtherCalls();
+        _mockAcmeClient.Verify(ac => ac.TriggerChallengeAsync(It.IsAny<string>(), It.Is<Uri>(u => u.ToString().Contains("http-01")), It.IsAny<string>(), It.IsAny<string>()), Times.Never, "HTTP-01 challenge should not have been triggered for wildcard.");
+    }
+
+    [TestMethod]
+    public async Task Wildcard_DNS01_Success_Cloudflare()
+    {
+        var wildcardDomain = "*.cf-example.com";
+        var baseDomain = "cf-example.com";
+        _mockConfig.Setup(c => c.EnableRoute53).Returns(false);
+        _mockConfig.Setup(c => c.EnableCloudflare).Returns(true);
+
+        var authzInitial = CreateAuthzResponse(wildcardDomain, true, false, "dnsTokenWildcardCF");
+        _mockAcmeClient.Setup(ac => ac.GetAuthzAsync(It.IsAny<string>(), It.IsAny<Uri>(), It.IsAny<string>(), "nonceWildCF_0"))
+            .ReturnsAsync(authzInitial);
+        
+        _mockCertClient.Setup(cc => cc.GetKeyAuthorization("dnsTokenWildcardCF")).Returns("keyAuthWildcardCF");
+
+        _mockCloudflareProvider.Setup(cfp => cfp.CreateTxtRecordAsync(baseDomain, $"_acme-challenge.{baseDomain}", It.IsAny<string>()))
+            .Returns(Task.CompletedTask).Verifiable();
+        _mockCloudflareProvider.Setup(cfp => cfp.DeleteTxtRecordAsync(baseDomain, $"_acme-challenge.{baseDomain}", It.IsAny<string>()))
+            .Returns(Task.CompletedTask).Verifiable();
+
+        _mockAcmeClient.Setup(ac => ac.TriggerChallengeAsync(It.IsAny<string>(), new Uri(authzInitial.Challenges.First(c=>c.Type=="dns-01").Url), It.IsAny<string>(), authzInitial.Nonce))
+            .ReturnsAsync(CreateChallengeResponse("dns-01", "dnsTokenWildcardCF", "pending"));
+
+        var authzValid = CreateAuthzResponse(wildcardDomain, true, false, "dnsTokenWildcardCF");
+        authzValid.Challenges.First(c => c.Type == "dns-01").Status = "valid";
+        authzValid.Status = "valid";
+        authzValid.Nonce = "nonceWildCFValidated";
+        _mockAcmeClient.Setup(ac => ac.GetAuthzAsync(It.IsAny<string>(), It.IsAny<Uri>(), It.IsAny<string>(), "nonceAfterChallenge"))
+            .ReturnsAsync(authzValid);
+
+        var resultNonce = await _renewalHandler.ValidateAuthorizationAsync("keyWildCF", "kidWildCF", "nonceWildCF_0", new Uri("https://auth.example.com/wildcf"), _mockLogger.Object);
+
+        Assert.AreEqual("nonceWildCFValidated", resultNonce);
+        _mockCloudflareProvider.Verify();
+        _mockAwsProvider.VerifyNoOtherCalls();
+    }
+
+    [TestMethod]
+    public async Task Wildcard_DNS01_NoDnsChallengeFromAcme_ThrowsException()
+    {
+        var wildcardDomain = "*.nodns.example.com";
+        _mockConfig.Setup(c => c.EnableRoute53).Returns(true); // Provider configured
+
+        var authzInitial = CreateAuthzResponse(wildcardDomain, false, true, httpToken: "httpTokenOnly"); // No DNS-01 challenge
+        _mockAcmeClient.Setup(ac => ac.GetAuthzAsync(It.IsAny<string>(), It.IsAny<Uri>(), It.IsAny<string>(), It.IsAny<string>()))
+            .ReturnsAsync(authzInitial);
+
+        await Assert.ThrowsExceptionAsync<Exception>(async () => 
+            await _renewalHandler.ValidateAuthorizationAsync("keyNoDns", "kidNoDns", "nonceNoDns0", new Uri("https://auth.example.com/nodns"), _mockLogger.Object),
+            $"ACME server did not provide a DNS-01 challenge for wildcard domain {wildcardDomain}.");
+        
+        _mockAwsProvider.Verify(ap => ap.CreateTxtRecordAsync(It.IsAny<string>(), It.IsAny<string>(), It.IsAny<string>()), Times.Never);
+        _mockAcmeClient.Verify(ac => ac.TriggerChallengeAsync(It.IsAny<string>(), It.Is<Uri>(u => u.ToString().Contains("http-01")), It.IsAny<string>(), It.IsAny<string>()), Times.Never);
+    }
+
+    [TestMethod]
+    public async Task Wildcard_DNS01_ProviderCreateFails_ThrowsException_NoHttpFallback()
+    {
+        var wildcardDomain = "*.providerfail.example.com";
+        var baseDomain = "providerfail.example.com";
+        _mockConfig.Setup(c => c.EnableRoute53).Returns(true);
+
+        var authzInitial = CreateAuthzResponse(wildcardDomain, true, false, "dnsTokenProviderFail");
+        _mockAcmeClient.Setup(ac => ac.GetAuthzAsync(It.IsAny<string>(), It.IsAny<Uri>(), It.IsAny<string>(), It.IsAny<string>()))
+            .ReturnsAsync(authzInitial);
+        _mockCertClient.Setup(cc => cc.GetKeyAuthorization(It.IsAny<string>())).Returns("keyAuthPF");
+
+        _mockAwsProvider.Setup(ap => ap.CreateTxtRecordAsync(baseDomain, $"_acme-challenge.{baseDomain}", It.IsAny<string>()))
+            .ThrowsAsync(new Exception("Simulated AWS Create Exception")).Verifiable();
+        _mockAwsProvider.Setup(ap => ap.DeleteTxtRecordAsync(baseDomain, $"_acme-challenge.{baseDomain}", It.IsAny<string>()))
+            .Returns(Task.CompletedTask); // Delete might still be called if dnsRecordCreated was true before throw, or not.
+
+        await Assert.ThrowsExceptionAsync<Exception>(async () => 
+            await _renewalHandler.ValidateAuthorizationAsync("keyPF", "kidPF", "noncePF0", new Uri("https://auth.example.com/pf"), _mockLogger.Object),
+            "Simulated AWS Create Exception"); // Original exception should be re-thrown for wildcards
+
+        _mockAwsProvider.Verify(); // Verifies CreateTxtRecordAsync was called
+        // Depending on precise error handling logic for dnsRecordCreated, Delete might or might not be called.
+        // Current code: if Create throws, dnsRecordCreated remains false, so Delete is NOT called in finally.
+        _mockAwsProvider.Verify(ap => ap.DeleteTxtRecordAsync(It.IsAny<string>(), It.IsAny<string>(), It.IsAny<string>()), Times.Never);
+        _mockAcmeClient.Verify(ac => ac.TriggerChallengeAsync(It.IsAny<string>(), It.Is<Uri>(u => u.ToString().Contains("http-01")), It.IsAny<string>(), It.IsAny<string>()), Times.Never);
+    }
+
+    [TestMethod]
+    public async Task Wildcard_DNS01_AcmeValidationFails_ThrowsException_NoHttpFallback()
+    {
+        var wildcardDomain = "*.acmevalidationfail.example.com";
+        var baseDomain = "acmevalidationfail.example.com";
+        _mockConfig.Setup(c => c.EnableRoute53).Returns(true);
+
+        var authzInitial = CreateAuthzResponse(wildcardDomain, true, false, "dnsTokenAcmeFail");
+        _mockAcmeClient.Setup(ac => ac.GetAuthzAsync(It.IsAny<string>(), It.IsAny<Uri>(), It.IsAny<string>(), "nonceAcmeFail0"))
+            .ReturnsAsync(authzInitial);
+        
+        _mockCertClient.Setup(cc => cc.GetKeyAuthorization("dnsTokenAcmeFail")).Returns("keyAuthAcmeFail");
+
+        _mockAwsProvider.Setup(ap => ap.CreateTxtRecordAsync(baseDomain, $"_acme-challenge.{baseDomain}", It.IsAny<string>()))
+            .Returns(Task.CompletedTask).Verifiable();
+        _mockAwsProvider.Setup(ap => ap.DeleteTxtRecordAsync(baseDomain, $"_acme-challenge.{baseDomain}", It.IsAny<string>()))
+            .Returns(Task.CompletedTask).Verifiable();
+
+        _mockAcmeClient.Setup(ac => ac.TriggerChallengeAsync(It.IsAny<string>(), new Uri(authzInitial.Challenges.First(c=>c.Type=="dns-01").Url), It.IsAny<string>(), authzInitial.Nonce))
+            .ReturnsAsync(CreateChallengeResponse("dns-01", "dnsTokenAcmeFail", "pending")); // Initial trigger is fine
+
+        // Subsequent GetAuthzAsync calls never return "valid" for the DNS challenge
+        var authzStillPending = CreateAuthzResponse(wildcardDomain, true, false, "dnsTokenAcmeFail");
+        authzStillPending.Challenges.First(c => c.Type == "dns-01").Status = "pending"; 
+        authzStillPending.Status = "pending";
+        authzStillPending.Nonce = "nonceAcmeFail_StillPending";
+        _mockAcmeClient.Setup(ac => ac.GetAuthzAsync(It.IsAny<string>(), It.IsAny<Uri>(), It.IsAny<string>(), "nonceAfterChallenge"))
+            .ReturnsAsync(authzStillPending);
+
+        await Assert.ThrowsExceptionAsync<Exception>(async () => 
+            await _renewalHandler.ValidateAuthorizationAsync("keyAcmeFail", "kidAcmeFail", "nonceAcmeFail0", new Uri("https://auth.example.com/acmefail"), _mockLogger.Object),
+            $"DNS-01 challenge failed for wildcard domain {wildcardDomain} and is mandatory.");
+
+        _mockAwsProvider.Verify(); // Create and Delete should have been called
+        _mockAcmeClient.Verify(ac => ac.TriggerChallengeAsync(It.IsAny<string>(), It.Is<Uri>(u => u.ToString().Contains("http-01")), It.IsAny<string>(), It.IsAny<string>()), Times.Never);
+    }
+
+    // Review existing test: ValidateAuthorizationAsync_Dns01_CreateTxtFails_FallbackToHttp01
+    // This test ALREADY covers non-wildcard DNS-01 failure falling back to HTTP-01.
+    // It mocks CreateTxtRecordAsync to throw an exception and verifies HTTP-01 is then attempted.
+    // The logic for "isWildcard" in RenewalHandler ensures this fallback only happens for non-wildcards.
 }

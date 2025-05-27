@@ -188,6 +188,80 @@ If `dns-01` is the preferred challenge type and a DNS provider is successfully c
 **Auto-Renewal:**
 The DNS-01 challenge mechanism is fully compatible with KCert's automatic certificate renewal process.
 
+### Wildcard Certificates
+
+KCert supports issuing certificates for wildcard domains (e.g., `*.example.com`). This allows a single certificate to cover multiple subdomains under a specific domain.
+
+**Key Requirements for Wildcard Certificates:**
+
+1.  **DNS-01 Challenge is Mandatory:** Wildcard domain validation can **only** be performed using the DNS-01 challenge type. You must configure KCert to use DNS-01 by:
+    *   Setting `KCert:PreferredChallengeType` (`KCERT__PREFERREDCHALLENGETYPE` env var) to `"dns-01"`.
+    *   Properly configuring a DNS provider (AWS Route53 or Cloudflare) as detailed in the "DNS Provider Configuration" section.
+    *   If DNS-01 is not configured or fails for a wildcard domain, KCert will **not** fall back to HTTP-01 for that domain, and certificate issuance will fail.
+
+2.  **Explicitly List Both Wildcard and Apex/Base Domain:** If you want a certificate that covers both the wildcard domain (e.g., `*.example.com`) AND the apex/base domain (e.g., `example.com`), you **must explicitly list both hostnames** in your Ingress `spec.tls[].hosts` array or ConfigMap `data.hosts` field. KCert requests certificates for exactly the hostnames provided.
+
+**Example: Ingress for Wildcard Certificate (`*.example.com` and `example.com`)**
+
+```yaml
+apiVersion: networking.k8s.io/v1
+kind: Ingress
+metadata:
+  name: my-wildcard-app
+  # namespace: my-namespace # Optional: specify if not default
+  labels:
+    kcert.dev/ingress: "managed" # Required for KCert to manage this Ingress
+  # annotations:
+  #   kubernetes.io/ingress.class: "nginx" # Example Ingress controller
+spec:
+  tls:
+  - hosts:
+    - "*.example.com"
+    - "example.com" # Important: Include the base domain for SAN coverage
+    secretName: my-example-wildcard-tls # Name of the secret to store the certificate
+  rules:
+  - host: "www.example.com" # Example specific subdomain covered by the wildcard
+    http:
+      paths:
+      - path: /
+        pathType: Prefix
+        backend:
+          service:
+            name: my-app-service
+            port:
+              number: 80
+  # Optional: Rule for the apex domain if it also serves traffic directly
+  - host: "example.com"
+    http:
+      paths:
+      - path: /
+        pathType: Prefix
+        backend:
+          service:
+            name: my-app-service 
+            port:
+              number: 80
+```
+*Note: Ensure `kcert.dev/ingress: "managed"` label is present. To cover both `*.example.com` and `example.com`, list both in `spec.tls[].hosts`.*
+
+**Example: ConfigMap for Wildcard Certificate (`*.example.com` and `example.com`)**
+
+```yaml
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: my-example-wildcard-tls # This ConfigMap name will be the Kubernetes Secret name
+  # namespace: my-namespace # Optional: specify if not default
+  annotations:
+    kcert.dev/configmap: "managed" # Required for KCert to manage this ConfigMap
+data:
+  hosts: "*.example.com,example.com" # Comma-separated list
+```
+*Note: Ensure `kcert.dev/configmap: "managed"` annotation is present. The ConfigMap's name is used as the Kubernetes secret name for the certificate.*
+
+**DNS Provider Setup:**
+Remember to refer to the "DNS Provider Configuration" section to correctly set up AWS Route53 or Cloudflare for DNS-01 challenges. Without a functional DNS provider configuration, wildcard certificate issuance will fail.
+
 ### Diagnostics
 
 To check that everything is running as expected:
