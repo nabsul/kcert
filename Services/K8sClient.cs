@@ -3,11 +3,13 @@ using k8s.Autorest;
 using k8s.Models;
 using System.Net;
 using System.Text;
+using System.Text.Json;
+using Microsoft.Extensions.Logging;
 
 namespace KCert.Services;
 
 [Service]
-public class K8sClient(KCertConfig cfg, Kubernetes client)
+public class K8sClient(KCertConfig cfg, Kubernetes client, ILogger<K8sClient> log)
 {
     private const string TlsSecretType = "kubernetes.io/tls";
     private const string CertLabelKey = "kcert.dev/secret";
@@ -30,18 +32,42 @@ public class K8sClient(KCertConfig cfg, Kubernetes client)
 
     public async IAsyncEnumerable<V1ConfigMap> GetAllConfigMapsAsync()
     {
+        log.LogInformation("GetAllConfigMapsAsync: Starting.");
+        int receivedCount = 0;
+        int yieldedCount = 0;
+
         var configMaps = IterateAsync<V1ConfigMap, V1ConfigMapList>(GetAllConfigMapsInternalAsync, GetNsConfigMapsAsync);
         await foreach (var cm in configMaps)
         {
-            if (cm.Metadata?.Labels != null &&
-                cm.Metadata.Labels.TryGetValue(cfg.ConfigMapWatchLabelKey, out var labelValue))
+            receivedCount++;
+            log.LogInformation("GetAllConfigMapsAsync: Processing received ConfigMap #{Count} - {Namespace}/{Name}", receivedCount, cm.Namespace(), cm.Name());
+            log.LogDebug("GetAllConfigMapsAsync: Labels for {Namespace}/{Name}: {Labels}", cm.Namespace(), cm.Name(), JsonSerializer.Serialize(cm.Metadata?.Labels ?? new Dictionary<string, string>()));
+
+            if (cm.Metadata?.Labels != null)
             {
-                if (string.IsNullOrEmpty(cfg.ConfigMapWatchLabelValue) || labelValue == cfg.ConfigMapWatchLabelValue)
+                log.LogDebug("GetAllConfigMapsAsync: Checking for label key '{Key}' on {Namespace}/{Name}", cfg.ConfigMapWatchLabelKey, cm.Namespace(), cm.Name());
+                if (cm.Metadata.Labels.TryGetValue(cfg.ConfigMapWatchLabelKey, out var labelValue))
                 {
-                    yield return cm;
+                    log.LogDebug("GetAllConfigMapsAsync: Found label key '{Key}', value is '{Value}' on {Namespace}/{Name}", cfg.ConfigMapWatchLabelKey, labelValue, cm.Namespace(), cm.Name());
+                    log.LogDebug("GetAllConfigMapsAsync: Comparing found label value '{LabelValue}' with configured watch value '{ConfigValue}' (is configured value null_or_empty: {IsNullOrEmpty}) for {Namespace}/{Name}", labelValue, cfg.ConfigMapWatchLabelValue, string.IsNullOrEmpty(cfg.ConfigMapWatchLabelValue), cm.Namespace(), cm.Name());
+                    if (string.IsNullOrEmpty(cfg.ConfigMapWatchLabelValue) || labelValue == cfg.ConfigMapWatchLabelValue)
+                    {
+                        yieldedCount++;
+                        log.LogInformation("GetAllConfigMapsAsync: Yielding ConfigMap {Namespace}/{Name} as it passed all label filters.", cm.Namespace(), cm.Name());
+                        yield return cm;
+                    }
+                }
+                else
+                {
+                    log.LogDebug("GetAllConfigMapsAsync: Label key '{Key}' not found on {Namespace}/{Name}", cfg.ConfigMapWatchLabelKey, cm.Namespace(), cm.Name());
                 }
             }
+            else
+            {
+                log.LogDebug("GetAllConfigMapsAsync: ConfigMap {Namespace}/{Name} has no Metadata or Labels, skipping secondary filter.", cm.Namespace(), cm.Name());
+            }
         }
+        log.LogInformation("GetAllConfigMapsAsync: Finished. Received {ReceivedCount} ConfigMaps from API (matching initial label selector '{InitialLabelSelector}'), yielded {YieldedCount} ConfigMaps after further label filtering.", receivedCount, ConfigMapLabel, yieldedCount);
     }
 
     private Task<V1ConfigMapList> GetAllConfigMapsInternalAsync(string? tok) => client.ListConfigMapForAllNamespacesAsync(labelSelector: ConfigMapLabel, continueParameter: tok);
