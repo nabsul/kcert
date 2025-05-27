@@ -66,27 +66,24 @@ KCert can create TLS certificates based on definitions found in Kubernetes `Conf
 
 **Discovery Process:**
 
-KCert discovers ConfigMaps that request TLS certificates based on a two-tier labeling system:
+KCert discovers ConfigMaps that request TLS certificates based on a configurable label. The discovery is controlled by two environment variables:
 
-1.  **Primary Discovery Label (Required):**
-    *   ConfigMaps **must** have the label `kcert.dev/cert-request: watch`. This label is used by KCert's internal watcher to identify potential certificate requests and is a prerequisite for any further processing.
+-   **`KCERT_CONFIGMAP_WATCH_LABEL_KEY`**: Defines the key of the label KCert will look for on ConfigMaps.
+    -   Default: `kcert.dev/configmap`
+-   **`KCERT_CONFIGMAP_WATCH_LABEL_VALUE`**: Defines the expected value for the label identified by `KCERT_CONFIGMAP_WATCH_LABEL_KEY`.
+    -   Default: `""` (empty string)
 
-2.  **Secondary Filtering Label (Configurable):**
-    *   After the initial discovery, KCert applies a secondary filter based on another label, which is configurable via environment variables:
-        *   `KCERT_CONFIGMAP_WATCH_LABEL_KEY`: Defines the key of the label KCert will look for.
-            *   Default: `kcert.dev/configmap`
-        *   `KCERT_CONFIGMAP_WATCH_LABEL_VALUE`: Defines the expected value for the label identified by `KCERT_CONFIGMAP_WATCH_LABEL_KEY`.
-            *   Default: `""` (empty string)
+**Matching Logic:**
 
-    *   **Matching Logic for Secondary Filter:**
-        *   If `KCERT_CONFIGMAP_WATCH_LABEL_VALUE` is an empty string (default): KCert will process the ConfigMap if it has the primary `kcert.dev/cert-request: watch` label AND the label key defined by `KCERT_CONFIGMAP_WATCH_LABEL_KEY` (e.g., `kcert.dev/configmap`) is present, regardless of its value.
-        *   If `KCERT_CONFIGMAP_WATCH_LABEL_VALUE` is set to a specific string (e.g., `"managed"`, `"true"`): KCert will process the ConfigMap if it has the primary `kcert.dev/cert-request: watch` label AND the label defined by `KCERT_CONFIGMAP_WATCH_LABEL_KEY` exists with a value exactly matching `KCERT_CONFIGMAP_WATCH_LABEL_VALUE`.
+-   If `KCERT_CONFIGMAP_WATCH_LABEL_VALUE` is an empty string (default): KCert will process any ConfigMap that has a label key matching the value of `KCERT_CONFIGMAP_WATCH_LABEL_KEY` (e.g., `kcert.dev/configmap`), regardless of that label's value. The mere presence of the key is sufficient.
+-   If `KCERT_CONFIGMAP_WATCH_LABEL_VALUE` is set to a specific string (e.g., `"managed"`, `"true"`): KCert will process only those ConfigMaps that have a label where the key matches `KCERT_CONFIGMAP_WATCH_LABEL_KEY` AND the value of that label exactly matches `KCERT_CONFIGMAP_WATCH_LABEL_VALUE`.
 
 -   If `NamespaceConstraints` are active (see "Namespace-constrained installations" section), the ConfigMap must reside in one of the specified namespaces.
 
 **Example: ConfigMap for `service.example.com`**
 
-This example demonstrates a ConfigMap that KCert would process, assuming default settings for the secondary filter (`KCERT_CONFIGMAP_WATCH_LABEL_KEY="kcert.dev/configmap"` and `KCERT_CONFIGMAP_WATCH_LABEL_VALUE=""`). The presence of the `kcert.dev/configmap` label (with any value, here "active") is sufficient.
+This example demonstrates a ConfigMap that KCert would process.
+Assuming default settings (`KCERT_CONFIGMAP_WATCH_LABEL_KEY="kcert.dev/configmap"` and `KCERT_CONFIGMAP_WATCH_LABEL_VALUE=""`), the presence of the `kcert.dev/configmap` label (with any value, here "active") is sufficient.
 
 ```yaml
 apiVersion: v1
@@ -95,7 +92,6 @@ metadata:
   name: my-service-tls # This name will be used for the resulting TLS Secret
   namespace: my-app-namespace # Ensure this namespace is monitored by KCert
   labels:
-    kcert.dev/cert-request: watch      # Required for KCert to discover this ConfigMap
     kcert.dev/configmap: "active"      # Processed if KCERT_CONFIGMAP_WATCH_LABEL_VALUE is empty (default)
                                        # or if KCERT_CONFIGMAP_WATCH_LABEL_VALUE is "active".
                                        # The key can be changed via KCERT_CONFIGMAP_WATCH_LABEL_KEY.
@@ -107,23 +103,21 @@ data:
 
 KCert will detect this ConfigMap and attempt to create (or renew) a TLS Secret named `my-service-tls` in the `my-app-namespace` namespace, containing a certificate for `service.example.com` and `service.internal.example.com`.
 
-The `kcert-configmap` Helm chart can be used to create such ConfigMaps. You would need to ensure the chart allows setting these labels or customize its output.
+The `kcert-configmap` Helm chart can be used to create such ConfigMaps. You would need to ensure the chart allows setting the required label or customize its output.
 ```sh
-# Example using helm, assuming the chart supports setting these labels:
+# Example using helm, assuming the chart supports setting this label:
 helm install my-cert-def nabsul/kcert-configmap -n [TARGET_NAMESPACE] \
   --set name=my-service-tls \
   --set hosts="service.example.com,service.internal.example.com" \
-  --set labels.kcert\.dev/cert-request=watch \
   --set labels.kcert\.dev/configmap=active 
-  # Adjust label setting according to the chart's actual values structure.
+  # Adjust label key/value according to your KCert configuration and the chart's actual values structure.
 ```
 Replace `[TARGET_NAMESPACE]` with the namespace where you want the ConfigMap and the resulting Secret to reside.
 
 **Troubleshooting:**
 If KCert doesn't seem to be processing your ConfigMap:
 - Verify the `data.hosts` key exists and is correctly formatted.
-- Ensure the ConfigMap has the `kcert.dev/cert-request: watch` label.
-- Check if the ConfigMap meets the criteria for the secondary filtering label based on `KCERT_CONFIGMAP_WATCH_LABEL_KEY` and `KCERT_CONFIGMAP_WATCH_LABEL_VALUE` settings.
+- Ensure the ConfigMap has the label that KCert is configured to watch for, based on the `KCERT_CONFIGMAP_WATCH_LABEL_KEY` and `KCERT_CONFIGMAP_WATCH_LABEL_VALUE` environment variable settings.
 - Check KCert's logs. Enabling Debug logging (e.g., by setting the environment variable `Logging__LogLevel__KCert` to `Debug` for the KCert deployment) will provide more detailed information.
 - Ensure the ConfigMap is in a namespace monitored by KCert, especially if `NamespaceConstraints` are used.
 
@@ -314,13 +308,12 @@ metadata:
   name: my-example-wildcard-tls # This ConfigMap name will be the Kubernetes Secret name
   # namespace: my-namespace # Optional: specify if not default
   labels:
-    kcert.dev/cert-request: watch      # Required for KCert to discover this ConfigMap
-    kcert.dev/configmap: "managed"     # Processed if KCERT_CONFIGMAP_WATCH_LABEL_VALUE is "managed" or empty.
-                                       # The key can be changed via KCERT_CONFIGMAP_WATCH_LABEL_KEY.
+    kcert.dev/configmap: "managed"     # Processed if KCERT_CONFIGMAP_WATCH_LABEL_KEY is "kcert.dev/configmap" (default)
+                                       # AND KCERT_CONFIGMAP_WATCH_LABEL_VALUE is "managed" (or empty, in which case any value for this key works).
 data:
   hosts: "*.example.com,example.com" # Comma-separated list
 ```
-*Note: The ConfigMap's `metadata.name` is used as the Kubernetes Secret name for the certificate. Ensure `data.hosts` is present and labels meet the discovery criteria.*
+*Note: The ConfigMap's `metadata.name` is used as the Kubernetes Secret name for the certificate. Ensure `data.hosts` is present and the label meets KCert's discovery criteria based on its configuration.*
 
 **DNS Provider Setup:**
 Remember to refer to the "DNS Provider Configuration" section to correctly set up AWS Route53 or Cloudflare for DNS-01 challenges. Without a functional DNS provider configuration, wildcard certificate issuance will fail.
@@ -476,12 +469,13 @@ Settings with colons in their names, like `KCert:Route53:EnableRoute53`, are tra
 **Key Environment Variables for ConfigMap Certificate Discovery:**
 
 -   **`KCERT_CONFIGMAP_WATCH_LABEL_KEY`**:
-    -   Sets the label key that KCert looks for on ConfigMaps for secondary filtering (after the required `kcert.dev/cert-request: watch` label).
+    -   Defines the sole label key KCert uses to discover ConfigMaps for certificate management.
     -   Default: `kcert.dev/configmap`
 -   **`KCERT_CONFIGMAP_WATCH_LABEL_VALUE`**:
-    *   Sets the expected value for the label defined by `KCERT_CONFIGMAP_WATCH_LABEL_KEY`.
-    *   Default: `""` (empty string). If empty, any ConfigMap with the `KCERT_CONFIGMAP_WATCH_LABEL_KEY` present (regardless of its value) will be processed (assuming `kcert.dev/cert-request: watch` is also present).
-    *   If set to a specific value (e.g., `"managed"`), the label key must exist and its value must exactly match this setting.
+    *   Defines the required value for the label specified by `KCERT_CONFIGMAP_WATCH_LABEL_KEY`.
+    *   Default: `""` (empty string).
+    *   If empty, KCert processes ConfigMaps that have the `KCERT_CONFIGMAP_WATCH_LABEL_KEY` present, regardless of its value.
+    *   If set to a specific string (e.g., `"managed"`), the ConfigMap must have the label key with this exact value.
 
 For more information see the [official .NET Core documentation](https://docs.microsoft.com/en-us/aspnet/core/fundamentals/configuration/?view=aspnetcore-6.0) on .NET Core configuration and environment variables.
 
