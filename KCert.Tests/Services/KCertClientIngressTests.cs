@@ -14,7 +14,7 @@ public class KCertClientIngressTests
     [TestInitialize]
     public void TestInitialize()
     {
-        _mockK8sClient = new Mock<K8sClient>(null!, null!, null!, null!); // Dependencies not relevant for these tests
+        _mockK8sClient = new Mock<K8sClient>(null!, null!, null!, null!);
         _mockConfig = new Mock<KCertConfig>(Mock.Of<Microsoft.Extensions.Configuration.IConfiguration>());
         
         var mockRenewalLogger = new Mock<ILogger<RenewalHandler>>();
@@ -22,14 +22,14 @@ public class KCertClientIngressTests
         var mockAwsProvider = new Mock<AwsRoute53Provider>(Mock.Of<KCertConfig>(), Mock.Of<ILogger<AwsRoute53Provider>>());
         var mockCfProvider = new Mock<CloudflareProvider>(Mock.Of<KCertConfig>(), Mock.Of<ILogger<CloudflareProvider>>());
         
-        _mockCertClient = new Mock<CertClient>(_mockConfig.Object); // Initialize _mockCertClient before _mockRenewalHandler
+        _mockCertClient = new Mock<CertClient>(_mockConfig.Object);
 
         _mockRenewalHandler = new Mock<RenewalHandler>(
             mockRenewalLogger.Object,
             mockAcmeClient.Object,
             _mockK8sClient.Object,
             _mockConfig.Object,
-            _mockCertClient.Object, // Now _mockCertClient is initialized
+            _mockCertClient.Object,
             mockAwsProvider.Object,
             mockCfProvider.Object
         );
@@ -89,9 +89,22 @@ public class KCertClientIngressTests
             _mockK8sClient.Setup(k => k.DeleteIngressAsync(_mockConfig.Object.KCertNamespace, _mockConfig.Object.KCertIngressName))
                 .Returns(Task.CompletedTask);
             
-            var mockIngress = new k8s.Models.V1Ingress { Metadata = new k8s.Models.V1ObjectMeta { Name = _mockConfig.Object.KCertIngressName, NamespaceProperty = _mockConfig.Object.KCertNamespace }};
-             _mockK8sClient.Setup(k => k.GetIngressAsync(mockIngress.Namespace(), mockIngress.Name()))
-                .ReturnsAsync(new k8s.Models.V1Ingress { Status = new k8s.Models.V1IngressStatus { LoadBalancer = new k8s.Models.V1LoadBalancerStatus { Ingress = new List<k8s.Models.V1LoadBalancerIngress>{ new k8s.Models.V1LoadBalancerIngress { Ip = "1.2.3.4" } } } } } });
+            // Refactored section for mocking the GetIngressAsync call for propagation check
+            var mockIngressMeta = new k8s.Models.V1ObjectMeta 
+            { 
+                Name = _mockConfig.Object.KCertIngressName, 
+                NamespaceProperty = _mockConfig.Object.KCertNamespace 
+            };
+            var mockIngressForLambda = new k8s.Models.V1Ingress { Metadata = mockIngressMeta };
+
+            var ingressIpList = new List<k8s.Models.V1LoadBalancerIngress> { new k8s.Models.V1LoadBalancerIngress { Ip = "1.2.3.4" } };
+            var loadBalancerStatus = new k8s.Models.V1LoadBalancerStatus { Ingress = ingressIpList };
+            var ingressStatus = new k8s.Models.V1IngressStatus { LoadBalancer = loadBalancerStatus };
+            // Ensure the returned Ingress object also has metadata if any part of the code being tested might access it from the result of GetIngressAsync
+            var returnedIngress = new k8s.Models.V1Ingress { Metadata = mockIngressMeta, Status = ingressStatus }; 
+
+            _mockK8sClient.Setup(k => k.GetIngressAsync(mockIngressForLambda.Namespace(), mockIngressForLambda.Name()))
+                .ReturnsAsync(returnedIngress);
         }
 
         await RunRenewCertAsync();
