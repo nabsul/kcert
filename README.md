@@ -66,11 +66,24 @@ KCert can create TLS certificates based on definitions found in Kubernetes `Conf
 
 **Discovery Process:**
 
--   KCert **scans all ConfigMaps** within the namespaces it is configured to monitor.
--   Currently, **no special annotations or labels (like `kcert.dev/configmap: "managed"`) are required** on the ConfigMap for KCert to consider it. The presence of the `data.hosts` key is the sole criterion.
+KCert discovers ConfigMaps that request TLS certificates based on a configurable label. The discovery is controlled by two environment variables:
+
+-   **`KCERT_CONFIGMAP_WATCH_LABEL_KEY`**: Defines the key of the label KCert will look for on ConfigMaps.
+    -   Default: `kcert.dev/configmap`
+-   **`KCERT_CONFIGMAP_WATCH_LABEL_VALUE`**: Defines the expected value for the label identified by `KCERT_CONFIGMAP_WATCH_LABEL_KEY`.
+    -   Default: `""` (empty string)
+
+**Matching Logic:**
+
+-   If `KCERT_CONFIGMAP_WATCH_LABEL_VALUE` is an empty string (default): KCert will process any ConfigMap that has a label key matching the value of `KCERT_CONFIGMAP_WATCH_LABEL_KEY` (e.g., `kcert.dev/configmap`), regardless of that label's value. The mere presence of the key is sufficient.
+-   If `KCERT_CONFIGMAP_WATCH_LABEL_VALUE` is set to a specific string (e.g., `"managed"`, `"true"`): KCert will process only those ConfigMaps that have a label where the key matches `KCERT_CONFIGMAP_WATCH_LABEL_KEY` AND the value of that label exactly matches `KCERT_CONFIGMAP_WATCH_LABEL_VALUE`.
+
 -   If `NamespaceConstraints` are active (see "Namespace-constrained installations" section), the ConfigMap must reside in one of the specified namespaces.
 
 **Example: ConfigMap for `service.example.com`**
+
+This example demonstrates a ConfigMap that KCert would process.
+Assuming default settings (`KCERT_CONFIGMAP_WATCH_LABEL_KEY="kcert.dev/configmap"` and `KCERT_CONFIGMAP_WATCH_LABEL_VALUE=""`), the presence of the `kcert.dev/configmap` label (with any value, here "active") is sufficient.
 
 ```yaml
 apiVersion: v1
@@ -78,22 +91,34 @@ kind: ConfigMap
 metadata:
   name: my-service-tls # This name will be used for the resulting TLS Secret
   namespace: my-app-namespace # Ensure this namespace is monitored by KCert
+  labels:
+    kcert.dev/configmap: "active"      # Processed if KCERT_CONFIGMAP_WATCH_LABEL_VALUE is empty (default)
+                                       # or if KCERT_CONFIGMAP_WATCH_LABEL_VALUE is "active".
+                                       # The key can be changed via KCERT_CONFIGMAP_WATCH_LABEL_KEY.
 data:
   hosts: "service.example.com,service.internal.example.com"
+  # Optional: acmeRenewDays: "15" (Override global renewal threshold for this cert)
+  # Optional: acmeChallengeType: "dns-01" (Override global preferred challenge type for this cert)
 ```
 
 KCert will detect this ConfigMap and attempt to create (or renew) a TLS Secret named `my-service-tls` in the `my-app-namespace` namespace, containing a certificate for `service.example.com` and `service.internal.example.com`.
 
-The `kcert-configmap` Helm chart is a convenient way to create such ConfigMaps:
+The `kcert-configmap` Helm chart can be used to create such ConfigMaps. You would need to ensure the chart allows setting the required label or customize its output.
 ```sh
-helm install my-cert-def nabsul/kcert-configmap -n [TARGET_NAMESPACE] --set name=my-service-tls,hosts="service.example.com,service.internal.example.com"
+# Example using helm, assuming the chart supports setting this label:
+helm install my-cert-def nabsul/kcert-configmap -n [TARGET_NAMESPACE] \
+  --set name=my-service-tls \
+  --set hosts="service.example.com,service.internal.example.com" \
+  --set labels.kcert\.dev/configmap=active 
+  # Adjust label key/value according to your KCert configuration and the chart's actual values structure.
 ```
 Replace `[TARGET_NAMESPACE]` with the namespace where you want the ConfigMap and the resulting Secret to reside.
 
 **Troubleshooting:**
 If KCert doesn't seem to be processing your ConfigMap:
 - Verify the `data.hosts` key exists and is correctly formatted.
-- Check KCert's logs. Enabling Debug logging (e.g., by setting the environment variable `Logging__LogLevel__KCert` to `Debug` for the KCert deployment) will provide more detailed information about the ConfigMap scanning process, including which ConfigMaps are found and why they might be skipped (e.g., missing `data.hosts`, null `Data` section).
+- Ensure the ConfigMap has the label that KCert is configured to watch for, based on the `KCERT_CONFIGMAP_WATCH_LABEL_KEY` and `KCERT_CONFIGMAP_WATCH_LABEL_VALUE` environment variable settings.
+- Check KCert's logs. Enabling Debug logging (e.g., by setting the environment variable `Logging__LogLevel__KCert` to `Debug` for the KCert deployment) will provide more detailed information.
 - Ensure the ConfigMap is in a namespace monitored by KCert, especially if `NamespaceConstraints` are used.
 
 ### Namespace-constrained installations
@@ -282,12 +307,13 @@ kind: ConfigMap
 metadata:
   name: my-example-wildcard-tls # This ConfigMap name will be the Kubernetes Secret name
   # namespace: my-namespace # Optional: specify if not default
-  # No specific annotations or labels are currently required by KCert for ConfigMap discovery.
-  # The presence of 'data.hosts' is the trigger.
+  labels:
+    kcert.dev/configmap: "managed"     # Processed if KCERT_CONFIGMAP_WATCH_LABEL_KEY is "kcert.dev/configmap" (default)
+                                       # AND KCERT_CONFIGMAP_WATCH_LABEL_VALUE is "managed" (or empty, in which case any value for this key works).
 data:
   hosts: "*.example.com,example.com" # Comma-separated list
 ```
-*Note: The ConfigMap's `metadata.name` is used as the Kubernetes Secret name for the certificate. Ensure `data.hosts` is present.*
+*Note: The ConfigMap's `metadata.name` is used as the Kubernetes Secret name for the certificate. Ensure `data.hosts` is present and the label meets KCert's discovery criteria based on its configuration.*
 
 **DNS Provider Setup:**
 Remember to refer to the "DNS Provider Configuration" section to correctly set up AWS Route53 or Cloudflare for DNS-01 challenges. Without a functional DNS provider configuration, wildcard certificate issuance will fail.
@@ -433,13 +459,25 @@ If you have email notifications set up, you will receive a notifications of succ
 
 KCert uses the standard .NET Core configuration library to manage its settings.
 The [appsettings.json](https://github.com/nabsul/kcert/blob/main/appsettings.json)
-contains the full list of settings with reasonable default values. Configuration for DNS providers (Route53, Cloudflare) and preferred challenge type are typically set via environment variables in your Kubernetes deployment.
+contains the full list of settings with reasonable default values. Configuration for DNS providers (Route53, Cloudflare), preferred challenge type, and ConfigMap label filtering are typically set via environment variables in your Kubernetes deployment.
 
 All settings shown in `appsettings.json` can be modified via environment variables.
 For example, you can override the value of the `Acme:RenewalCheckTimeHours` setting
 with a `ACME__RENEWALCHECKTIMEHOURS` environment variable.
 Settings with colons in their names, like `KCert:Route53:EnableRoute53`, are transformed by replacing `:` with `__` (double underscore), e.g., `KCERT__ROUTE53__ENABLEROUTE53`.
-For more information see the [official .NET Core documentation](https://docs.microsoft.com/en-us/aspnet/core/fundamentals/configuration/?view=aspnetcore-6.0).
+
+**Key Environment Variables for ConfigMap Certificate Discovery:**
+
+-   **`KCERT_CONFIGMAP_WATCH_LABEL_KEY`**:
+    -   Defines the sole label key KCert uses to discover ConfigMaps for certificate management.
+    -   Default: `kcert.dev/configmap`
+-   **`KCERT_CONFIGMAP_WATCH_LABEL_VALUE`**:
+    *   Defines the required value for the label specified by `KCERT_CONFIGMAP_WATCH_LABEL_KEY`.
+    *   Default: `""` (empty string).
+    *   If empty, KCert processes ConfigMaps that have the `KCERT_CONFIGMAP_WATCH_LABEL_KEY` present, regardless of its value.
+    *   If set to a specific string (e.g., `"managed"`), the ConfigMap must have the label key with this exact value.
+
+For more information see the [official .NET Core documentation](https://docs.microsoft.com/en-us/aspnet/core/fundamentals/configuration/?view=aspnetcore-6.0) on .NET Core configuration and environment variables.
 
 ### Deployment and Setup Notes for DNS-01
 

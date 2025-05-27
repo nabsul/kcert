@@ -26,16 +26,29 @@ public class CloudflareProvider : IDnsProvider
         _cfg = cfg;
         _log = log;
 
+        _httpClient = null!; // Null forgiving, will be set if config is valid
+
         if (_cfg.EnableCloudflare)
         {
-            if (string.IsNullOrWhiteSpace(_cfg.CloudflareApiToken) || string.IsNullOrWhiteSpace(_cfg.CloudflareAccountId))
+            bool configError = false;
+            if (string.IsNullOrWhiteSpace(_cfg.CloudflareApiToken))
             {
-                _log.LogError("Cloudflare is enabled, but API Token or Account ID is missing in configuration.");
-                _httpClient = new HttpClient(); // Avoid null ref, but it won't be usable
+                _log.LogError("Cloudflare is enabled, but CloudflareApiToken is missing.");
+                configError = true;
+            }
+            if (string.IsNullOrWhiteSpace(_cfg.CloudflareAccountId))
+            {
+                _log.LogError("Cloudflare is enabled, but CloudflareAccountId is missing.");
+                configError = true;
+            }
+
+            if (configError)
+            {
+                // _httpClient remains null
                 return;
             }
 
-            _accountId = _cfg.CloudflareAccountId; // Store accountId, though not used in v4 API for DNS records directly with API Token
+            _accountId = _cfg.CloudflareAccountId;
             _httpClient = new HttpClient
             {
                 BaseAddress = new Uri("https://api.cloudflare.com/client/v4/")
@@ -47,15 +60,21 @@ public class CloudflareProvider : IDnsProvider
         else
         {
             _log.LogInformation("Cloudflare Provider is disabled.");
-            _httpClient = new HttpClient(); // Avoid null ref
+            // _httpClient remains null
         }
     }
 
     private async Task<string?> GetZoneIdAsync(string domainName)
     {
-        if (!_cfg.EnableCloudflare || string.IsNullOrWhiteSpace(_cfg.CloudflareApiToken))
+        if (_httpClient == null)
         {
-            _log.LogWarning("Cloudflare client not available or provider disabled. Cannot get zone ID.");
+            _log.LogError($"Cloudflare client is not initialized due to configuration errors. Cannot get zone ID for {domainName}.");
+            return null;
+        }
+        if (!_cfg.EnableCloudflare)
+        {
+            // This case should ideally be caught by _httpClient == null if constructor logic is sound
+            _log.LogWarning($"Cloudflare provider is disabled. Cannot get zone ID for {domainName}.");
             return null;
         }
 
@@ -111,9 +130,15 @@ public class CloudflareProvider : IDnsProvider
 
     public async Task CreateTxtRecordAsync(string domainName, string recordName, string recordValue)
     {
-        if (!_cfg.EnableCloudflare || string.IsNullOrWhiteSpace(_cfg.CloudflareApiToken))
+        if (_httpClient == null)
         {
-            _log.LogWarning("Cloudflare client not available or provider disabled. Cannot create TXT record.");
+            _log.LogError($"Cloudflare client is not initialized due to configuration errors. Cannot create TXT record for {recordName}.");
+            return;
+        }
+        if (!_cfg.EnableCloudflare)
+        {
+            // This case should ideally be caught by _httpClient == null
+            _log.LogWarning($"Cloudflare provider is disabled. Cannot create TXT record for {recordName}.");
             return;
         }
 
@@ -158,9 +183,15 @@ public class CloudflareProvider : IDnsProvider
 
     public async Task DeleteTxtRecordAsync(string domainName, string recordName, string recordValue)
     {
-        if (!_cfg.EnableCloudflare || string.IsNullOrWhiteSpace(_cfg.CloudflareApiToken))
+        if (_httpClient == null)
         {
-            _log.LogWarning("Cloudflare client not available or provider disabled. Cannot delete TXT record.");
+            _log.LogError($"Cloudflare client is not initialized due to configuration errors. Cannot delete TXT record for {recordName}.");
+            return;
+        }
+        if (!_cfg.EnableCloudflare)
+        {
+            // This case should ideally be caught by _httpClient == null
+            _log.LogWarning($"Cloudflare provider is disabled. Cannot delete TXT record for {recordName}.");
             return;
         }
 
