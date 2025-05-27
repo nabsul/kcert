@@ -57,14 +57,44 @@ helm install myingress1 nabsul/kcert-ingress -n kcert --debug --set name=[INGRES
 
 ### Creating a Certificate via ConfigMap
 
-If you want to create a certificate without creating an ingress, you can do so via a ConfigMap.
-You can create one using the  `kcert-configmap` chart as follows:
+KCert can create TLS certificates based on definitions found in Kubernetes `ConfigMap` resources. This is useful if you need a certificate for a service that doesn't have an Ingress, or if you prefer to manage certificate definitions separately.
 
-```sh
-helm install [VERSION] nabsul/kcert-configmap -n kcert --debug --set name=kcert,hosts=[HOSTS]
+**Key Fields:**
+
+-   **`data.hosts`**: This field is **required** and triggers KCert to process the ConfigMap. It should contain a comma-separated list of hostnames to be included in the certificate (e.g., `service.example.com,api.example.com`).
+-   **`metadata.name`**: The name of the ConfigMap resource will be used as the name for the generated Kubernetes `Secret` containing the TLS certificate and private key.
+
+**Discovery Process:**
+
+-   KCert **scans all ConfigMaps** within the namespaces it is configured to monitor.
+-   Currently, **no special annotations or labels (like `kcert.dev/configmap: "managed"`) are required** on the ConfigMap for KCert to consider it. The presence of the `data.hosts` key is the sole criterion.
+-   If `NamespaceConstraints` are active (see "Namespace-constrained installations" section), the ConfigMap must reside in one of the specified namespaces.
+
+**Example: ConfigMap for `service.example.com`**
+
+```yaml
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: my-service-tls # This name will be used for the resulting TLS Secret
+  namespace: my-app-namespace # Ensure this namespace is monitored by KCert
+data:
+  hosts: "service.example.com,service.internal.example.com"
 ```
 
-An example would be *helm install 1.1.0 nabsul/kcert-configmap -n kcert --debug --set name=kcert,hosts="www.yourdomain.duckdns.org"*
+KCert will detect this ConfigMap and attempt to create (or renew) a TLS Secret named `my-service-tls` in the `my-app-namespace` namespace, containing a certificate for `service.example.com` and `service.internal.example.com`.
+
+The `kcert-configmap` Helm chart is a convenient way to create such ConfigMaps:
+```sh
+helm install my-cert-def nabsul/kcert-configmap -n [TARGET_NAMESPACE] --set name=my-service-tls,hosts="service.example.com,service.internal.example.com"
+```
+Replace `[TARGET_NAMESPACE]` with the namespace where you want the ConfigMap and the resulting Secret to reside.
+
+**Troubleshooting:**
+If KCert doesn't seem to be processing your ConfigMap:
+- Verify the `data.hosts` key exists and is correctly formatted.
+- Check KCert's logs. Enabling Debug logging (e.g., by setting the environment variable `Logging__LogLevel__KCert` to `Debug` for the KCert deployment) will provide more detailed information about the ConfigMap scanning process, including which ConfigMaps are found and why they might be skipped (e.g., missing `data.hosts`, null `Data` section).
+- Ensure the ConfigMap is in a namespace monitored by KCert, especially if `NamespaceConstraints` are used.
 
 ### Namespace-constrained installations
 
@@ -252,12 +282,12 @@ kind: ConfigMap
 metadata:
   name: my-example-wildcard-tls # This ConfigMap name will be the Kubernetes Secret name
   # namespace: my-namespace # Optional: specify if not default
-  annotations:
-    kcert.dev/configmap: "managed" # Required for KCert to manage this ConfigMap
+  # No specific annotations or labels are currently required by KCert for ConfigMap discovery.
+  # The presence of 'data.hosts' is the trigger.
 data:
   hosts: "*.example.com,example.com" # Comma-separated list
 ```
-*Note: Ensure `kcert.dev/configmap: "managed"` annotation is present. The ConfigMap's name is used as the Kubernetes secret name for the certificate.*
+*Note: The ConfigMap's `metadata.name` is used as the Kubernetes Secret name for the certificate. Ensure `data.hosts` is present.*
 
 **DNS Provider Setup:**
 Remember to refer to the "DNS Provider Configuration" section to correctly set up AWS Route53 or Cloudflare for DNS-01 challenges. Without a functional DNS provider configuration, wildcard certificate issuance will fail.
