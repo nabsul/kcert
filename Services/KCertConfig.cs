@@ -52,6 +52,9 @@ public class KCertConfig(IConfiguration cfg)
 
     public string IngressLabelValue => GetRequiredString("ChallengeIngress:IngressLabelValue");
 
+    public string ConfigMapWatchLabelKey { get; } = Environment.GetEnvironmentVariable("KCERT_CONFIGMAP_WATCH_LABEL_KEY") ?? "kcert.dev/configmap";
+    public string ConfigMapWatchLabelValue { get; } = Environment.GetEnvironmentVariable("KCERT_CONFIGMAP_WATCH_LABEL_VALUE") ?? "";
+
     // AWS Route53 Configuration
     public bool EnableRoute53 => GetBool("KCert:Route53:EnableRoute53");
     public string? Route53AccessKeyId => GetString("KCert:Route53:AccessKeyId");
