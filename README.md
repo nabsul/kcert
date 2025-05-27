@@ -162,7 +162,7 @@ All settings are configured via environment variables, following the .NET Core c
 
 #### Global DNS Settings
 
--   **`KCert:PreferredChallengeType`** (`KCERT__PREFERREDCHallenGETYPE` env var):
+-   **`KCert:PreferredChallengeType`** (`KCERT__PREFERREDCHALLENGETYPE` env var):
     -   Specifies the preferred ACME challenge type.
     -   Possible values:
         -   `"http-01"` (Default): Uses the traditional HTTP-01 challenge, requiring the KCert service to be reachable via an Ingress for challenge validation.
