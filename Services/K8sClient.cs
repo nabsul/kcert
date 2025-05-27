@@ -13,6 +13,8 @@ public class K8sClient(KCertConfig cfg, Kubernetes client)
     private const string CertLabelKey = "kcert.dev/secret";
     public const string IngressLabelKey = "kcert.dev/ingress";
     private const string TlsTypeSelector = "type=kubernetes.io/tls";
+    private const string ConfigMapAnnotationKey = "kcert.dev/configmap";
+    private const string ConfigMapAnnotationValue = "managed";
 
     private string IngressLabel => $"{IngressLabelKey}={cfg.IngressLabelValue}";
     private string ConfigMapLabel => $"{K8sWatchClient.CertRequestKey}={K8sWatchClient.CertRequestValue}";
@@ -28,12 +30,21 @@ public class K8sClient(KCertConfig cfg, Kubernetes client)
     private Task<V1IngressList> GetAllIngressesAsync(string? tok) => client.ListIngressForAllNamespacesAsync(labelSelector: IngressLabel, continueParameter: tok);
     private Task<V1IngressList> GetNsIngressesAsync(string ns, string? tok) => client.ListNamespacedIngressAsync(ns, labelSelector: IngressLabel, continueParameter: tok);
 
-    public IAsyncEnumerable<V1ConfigMap> GetAllConfigMapsAsync()
+    public async IAsyncEnumerable<V1ConfigMap> GetAllConfigMapsAsync()
     {
-        return IterateAsync<V1ConfigMap, V1ConfigMapList>(GetAllConfigMapsAsync, GetNsConfigMapsAsync);
+        var configMaps = IterateAsync<V1ConfigMap, V1ConfigMapList>(GetAllConfigMapsInternalAsync, GetNsConfigMapsAsync);
+        await foreach (var cm in configMaps)
+        {
+            if (cm.Metadata?.Annotations != null &&
+                cm.Metadata.Annotations.TryGetValue(ConfigMapAnnotationKey, out var value) &&
+                value == ConfigMapAnnotationValue)
+            {
+                yield return cm;
+            }
+        }
     }
 
-    private Task<V1ConfigMapList> GetAllConfigMapsAsync(string? tok) => client.ListConfigMapForAllNamespacesAsync(labelSelector: ConfigMapLabel, continueParameter: tok);
+    private Task<V1ConfigMapList> GetAllConfigMapsInternalAsync(string? tok) => client.ListConfigMapForAllNamespacesAsync(labelSelector: ConfigMapLabel, continueParameter: tok);
     private Task<V1ConfigMapList> GetNsConfigMapsAsync(string ns, string? tok) => client.ListNamespacedConfigMapAsync(ns, labelSelector: ConfigMapLabel, continueParameter: tok);
 
     public IAsyncEnumerable<V1Secret> GetManagedSecretsAsync()
