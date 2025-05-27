@@ -13,8 +13,6 @@ public class K8sClient(KCertConfig cfg, Kubernetes client)
     private const string CertLabelKey = "kcert.dev/secret";
     public const string IngressLabelKey = "kcert.dev/ingress";
     private const string TlsTypeSelector = "type=kubernetes.io/tls";
-    private const string ConfigMapAnnotationKey = "kcert.dev/configmap";
-    private const string ConfigMapAnnotationValue = "managed";
 
     private string IngressLabel => $"{IngressLabelKey}={cfg.IngressLabelValue}";
     private string ConfigMapLabel => $"{K8sWatchClient.CertRequestKey}={K8sWatchClient.CertRequestValue}";
@@ -35,11 +33,13 @@ public class K8sClient(KCertConfig cfg, Kubernetes client)
         var configMaps = IterateAsync<V1ConfigMap, V1ConfigMapList>(GetAllConfigMapsInternalAsync, GetNsConfigMapsAsync);
         await foreach (var cm in configMaps)
         {
-            if (cm.Metadata?.Annotations != null &&
-                cm.Metadata.Annotations.TryGetValue(ConfigMapAnnotationKey, out var value) &&
-                value == ConfigMapAnnotationValue)
+            if (cm.Metadata?.Labels != null &&
+                cm.Metadata.Labels.TryGetValue(cfg.ConfigMapWatchLabelKey, out var labelValue))
             {
-                yield return cm;
+                if (string.IsNullOrEmpty(cfg.ConfigMapWatchLabelValue) || labelValue == cfg.ConfigMapWatchLabelValue)
+                {
+                    yield return cm;
+                }
             }
         }
     }
