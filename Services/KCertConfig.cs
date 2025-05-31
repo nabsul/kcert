@@ -86,7 +86,6 @@ public class KCertConfig(IConfiguration cfg)
         },
     };
 
-
     private static string HideString(string? val) => string.IsNullOrEmpty(val) ? "" : "[REDACTED]";
     private string? GetString(string key) => cfg.GetValue<string>(key);
     private string GetRequiredString(string key) => cfg.GetValue<string>(key) ?? throw new Exception($"[{key}] must be defined");
