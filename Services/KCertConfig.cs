@@ -28,6 +28,7 @@ public class KCertConfig(IConfiguration cfg)
 
     public TimeSpan ChallengeIngressMaxPropagationWaitTime => TimeSpan.FromSeconds(GetInt("ChallengeIngress:MaxPropagationWaitTimeSeconds"));
     public TimeSpan ChallengeIngressPropagationCheckInterval => TimeSpan.FromMilliseconds(GetInt("ChallengeIngress:PropagationCheckIntervalMilliseconds"));
+    public bool SkipIngressPropagationCheck => GetBool("ChallengeIngress:SkipIngressPropagationCheck");
 
     public TimeSpan AcmeWaitTime => TimeSpan.FromSeconds(cfg.GetValue<int>("Acme:ValidationWaitTimeSeconds"));
     public int AcmeNumRetries => cfg.GetValue<int>("Acme:ValidationNumRetries");
