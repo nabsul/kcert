@@ -36,7 +36,7 @@ public class AcmeClient(CertClient cert, KCertConfig cfg)
             throw new Exception(message);
         }
 
-        using var stream = await resp.Content.ReadAsStreamAsync();
+        await using var stream = await resp.Content.ReadAsStreamAsync();
         _dir = await JsonSerializer.DeserializeAsync<AcmeDirectoryResponse>(stream, options);
     }
 
@@ -46,11 +46,22 @@ public class AcmeClient(CertClient cert, KCertConfig cfg)
         return _dir?.Meta?.TermsOfService ?? throw new Exception("_dir should be defined here");
     }
 
-    public async Task<AcmeAccountResponse> CreateAccountAsync(string nonce)
+    public async Task<AcmeAccountResponse> GetAccountAsync(string nonce)
     {
         var uri = new Uri(_dir?.NewAccount ?? throw new Exception("_dir should be defined here"));
-        var payload = GetAccountRequestPayload(uri);
-        return await PostAsync<AcmeAccountResponse>(cfg.AcmeKey, uri, payload, nonce);
+        try
+        {
+            // Try searching for account before account creation.
+            // This is needed for the Venafi implementation of ACME
+            // since they do NOT follow RFC8555 Section 7.3.1
+            return await PostAsync<AcmeAccountResponse>(cfg.AcmeKey, uri, new { onlyReturnExisting = true }, nonce);
+        }
+        catch (AcmeException ex) when (cfg.AcmeEnableAccountCreation && ex.Error.Type == "urn:ietf:params:acme:error:accountDoesNotExist")
+        {
+            nonce = await GetNonceAsync();
+            var payload = GetAccountRequestPayload(uri);
+            return await PostAsync<AcmeAccountResponse>(cfg.AcmeKey, uri, payload, nonce);
+        }
     }
 
     private object GetAccountRequestPayload(Uri uri)
@@ -192,6 +203,18 @@ public class AcmeClient(CertClient cert, KCertConfig cfg)
         if (!resp.IsSuccessStatusCode)
         {
             var content = await resp.Content.ReadAsStringAsync();
+            AcmeError? error = null;
+            try
+            {
+                error = JsonSerializer.Deserialize<AcmeError>(content, options);
+            }
+            catch
+            {
+                // Do nothing
+            }
+
+            if (error != null)
+                throw new AcmeException { Error = error };
             throw new Exception($"Request failed with status {resp.StatusCode} and content: {content}");
         }
     }
@@ -205,4 +228,6 @@ public class AcmeClient(CertClient cert, KCertConfig cfg)
 
         return headers.First();
     }
+    
+
 }

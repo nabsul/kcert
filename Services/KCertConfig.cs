@@ -40,6 +40,8 @@ public class KCertConfig(IConfiguration cfg)
     public string AcmeEmail => GetRequiredString("Acme:Email");
     public string AcmeKey => GetString("Acme:Key") ?? _key; // If no key is provided via configs, use generated key.
     public bool AcmeAccepted => GetBool("Acme:TermsAccepted");
+    
+    public bool AcmeEnableAccountCreation => cfg.GetValue<bool?>("Acme:EnableAccountCreation") ?? true;
 
     public string? AcmeEabKeyId => GetString("Acme:EabKeyId");
     public string? AcmeHmacKey => GetString("Acme:EabHmacKey");
