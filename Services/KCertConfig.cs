@@ -52,6 +52,23 @@ public class KCertConfig(IConfiguration cfg)
 
     public string IngressLabelValue => GetRequiredString("ChallengeIngress:IngressLabelValue");
 
+    public string ConfigMapWatchLabelKey { get; } = Environment.GetEnvironmentVariable("KCERT_CONFIGMAP_WATCH_LABEL_KEY") ?? "kcert.dev/configmap";
+    public string ConfigMapWatchLabelValue { get; } = Environment.GetEnvironmentVariable("KCERT_CONFIGMAP_WATCH_LABEL_VALUE") ?? "";
+
+    // AWS Route53 Configuration
+    public bool EnableRoute53 => GetBool("KCert:Route53:EnableRoute53");
+    public string? Route53AccessKeyId => GetString("KCert:Route53:AccessKeyId");
+    public string? Route53SecretAccessKey => GetString("KCert:Route53:SecretAccessKey");
+    public string? Route53Region => EnableRoute53 ? GetRequiredString("KCert:Route53:Region") : GetString("KCert:Route53:Region");
+
+    // Cloudflare Configuration
+    public bool EnableCloudflare => GetBool("KCert:Cloudflare:EnableCloudflare");
+    public string? CloudflareApiToken => GetString("KCert:Cloudflare:ApiToken");
+    public string? CloudflareAccountId => EnableCloudflare ? GetRequiredString("KCert:Cloudflare:AccountId") : GetString("KCert:Cloudflare:AccountId");
+
+    // Preferred Challenge Type
+    public string PreferredChallengeType => GetString("KCert:PreferredChallengeType") ?? "http-01";
+
     public object AllConfigs => new
     {
         KCert = new
@@ -63,6 +80,7 @@ public class KCertConfig(IConfiguration cfg)
             ServicePort = KCertServicePort,
             ShowRenewButton,
             NamespaceConstraints,
+            PreferredChallengeType = PreferredChallengeType,
         },
         ACME = new
         {
@@ -84,6 +102,19 @@ public class KCertConfig(IConfiguration cfg)
             User = HideString(SmtpUser),
             Pass = HideString(SmtpPass)
         },
+        Route53 = new
+        {
+            EnableRoute53 = EnableRoute53,
+            AccessKeyId = HideString(Route53AccessKeyId),
+            SecretAccessKey = HideString(Route53SecretAccessKey),
+            Region = Route53Region,
+        },
+        Cloudflare = new
+        {
+            EnableCloudflare = EnableCloudflare,
+            ApiToken = HideString(CloudflareApiToken),
+            AccountId = CloudflareAccountId,
+        }
     };
 
     private static string HideString(string? val) => string.IsNullOrEmpty(val) ? "" : "[REDACTED]";
