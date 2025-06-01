@@ -101,7 +101,15 @@ public class RenewalHandler(ILogger<RenewalHandler> log, AcmeClient acme, K8sCli
         {
             await Task.Delay(waitTime);
             finalize = await acme.GetOrderAsync(key, orderUri, kid, finalize.Nonce);
-            logbuf.LogInformation("Check Order {orderUri}: {finalize.Status}", orderUri, finalize.Status);
+            
+            if (finalize.Error is { } error)
+            {
+                logbuf.LogWarning("Check Order {orderUri}: {finalize.Status}\nError: {error}", orderUri, finalize.Status, error);
+            }
+            else
+            {
+                logbuf.LogInformation("Check Order {orderUri}: {finalize.Status}", orderUri, finalize.Status);
+            }
         }
 
         if (finalize.Status != "valid")
