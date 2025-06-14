@@ -8,7 +8,7 @@ KCert is a simple alternative to [cert-manager](https://github.com/jetstack/cert
 
 ## How it Works
 
-- KCert runs as a single-replica deployment in your cluster
+- KCert runs as a single-replica deployment in your cluster.
 - By default, an ingress is managed to route `/.well-known/acme-challenge/` requests to the kcert service for HTTP-01 challenges.
 - Alternatively, KCert now supports DNS-01 challenges with AWS Route53 and Cloudflare, which may not require managing a public-facing ingress for challenges.
 - Service provides a web UI for basic information and configuration details.
