@@ -73,10 +73,33 @@ public class KCertClient
 
         try
         {
-            await AddChallengeHostsAsync(hosts);
-            tok.ThrowIfCancellationRequested();
+            bool shouldManageHttpChallengeIngress = true;
+            if (_cfg.PreferredChallengeType?.ToLower() == "dns-01" && (_cfg.EnableRoute53 || _cfg.EnableCloudflare))
+            {
+                shouldManageHttpChallengeIngress = false;
+                _log.LogInformation("DNS-01 is preferred and a DNS provider is enabled. Skipping HTTP challenge Ingress setup for hosts: {hosts}", string.Join(", ", hosts));
+            }
+
+            if (shouldManageHttpChallengeIngress)
+            {
+                _log.LogInformation("HTTP-01 challenge Ingress will be managed for hosts: {hosts}", string.Join(", ", hosts));
+                await AddChallengeHostsAsync(hosts);
+                tok.ThrowIfCancellationRequested();
+            }
+            
             await _getCert.RenewCertAsync(ns, secretName, hosts);
-            await _kube.DeleteIngressAsync(_cfg.KCertNamespace, _cfg.KCertIngressName);
+            tok.ThrowIfCancellationRequested();
+
+            if (shouldManageHttpChallengeIngress)
+            {
+                _log.LogInformation("Deleting HTTP challenge Ingress for hosts: {hosts}", string.Join(", ", hosts));
+                await _kube.DeleteIngressAsync(_cfg.KCertNamespace, _cfg.KCertIngressName);
+            }
+            else
+            {
+                _log.LogInformation("Skipping deletion of HTTP challenge Ingress as it was not managed for hosts: {hosts}", string.Join(", ", hosts));
+            }
+            
             await _email.NotifyRenewalResultAsync(ns, secretName, null);
             tok.ThrowIfCancellationRequested();
         }
