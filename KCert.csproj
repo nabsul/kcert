@@ -10,6 +10,7 @@
   <ItemGroup>
     <PackageReference Include="KubernetesClient" Version="13.0.11" />
     <PackageReference Include="System.Linq.Async" Version="6.0.1" />
+    <PackageReference Include="AWSSDK.Route53" Version="3.7.300.1" />
   </ItemGroup>
 
 </Project>
