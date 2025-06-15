@@ -57,9 +57,9 @@ public class KCertConfig(IConfiguration cfg)
 
     // AWS Route53 Configuration
     public bool EnableRoute53 => GetBool("KCert:Route53:EnableRoute53");
-    public string? Route53AccessKeyId => GetString("KCert:Route53:AccessKeyId");
-    public string? Route53SecretAccessKey => GetString("KCert:Route53:SecretAccessKey");
-    public string? Route53Region => EnableRoute53 ? GetRequiredString("KCert:Route53:Region") : GetString("KCert:Route53:Region");
+    public string Route53AccessKeyId => GetRequiredString("KCert:Route53:AccessKeyId");
+    public string Route53SecretAccessKey => GetRequiredString("KCert:Route53:SecretAccessKey");
+    public string Route53Region => GetRequiredString("KCert:Route53:Region");
 
     // Cloudflare Configuration
     public bool EnableCloudflare => GetBool("KCert:Cloudflare:EnableCloudflare");

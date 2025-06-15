@@ -1,126 +1,39 @@
 using Amazon;
 using Amazon.Route53;
 using Amazon.Route53.Model;
-using KCert.Models; // Assuming CertClient is in here for GenerateNewKey, or some other model
-using Microsoft.Extensions.Logging;
-using System;
-using System.Collections.Generic;
-using System.Linq;
-using System.Threading.Tasks;
 
 namespace KCert.Services;
 
 [Service]
-public class AwsRoute53Provider : IDnsProvider
+public class AwsRoute53Provider(KCertConfig cfg, ILogger<AwsRoute53Provider> log) : IDnsProvider
 {
-    private readonly KCertConfig _cfg;
-    private readonly ILogger<AwsRoute53Provider> _log;
-    private readonly AmazonRoute53Client? _route53Client;
-
-    public AwsRoute53Provider(KCertConfig cfg, ILogger<AwsRoute53Provider> log)
-    {
-        _cfg = cfg;
-        _log = log;
-
-        if (_cfg.EnableRoute53)
-        {
-            bool configError = false;
-            if (string.IsNullOrWhiteSpace(_cfg.Route53AccessKeyId))
-            {
-                _log.LogError("AWS Route53 is enabled, but Route53AccessKeyId is missing.");
-                configError = true;
-            }
-            if (string.IsNullOrWhiteSpace(_cfg.Route53SecretAccessKey))
-            {
-                _log.LogError("AWS Route53 is enabled, but Route53SecretAccessKey is missing.");
-                configError = true;
-            }
-            if (string.IsNullOrWhiteSpace(_cfg.Route53Region))
-            {
-                _log.LogError("AWS Route53 is enabled, but Route53Region is missing.");
-                configError = true;
-            }
-
-            if (configError)
-            {
-                _route53Client = null;
-                return;
-            }
-
-            try
-            {
-                var awsCredentials = new Amazon.Runtime.BasicAWSCredentials(_cfg.Route53AccessKeyId, _cfg.Route53SecretAccessKey);
-                _route53Client = new AmazonRoute53Client(awsCredentials, RegionEndpoint.GetBySystemName(_cfg.Route53Region));
-                _log.LogInformation("AWS Route53 Provider initialized.");
-            }
-            catch (Exception ex)
-            {
-                _log.LogError(ex, "Error initializing AWS Route53 client.");
-                _route53Client = null;
-            }
-        }
-        else
-        {
-            _log.LogInformation("AWS Route53 Provider is disabled.");
-        }
+    private static AmazonRoute53Client GetClient(string id, string key, string region) {
+        var awsCredentials = new Amazon.Runtime.BasicAWSCredentials(id, key);
+        return new AmazonRoute53Client(awsCredentials, RegionEndpoint.GetBySystemName(region));
     }
 
-    private async Task<string?> GetHostedZoneIdAsync(string domainName)
+    private readonly AmazonRoute53Client _client = GetClient(cfg.Route53AccessKeyId, cfg.Route53SecretAccessKey, cfg.Route53Region);
+
+    private async Task<string> GetHostedZoneIdAsync(string domainName)
     {
-        if (_route53Client == null)
-        {
-            _log.LogError($"Route53 client is not initialized due to configuration errors. Cannot get hosted zone ID for {domainName}.");
-            return null;
-        }
-        if (!_cfg.EnableRoute53)
-        {
-            _log.LogWarning($"Route53 provider is disabled. Cannot get hosted zone ID for {domainName}.");
-            return null;
-        }
+        var zonesResponse = await _client.ListHostedZonesAsync();
 
         try
         {
-            var zonesResponse = await _route53Client.ListHostedZonesAsync();
-            var bestMatch = zonesResponse.HostedZones
+            return zonesResponse.HostedZones
                 .Where(z => domainName.EndsWith(z.Name.TrimEnd('.')))
                 .OrderByDescending(z => z.Name.Length)
-                .FirstOrDefault();
-
-            if (bestMatch != null)
-            {
-                _log.LogInformation($"Found hosted zone ID {bestMatch.Id} for domain {domainName}");
-                return bestMatch.Id;
-            }
-
-            _log.LogWarning($"No hosted zone found for domain {domainName}");
-            return null;
+                .First().Id;
         }
         catch (Exception ex)
         {
-            _log.LogError(ex, $"Error getting hosted zone ID for domain {domainName}");
-            return null;
+            throw new InvalidOperationException($"No hosted zone found for domain {domainName}. Ensure the domain is managed by Route53.", ex);
         }
     }
 
     public async Task CreateTxtRecordAsync(string domainName, string recordName, string recordValue)
     {
-        if (_route53Client == null)
-        {
-            _log.LogError($"Route53 client is not initialized due to configuration errors. Cannot create TXT record for {recordName}.");
-            return;
-        }
-        if (!_cfg.EnableRoute53)
-        {
-            _log.LogWarning($"Route53 provider is disabled. Cannot create TXT record for {recordName}.");
-            return;
-        }
-
         var hostedZoneId = await GetHostedZoneIdAsync(domainName);
-        if (string.IsNullOrEmpty(hostedZoneId))
-        {
-            _log.LogError($"Cannot create TXT record for {recordName}. Hosted zone ID not found for domain {domainName}.");
-            return;
-        }
 
         // TXT record values need to be enclosed in quotes.
         var properlyQuotedValue = $"\"{recordValue.Replace("\"", "\\\"")}\"";
@@ -133,46 +46,35 @@ public class AwsRoute53Provider : IDnsProvider
                 Name = recordName,
                 Type = RRType.TXT,
                 TTL = 60, // Low TTL for ACME challenges
-                ResourceRecords = new List<ResourceRecord> { new ResourceRecord { Value = properlyQuotedValue } }
+                ResourceRecords = [new ResourceRecord { Value = properlyQuotedValue }]
             }
         };
 
         var request = new ChangeResourceRecordSetsRequest
         {
             HostedZoneId = hostedZoneId,
-            ChangeBatch = new ChangeBatch(new List<Change> { change })
+            ChangeBatch = new ChangeBatch([change])
         };
 
         try
         {
-            _log.LogInformation($"Attempting to create/update TXT record: {recordName} with value: {properlyQuotedValue} in zone {hostedZoneId}");
-            var response = await _route53Client.ChangeResourceRecordSetsAsync(request);
-            _log.LogInformation($"Successfully sent request to create/update TXT record {recordName}. Status: {response.ChangeInfo.Status}, ID: {response.ChangeInfo.Id}");
+            log.LogInformation("Attempting to create/update TXT record: {recordName} with value: {properlyQuotedValue} in zone {hostedZoneId}", recordName, properlyQuotedValue, hostedZoneId);
+            var response = await _client.ChangeResourceRecordSetsAsync(request);
+            log.LogInformation("Successfully sent request to create/update TXT record {recordName}. Status: {response.ChangeInfo.Status}, ID: {response.ChangeInfo.Id}", recordName, response.ChangeInfo.Status, response.ChangeInfo.Id);
             // Optionally, wait for the change to propagate if needed, though ACME validation usually handles this.
         }
         catch (Exception ex)
         {
-            _log.LogError(ex, $"Error creating/updating TXT record {recordName} in zone {hostedZoneId}");
+            throw new Exception($"Error creating/updating TXT record {recordName} in zone {hostedZoneId}", ex);
         }
     }
 
     public async Task DeleteTxtRecordAsync(string domainName, string recordName, string recordValue)
     {
-        if (_route53Client == null)
-        {
-            _log.LogError($"Route53 client is not initialized due to configuration errors. Cannot delete TXT record for {recordName}.");
-            return;
-        }
-        if (!_cfg.EnableRoute53)
-        {
-            _log.LogWarning($"Route53 provider is disabled. Cannot delete TXT record for {recordName}.");
-            return;
-        }
-
         var hostedZoneId = await GetHostedZoneIdAsync(domainName);
         if (string.IsNullOrEmpty(hostedZoneId))
         {
-            _log.LogError($"Cannot delete TXT record for {recordName}. Hosted zone ID not found for domain {domainName}.");
+            log.LogError("Cannot delete TXT record for {recordName}. Hosted zone ID not found for domain {domainName}.", recordName, domainName);
             return;
         }
 
@@ -186,21 +88,21 @@ public class AwsRoute53Provider : IDnsProvider
                 Name = recordName,
                 Type = RRType.TXT,
                 TTL = 60, 
-                ResourceRecords = new List<ResourceRecord> { new ResourceRecord { Value = properlyQuotedValue } }
+                ResourceRecords = [new ResourceRecord { Value = properlyQuotedValue }]
             }
         };
 
         var request = new ChangeResourceRecordSetsRequest
         {
             HostedZoneId = hostedZoneId,
-            ChangeBatch = new ChangeBatch(new List<Change> { change })
+            ChangeBatch = new ChangeBatch([change])
         };
 
         try
         {
-            _log.LogInformation($"Attempting to delete TXT record: {recordName} with value: {properlyQuotedValue} in zone {hostedZoneId}");
-            var response = await _route53Client.ChangeResourceRecordSetsAsync(request);
-            _log.LogInformation($"Successfully sent request to delete TXT record {recordName}. Status: {response.ChangeInfo.Status}, ID: {response.ChangeInfo.Id}");
+            log.LogInformation("Attempting to delete TXT record: {recordName} with value: {properlyQuotedValue} in zone {hostedZoneId}", recordName, properlyQuotedValue, hostedZoneId);
+            var response = await _client.ChangeResourceRecordSetsAsync(request);
+            log.LogInformation("Successfully sent request to delete TXT record {recordName}. Status: {response.ChangeInfo.Status}, ID: {response.ChangeInfo.Id}", recordName, response.ChangeInfo.Status, response.ChangeInfo.Id);
         }
         catch (InvalidChangeBatchException ex)
         {
@@ -208,16 +110,16 @@ public class AwsRoute53Provider : IDnsProvider
             // Check if it's a "tried to delete resource record set that does not exist" error
             if (ex.Message.Contains("tried to delete resource record set") && ex.Message.Contains("but it was not found"))
             {
-                _log.LogWarning($"Attempted to delete TXT record {recordName} but it was not found or already deleted. This may be normal.");
+                log.LogWarning("Attempted to delete TXT record {recordName} but it was not found or already deleted. This may be normal.", recordName);
             }
             else
             {
-                _log.LogError(ex, $"Error deleting TXT record {recordName} in zone {hostedZoneId}. InvalidChangeBatchException.");
+                log.LogError(ex, "Error deleting TXT record {recordName} in zone {hostedZoneId}. InvalidChangeBatchException.", recordName, hostedZoneId);
             }
         }
         catch (Exception ex)
         {
-            _log.LogError(ex, $"Error deleting TXT record {recordName} in zone {hostedZoneId}");
+            throw new Exception($"Error deleting TXT record {recordName} in zone {hostedZoneId}", ex);
         }
     }
 }
