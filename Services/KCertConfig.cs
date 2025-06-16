@@ -63,8 +63,8 @@ public class KCertConfig(IConfiguration cfg)
 
     // Cloudflare Configuration
     public bool EnableCloudflare => GetBool("KCert:Cloudflare:EnableCloudflare");
-    public string? CloudflareApiToken => GetString("KCert:Cloudflare:ApiToken");
-    public string? CloudflareAccountId => EnableCloudflare ? GetRequiredString("KCert:Cloudflare:AccountId") : GetString("KCert:Cloudflare:AccountId");
+    public string CloudflareApiToken => GetRequiredString("KCert:Cloudflare:ApiToken");
+    public string CloudflareAccountId => GetRequiredString("KCert:Cloudflare:AccountId");
 
     // Preferred Challenge Type
     public string PreferredChallengeType => GetString("KCert:PreferredChallengeType") ?? "http-01";
@@ -104,14 +104,12 @@ public class KCertConfig(IConfiguration cfg)
         },
         Route53 = new
         {
-            EnableRoute53 = EnableRoute53,
-            AccessKeyId = HideString(Route53AccessKeyId),
-            SecretAccessKey = HideString(Route53SecretAccessKey),
+            AccessKeyId = GetString("KCert:Route53:AccessKeyId"),
+            SecretAccessKey = HideString(GetString("KCert:Route53:SecretAccessKey")),
             Region = Route53Region,
         },
         Cloudflare = new
         {
-            EnableCloudflare = EnableCloudflare,
             ApiToken = HideString(CloudflareApiToken),
             AccountId = CloudflareAccountId,
         }
