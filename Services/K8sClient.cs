@@ -3,13 +3,11 @@ using k8s.Autorest;
 using k8s.Models;
 using System.Net;
 using System.Text;
-using System.Text.Json;
-using Microsoft.Extensions.Logging;
 
 namespace KCert.Services;
 
 [Service]
-public class K8sClient(KCertConfig cfg, Kubernetes client, ILogger<K8sClient> log)
+public class K8sClient(KCertConfig cfg, Kubernetes client)
 {
     private const string TlsSecretType = "kubernetes.io/tls";
     private const string CertLabelKey = "kcert.dev/secret";
@@ -30,55 +28,13 @@ public class K8sClient(KCertConfig cfg, Kubernetes client, ILogger<K8sClient> lo
     private Task<V1IngressList> GetAllIngressesAsync(string? tok) => client.ListIngressForAllNamespacesAsync(labelSelector: IngressLabel, continueParameter: tok);
     private Task<V1IngressList> GetNsIngressesAsync(string ns, string? tok) => client.ListNamespacedIngressAsync(ns, labelSelector: IngressLabel, continueParameter: tok);
 
-    public async IAsyncEnumerable<V1ConfigMap> GetAllConfigMapsAsync()
+    public IAsyncEnumerable<V1ConfigMap> GetAllConfigMapsAsync()
     {
-        log.LogInformation("GetAllConfigMapsAsync: Starting.");
-        var receivedCount = 0;
-
-        string currentSelector = string.IsNullOrEmpty(cfg.ConfigMapWatchLabelValue) ? cfg.ConfigMapWatchLabelKey : $"{cfg.ConfigMapWatchLabelKey}={cfg.ConfigMapWatchLabelValue}";
-        log.LogInformation("GetAllConfigMapsAsync: Using API label selector: \"{selector}\"", currentSelector);
-
-        IAsyncEnumerable<V1ConfigMap> configMaps = IterateAsync<V1ConfigMap, V1ConfigMapList>(GetAllConfigMapsInternalAsync, GetNsConfigMapsAsync);
-
-        await foreach (var cm in configMaps)
-        {
-            receivedCount++;
-            log.LogInformation("GetAllConfigMapsAsync: Processing ConfigMap #{Count} - {Namespace}/{Name} (matched API label selector)", receivedCount, cm.Namespace(), cm.Name());
-            log.LogDebug("GetAllConfigMapsAsync: Labels for {Namespace}/{Name}: {Labels}", cm.Namespace(), cm.Name(), JsonSerializer.Serialize(cm.Metadata?.Labels ?? new Dictionary<string, string>()));
-            log.LogInformation("GetAllConfigMapsAsync: Yielding ConfigMap {Namespace}/{Name}", cm.Namespace(), cm.Name());
-            yield return cm;
-        }
-
-        log.LogInformation("GetAllConfigMapsAsync: Finished. Fetched and yielded {Count} ConfigMaps matching selector key='{Key}' value='{Value}'.", receivedCount, cfg.ConfigMapWatchLabelKey, cfg.ConfigMapWatchLabelValue);
+        return IterateAsync<V1ConfigMap, V1ConfigMapList>(GetAllConfigMapsAsync, GetNsConfigMapsAsync);
     }
 
-    private Task<V1ConfigMapList> GetAllConfigMapsInternalAsync(string? tok)
-    {
-        string newLabelSelector;
-        if (string.IsNullOrEmpty(cfg.ConfigMapWatchLabelValue))
-        {
-            newLabelSelector = cfg.ConfigMapWatchLabelKey;
-        }
-        else
-        {
-            newLabelSelector = $"{cfg.ConfigMapWatchLabelKey}={cfg.ConfigMapWatchLabelValue}";
-        }
-        return client.ListConfigMapForAllNamespacesAsync(labelSelector: newLabelSelector, continueParameter: tok);
-    }
-
-    private Task<V1ConfigMapList> GetNsConfigMapsAsync(string ns, string? tok)
-    {
-        string newLabelSelector;
-        if (string.IsNullOrEmpty(cfg.ConfigMapWatchLabelValue))
-        {
-            newLabelSelector = cfg.ConfigMapWatchLabelKey;
-        }
-        else
-        {
-            newLabelSelector = $"{cfg.ConfigMapWatchLabelKey}={cfg.ConfigMapWatchLabelValue}";
-        }
-        return client.ListNamespacedConfigMapAsync(ns, labelSelector: newLabelSelector, continueParameter: tok);
-    }
+    private Task<V1ConfigMapList> GetAllConfigMapsAsync(string? tok) => client.ListConfigMapForAllNamespacesAsync(labelSelector: ConfigMapLabel, continueParameter: tok);
+    private Task<V1ConfigMapList> GetNsConfigMapsAsync(string ns, string? tok) => client.ListNamespacedConfigMapAsync(ns, labelSelector: ConfigMapLabel, continueParameter: tok);
 
     public IAsyncEnumerable<V1Secret> GetManagedSecretsAsync()
     {
