@@ -1,15 +1,17 @@
-﻿using KCert.Models;
+using KCert.Models;
 using Microsoft.AspNetCore.Authentication;
 using System.Net.Http.Headers;
 using System.Security.Cryptography;
 using System.Text;
 using System.Text.Json;
+using Microsoft.Extensions.Logging; // Added for ILogger
 
 namespace KCert.Services;
 
 [Service]
-public class AcmeClient(CertClient cert, KCertConfig cfg)
+public class AcmeClient(CertClient cert, KCertConfig cfg, ILogger<AcmeClient> logger)
 {
+    private readonly ILogger<AcmeClient> _logger = logger; // Added logger field
     private const string HeaderReplayNonce = "Replay-Nonce";
     private const string HeaderLocation = "Location";
     private const string ContentType = "application/jose+json";
@@ -157,7 +159,7 @@ public class AcmeClient(CertClient cert, KCertConfig cfg)
         return await _http.PostAsync(uri, content);
     }
 
-    private static async Task<T> ParseJsonAsync<T>(HttpResponseMessage resp) where T : AcmeResponse
+    private async Task<T> ParseJsonAsync<T>(HttpResponseMessage resp) where T : AcmeResponse
     {
         var content = await GetContentAsync(resp);
         var result = JsonSerializer.Deserialize<T>(content, options) ?? throw new Exception($"Invalid content: {content}");
@@ -200,7 +202,7 @@ public class AcmeClient(CertClient cert, KCertConfig cfg)
     {
         if (!message.Headers.TryGetValues(header, out var headers))
         {
-            headers = [];
+            throw new Exception($"Header '{header}' not found in response.");
         }
 
         return headers.First();

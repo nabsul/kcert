@@ -22,29 +22,28 @@ public class CertChangeService(ILogger<CertChangeService> log, K8sClient k8s, KC
     private async Task CheckForChangesAsync()
     {
         var start = DateTime.UtcNow;
-        log.LogInformation("Waiting for semaphore");
+        log.LogInformation("CheckForChangesAsync: Waiting for semaphore.");
 
         await _sem.WaitAsync();
         if (_lastRun > start)
         {
-            log.LogInformation("No need to run this check");
+            log.LogInformation("CheckForChangesAsync: Check already queued or recently completed after this request. No need to run this instance.");
             _sem.Release();
             return;
         }
 
         _lastRun = start;
-        log.LogInformation("Starting check for changes.");
+        log.LogInformation("CheckForChangesAsync: Starting check for certificate changes.");
 
         try
         {
-            // fetch all ingresses to figure out which certs need have which hosts
             var nsLookup = new Dictionary<(string Namespace, string Name), HashSet<string>>();
-            await foreach (var (ns, name, hosts) in MergeAsync(GetIngressCertsAsync(), GetConfigMapCertsAsync()))
+            await foreach (var (ns, name, hosts) in GetIngressCertsAsync().Concat(GetConfigMapCertsAsync()))
             {
                 var key = (ns, name);
                 if (!nsLookup.TryGetValue(key, out var currHosts))
                 {
-                    currHosts = new HashSet<string>();
+                    currHosts = [];
                     nsLookup.Add(key, currHosts);
                 }
 
@@ -54,13 +53,14 @@ public class CertChangeService(ILogger<CertChangeService> log, K8sClient k8s, KC
                 }
             }
 
+            log.LogInformation("CheckForChangesAsync: Total {Count} unique certificate definitions to process after merging Ingress and ConfigMap sources.", nsLookup.Count);
             foreach (var ((ns, name), hosts) in nsLookup)
             {
-                log.LogInformation("Handling cert {ns} - {name} hosts: {h}", ns, name, string.Join(",", hosts));
-                await kcert.RenewIfNeededAsync(ns, name, hosts.ToArray(), CancellationToken.None);
+                log.LogInformation("Handling cert {ns} - {name} hosts: {h}", ns, name, string.Join(",", hosts)); // Existing log, good as is.
+                await kcert.RenewIfNeededAsync(ns, name, [.. hosts], CancellationToken.None);
             }
 
-            log.LogInformation("Check for changes completed.");
+            log.LogInformation("CheckForChangesAsync: Check for certificate changes completed.");
         }
         catch (Exception ex)
         {
@@ -73,52 +73,59 @@ public class CertChangeService(ILogger<CertChangeService> log, K8sClient k8s, KC
 
     }
 
-    private static async IAsyncEnumerable<T> MergeAsync<T>(params IAsyncEnumerable<T>[] enumerators)
+    private async IAsyncEnumerable<(string Namespace, string Name, IEnumerable<string> Hosts)> GetIngressCertsAsync()
     {
-        foreach (var e in enumerators)
-        {
-            await foreach (var v in e)
-            {
-                yield return v;
-            }
-        }
-    }
-
-    private async IAsyncEnumerable<(string Namespace, string Name, IEnumerable<string> hosts)> GetIngressCertsAsync()
-    {
+        int ingressCount = 0;
+        int skipped = 0;
+        int hosts = 0;
         await foreach (var ing in k8s.GetAllIngressesAsync())
         {
-            log.LogInformation("Processing ingress {ns}:{n}", ing.Namespace(), ing.Name());
-            foreach (var tls in ing?.Spec?.Tls ?? new List<V1IngressTLS>())
+            ingressCount++;
+            if (ing?.Spec?.Tls == null || !ing.Spec.Tls.Any())
             {
-                log.LogInformation("Processing secret {s}", tls.SecretName);
+                skipped++;
+                continue;
+            }
+
+            foreach (var tls in ing.Spec.Tls)
+            {
+                hosts++;
                 yield return (ing.Namespace(), tls.SecretName, tls.Hosts);
             }
         }
+
+        log.LogInformation("GetIngressCertsAsync: Processed {Count} Ingresses. Skipped {skipped} ingresses. Extracted {numHosts} hosts", ingressCount, skipped, hosts);
     }
 
     private async IAsyncEnumerable<(string Namespace, string Name, IEnumerable<string> hosts)> GetConfigMapCertsAsync()
     {
+        int foundConfigMapsCount = 0;
+        int skipped = 0;
+        int numHosts = 0;
         await foreach (var config in k8s.GetAllConfigMapsAsync())
         {
-            log.LogInformation("Processing configmap {ns}:{n}", config.Namespace(), config.Name());
+            foundConfigMapsCount++;
             var ns = config.Namespace();
             var name = config.Name();
 
-            if (!config.Data.TryGetValue("hosts", out var hostList))
+            if (config.Data == null || !config.Data.TryGetValue("hosts", out var hostList))
             {
-                log.LogError("ConfigMap {ns}-{n} does not have a hosts entry", ns, name);
+                skipped++;
                 continue;
             }
 
-            var hosts = hostList.Split(',');
-            if (hosts.Length < 1)
+            var hosts = hostList.Split(',', StringSplitOptions.RemoveEmptyEntries | StringSplitOptions.TrimEntries) ?? [];
+
+            if (hosts.Length == 0)
             {
-                log.LogError("ConfigMap {ns}-{n} does not contain a list of hosts", ns, name);
+                skipped++;
                 continue;
             }
 
+            numHosts += hosts.Length;
             yield return (ns, name, hosts);
         }
+
+        log.LogInformation("GetConfigMapCertsAsync: Processed {count} ConfigMaps. Skipped {skipepd}. Extracted {numHosts} hosts.", foundConfigMapsCount, skipped, numHosts);
     }
 }
