@@ -37,27 +37,13 @@ public class CertChangeService(ILogger<CertChangeService> log, K8sClient k8s, KC
 
         try
         {
-            var ingressCerts = new List<(string Namespace, string Name, IEnumerable<string> hosts)>();
-            await foreach (var cert in GetIngressCertsAsync())
-            {
-                ingressCerts.Add(cert);
-            }
-            log.LogInformation("CheckForChangesAsync: Found {Count} certificate definitions from Ingresses.", ingressCerts.Count);
-
-            var configMapCerts = new List<(string Namespace, string Name, IEnumerable<string> hosts)>();
-            await foreach (var cert in GetConfigMapCertsAsync())
-            {
-                configMapCerts.Add(cert);
-            }
-            log.LogInformation("CheckForChangesAsync: Found {Count} certificate definitions from ConfigMaps.", configMapCerts.Count);
-
             var nsLookup = new Dictionary<(string Namespace, string Name), HashSet<string>>();
-            foreach (var (ns, name, hosts) in ingressCerts.Concat(configMapCerts))
+            await foreach (var (ns, name, hosts) in GetIngressCertsAsync().Concat(GetConfigMapCertsAsync()))
             {
                 var key = (ns, name);
                 if (!nsLookup.TryGetValue(key, out var currHosts))
                 {
-                    currHosts = new HashSet<string>();
+                    currHosts = [];
                     nsLookup.Add(key, currHosts);
                 }
 
@@ -70,13 +56,8 @@ public class CertChangeService(ILogger<CertChangeService> log, K8sClient k8s, KC
             log.LogInformation("CheckForChangesAsync: Total {Count} unique certificate definitions to process after merging Ingress and ConfigMap sources.", nsLookup.Count);
             foreach (var ((ns, name), hosts) in nsLookup)
             {
-                log.LogInformation("CheckForChangesAsync: Queued for processing: Secret '{Namespace}/{SecretName}', Hosts: [{HostList}]", ns, name, string.Join(", ", hosts));
-            }
-
-            foreach (var ((ns, name), hosts) in nsLookup)
-            {
                 log.LogInformation("Handling cert {ns} - {name} hosts: {h}", ns, name, string.Join(",", hosts)); // Existing log, good as is.
-                await kcert.RenewIfNeededAsync(ns, name, hosts.ToArray(), CancellationToken.None);
+                await kcert.RenewIfNeededAsync(ns, name, [.. hosts], CancellationToken.None);
             }
 
             log.LogInformation("CheckForChangesAsync: Check for certificate changes completed.");
@@ -92,18 +73,7 @@ public class CertChangeService(ILogger<CertChangeService> log, K8sClient k8s, KC
 
     }
 
-    private static async IAsyncEnumerable<T> MergeAsync<T>(params IAsyncEnumerable<T>[] enumerators)
-    {
-        foreach (var e in enumerators)
-        {
-            await foreach (var v in e)
-            {
-                yield return v;
-            }
-        }
-    }
-
-    private async IAsyncEnumerable<(string Namespace, string Name, IEnumerable<string> hosts)> GetIngressCertsAsync()
+    private async IAsyncEnumerable<(string Namespace, string Name, IEnumerable<string> Hosts)> GetIngressCertsAsync()
     {
         // This method's logging seems fine based on the prompt, focusing on GetConfigMapCertsAsync and CheckForChangesAsync.
         // For consistency, I'll ensure its messages are clear.
