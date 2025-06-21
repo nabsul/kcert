@@ -19,6 +19,7 @@ public class CloudflareProvider(KCertConfig cfg, ILogger<CloudflareProvider> log
         {
             BaseAddress = new Uri("https://api.cloudflare.com/client/v4/")
         };
+        
         client.DefaultRequestHeaders.Authorization = new AuthenticationHeaderValue("Bearer", cfg.CloudflareApiToken);
         client.DefaultRequestHeaders.Accept.Add(new MediaTypeWithQualityHeaderValue("application/json"));
         return client;
@@ -42,37 +43,29 @@ public class CloudflareProvider(KCertConfig cfg, ILogger<CloudflareProvider> log
             return cachedZoneId;
         }
 
-        try
+        log.LogDebug("Attempting to find zone ID for domain: {Domain}", registrableDomain);
+        var response = await _httpClient.GetAsync($"zones?name={registrableDomain}");
+        if (!response.IsSuccessStatusCode)
         {
-            log.LogDebug("Attempting to find zone ID for domain: {Domain}", registrableDomain);
-            var response = await _httpClient.GetAsync($"zones?name={registrableDomain}");
-            if (!response.IsSuccessStatusCode)
-            {
-                var errorBody = await response.Content.ReadAsStringAsync();
-                log.LogError("Error fetching zone ID for {Domain}. Status: {StatusCode}. Body: {Body}", registrableDomain, response.StatusCode, errorBody);
-                return null;
-            }
-
-            var content = await response.Content.ReadAsStringAsync();
-            var cfResponse = JsonSerializer.Deserialize<CloudflareZonesResponse>(content, _jsonOptions);
-
-            if (cfResponse?.Result == null || !cfResponse.Result.Any())
-            {
-                log.LogWarning("No zone found for domain: {Domain}", registrableDomain);
-                return null;
-            }
-
-            // Assuming the first result is the correct one if multiple are returned (shouldn't happen for exact name match)
-            var zoneId = cfResponse.Result.First().Id ?? throw new InvalidOperationException($"No zone ID found for domain {registrableDomain} in Cloudflare response.");
-            log.LogInformation("Found zone ID: {ZoneId} for domain: {Domain}", zoneId, registrableDomain);
-            _zoneIdCache.TryAdd(registrableDomain, zoneId);
-            return zoneId;
+            var errorBody = await response.Content.ReadAsStringAsync();
+            log.LogError("Error fetching zone ID for {Domain}. Status: {StatusCode}. Body: {Body}", registrableDomain, response.StatusCode, errorBody);
+            return null;
         }
-        catch (Exception ex)
+
+        var content = await response.Content.ReadAsStringAsync();
+        var cfResponse = JsonSerializer.Deserialize<CloudflareZonesResponse>(content, _jsonOptions);
+
+        if (cfResponse?.Result == null || !cfResponse.Result.Any())
         {
-            log.LogError(ex, "Exception fetching zone ID for {Domain}", registrableDomain);
-            throw;
+            log.LogWarning("No zone found for domain: {Domain}", registrableDomain);
+            return null;
         }
+
+        // Assuming the first result is the correct one if multiple are returned (shouldn't happen for exact name match)
+        var zoneId = cfResponse.Result.First().Id ?? throw new InvalidOperationException($"No zone ID found for domain {registrableDomain} in Cloudflare response.");
+        log.LogInformation("Found zone ID: {ZoneId} for domain: {Domain}", zoneId, registrableDomain);
+        _zoneIdCache.TryAdd(registrableDomain, zoneId);
+        return zoneId;
     }
 
     public async Task CreateTxtRecordAsync(string domainName, string recordName, string recordValue)
@@ -95,24 +88,17 @@ public class CloudflareProvider(KCertConfig cfg, ILogger<CloudflareProvider> log
         var jsonPayload = JsonSerializer.Serialize(payload);
         var httpContent = new StringContent(jsonPayload, Encoding.UTF8, "application/json");
 
-        try
-        {
-            log.LogInformation("Attempting to create TXT record: {RecordName} with value: {RecordValue} in zone {ZoneId}", recordName, recordValue, zoneId);
-            var response = await _httpClient.PostAsync($"zones/{zoneId}/dns_records", httpContent);
-            var responseBody = await response.Content.ReadAsStringAsync();
+        log.LogInformation("Attempting to create TXT record: {RecordName} with value: {RecordValue} in zone {ZoneId}", recordName, recordValue, zoneId);
+        var response = await _httpClient.PostAsync($"zones/{zoneId}/dns_records", httpContent);
+        var responseBody = await response.Content.ReadAsStringAsync();
 
-            if (response.IsSuccessStatusCode)
-            {
-                log.LogInformation("Successfully created TXT record {RecordName}. Response: {ResponseBody}", recordName, responseBody);
-            }
-            else
-            {
-                log.LogError("Error creating TXT record {RecordName}. Status: {StatusCode}. Response: {ResponseBody}", recordName, response.StatusCode, responseBody);
-            }
-        }
-        catch (Exception ex)
+        if (response.IsSuccessStatusCode)
         {
-            log.LogError(ex, "Exception creating TXT record {RecordName} in zone {ZoneId}", recordName, zoneId);
+            log.LogInformation("Successfully created TXT record {RecordName}. Response: {ResponseBody}", recordName, responseBody);
+        }
+        else
+        {
+            log.LogError("Error creating TXT record {RecordName}. Status: {StatusCode}. Response: {ResponseBody}", recordName, response.StatusCode, responseBody);
         }
     }
 
