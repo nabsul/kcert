@@ -75,63 +75,57 @@ public class CertChangeService(ILogger<CertChangeService> log, K8sClient k8s, KC
 
     private async IAsyncEnumerable<(string Namespace, string Name, IEnumerable<string> Hosts)> GetIngressCertsAsync()
     {
-        // This method's logging seems fine based on the prompt, focusing on GetConfigMapCertsAsync and CheckForChangesAsync.
-        // For consistency, I'll ensure its messages are clear.
-        log.LogInformation("GetIngressCertsAsync: Starting to fetch and process Ingresses for certificate definitions.");
         int ingressCount = 0;
+        int skipped = 0;
+        int hosts = 0;
         await foreach (var ing in k8s.GetAllIngressesAsync())
         {
             ingressCount++;
-            log.LogInformation("GetIngressCertsAsync: Processing Ingress {Namespace}/{Name}", ing.Namespace(), ing.Name());
             if (ing?.Spec?.Tls == null || !ing.Spec.Tls.Any())
             {
-                log.LogInformation("GetIngressCertsAsync: Ingress {Namespace}/{Name} has no TLS specifications, skipping.", ing.Namespace(), ing.Name());
+                skipped++;
                 continue;
             }
+
             foreach (var tls in ing.Spec.Tls)
             {
-                log.LogInformation("GetIngressCertsAsync: Ingress {Namespace}/{Name} - found Secret {SecretName} for hosts [{HostList}]", ing.Namespace(), ing.Name(), tls.SecretName, string.Join(", ", tls.Hosts));
+                hosts++;
                 yield return (ing.Namespace(), tls.SecretName, tls.Hosts);
             }
         }
-        log.LogInformation("GetIngressCertsAsync: Processed {Count} Ingresses.", ingressCount);
+
+        log.LogInformation("GetIngressCertsAsync: Processed {Count} Ingresses. Skipped {skipped} ingresses. Extracted {numHosts} hosts", ingressCount, skipped, hosts);
     }
 
     private async IAsyncEnumerable<(string Namespace, string Name, IEnumerable<string> hosts)> GetConfigMapCertsAsync()
     {
-        log.LogInformation("GetConfigMapCertsAsync: Starting to fetch and process ConfigMaps for certificate definitions.");
         int foundConfigMapsCount = 0;
+        int skipped = 0;
+        int numHosts = 0;
         await foreach (var config in k8s.GetAllConfigMapsAsync())
         {
             foundConfigMapsCount++;
-            log.LogInformation("GetConfigMapCertsAsync: Processing ConfigMap {Namespace}/{Name}", config.Namespace(), config.Name());
             var ns = config.Namespace();
             var name = config.Name();
 
-            if (config.Data == null)
+            if (config.Data == null || !config.Data.TryGetValue("hosts", out var hostList))
             {
-                log.LogWarning("GetConfigMapCertsAsync: ConfigMap {Namespace}/{Name} has no Data section, skipping.", ns, name);
+                skipped++;
                 continue;
             }
 
-            if (!config.Data.TryGetValue("hosts", out var hostList))
-            {
-                log.LogWarning("GetConfigMapCertsAsync: ConfigMap {Namespace}/{Name} does not have a 'hosts' key in Data, skipping.", ns, name);
-                continue;
-            }
-            
-            log.LogInformation("GetConfigMapCertsAsync: ConfigMap {Namespace}/{Name} found 'hosts' key. Raw value: '{HostListValue}'", ns, name, hostList);
+            var hosts = hostList.Split(',', StringSplitOptions.RemoveEmptyEntries | StringSplitOptions.TrimEntries) ?? [];
 
-            var hosts = hostList.Split(',', StringSplitOptions.RemoveEmptyEntries | StringSplitOptions.TrimEntries);
-            if (hosts.Length < 1)
+            if (hosts.Length == 0)
             {
-                log.LogWarning("GetConfigMapCertsAsync: ConfigMap {Namespace}/{Name} 'hosts' key is empty or invalid after splitting, skipping.", ns, name);
+                skipped++;
                 continue;
             }
 
-            log.LogInformation("GetConfigMapCertsAsync: Yielding cert definition from ConfigMap {Namespace}/{Name} for hosts: [{HostList}]", ns, name, string.Join(", ", hosts));
+            numHosts += hosts.Length;
             yield return (ns, name, hosts);
         }
-        log.LogInformation("GetConfigMapCertsAsync: Found {count} ConfigMaps after filtering by K8sClient.", foundConfigMapsCount);
+
+        log.LogInformation("GetConfigMapCertsAsync: Processed {count} ConfigMaps. Skipped {skipepd}. Extracted {numHosts} hosts.", foundConfigMapsCount, skipped, numHosts);
     }
 }
