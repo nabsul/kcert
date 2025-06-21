@@ -38,30 +38,12 @@ public class K8sWatchClient(KCertConfig cfg, ILogger<K8sClient> log, Kubernetes 
 
     private Task<HttpOperationResponse<V1ConfigMapList>> WatchAllConfigMapsAsync(CancellationToken tok)
     {
-        string newLabelSelector;
-        if (string.IsNullOrEmpty(cfg.ConfigMapWatchLabelValue))
-        {
-            newLabelSelector = cfg.ConfigMapWatchLabelKey; // Match key presence
-        }
-        else
-        {
-            newLabelSelector = $"{cfg.ConfigMapWatchLabelKey}={cfg.ConfigMapWatchLabelValue}"; // Match key and value
-        }
-        return client.CoreV1.ListConfigMapForAllNamespacesWithHttpMessagesAsync(watch: true, cancellationToken: tok, labelSelector: newLabelSelector);
+        return client.CoreV1.ListConfigMapForAllNamespacesWithHttpMessagesAsync(watch: true, cancellationToken: tok, labelSelector: ConfigLabel);
     }
 
     private Task<HttpOperationResponse<V1ConfigMapList>> WatchNsConfigMapsAsync(string ns, CancellationToken tok)
     {
-        string newLabelSelector;
-        if (string.IsNullOrEmpty(cfg.ConfigMapWatchLabelValue))
-        {
-            newLabelSelector = cfg.ConfigMapWatchLabelKey; // Match key presence
-        }
-        else
-        {
-            newLabelSelector = $"{cfg.ConfigMapWatchLabelKey}={cfg.ConfigMapWatchLabelValue}"; // Match key and value
-        }
-        return client.CoreV1.ListNamespacedConfigMapWithHttpMessagesAsync(ns, watch: true, cancellationToken: tok, labelSelector: newLabelSelector);
+        return client.CoreV1.ListNamespacedConfigMapWithHttpMessagesAsync(ns, watch: true, cancellationToken: tok, labelSelector: ConfigLabel);
     }
 
     delegate Task<HttpOperationResponse<L>> WatchAllFunc<L>(CancellationToken tok);

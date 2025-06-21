@@ -52,22 +52,14 @@ public class KCertConfig(IConfiguration cfg)
 
     public string IngressLabelValue => GetRequiredString("ChallengeIngress:IngressLabelValue");
 
-    public string ConfigMapWatchLabelKey { get; } = Environment.GetEnvironmentVariable("KCERT_CONFIGMAP_WATCH_LABEL_KEY") ?? "kcert.dev/configmap";
-    public string ConfigMapWatchLabelValue { get; } = Environment.GetEnvironmentVariable("KCERT_CONFIGMAP_WATCH_LABEL_VALUE") ?? "";
+    public string Route53AccessKeyId => GetRequiredString("Route53:AccessKeyId");
+    public string Route53SecretAccessKey => GetRequiredString("Route53:SecretAccessKey");
+    public string Route53Region => GetRequiredString("Route53:Region");
 
-    // AWS Route53 Configuration
-    public bool EnableRoute53 => GetBool("KCert:Route53:EnableRoute53");
-    public string Route53AccessKeyId => GetRequiredString("KCert:Route53:AccessKeyId");
-    public string Route53SecretAccessKey => GetRequiredString("KCert:Route53:SecretAccessKey");
-    public string Route53Region => GetRequiredString("KCert:Route53:Region");
+    public string CloudflareApiToken => GetRequiredString("Cloudflare:ApiToken");
+    public string CloudflareAccountId => GetRequiredString("Cloudflare:AccountId");
 
-    // Cloudflare Configuration
-    public bool EnableCloudflare => GetBool("KCert:Cloudflare:EnableCloudflare");
-    public string CloudflareApiToken => GetRequiredString("KCert:Cloudflare:ApiToken");
-    public string CloudflareAccountId => GetRequiredString("KCert:Cloudflare:AccountId");
-
-    // Preferred Challenge Type
-    public string PreferredChallengeType => GetString("KCert:PreferredChallengeType") ?? "http-01";
+    public string PreferredChallengeType => GetRequiredString("KCert:PreferredChallengeType");
 
     public object AllConfigs => new
     {
@@ -80,7 +72,7 @@ public class KCertConfig(IConfiguration cfg)
             ServicePort = KCertServicePort,
             ShowRenewButton,
             NamespaceConstraints,
-            PreferredChallengeType = PreferredChallengeType,
+            PreferredChallengeType,
         },
         ACME = new
         {
@@ -104,8 +96,8 @@ public class KCertConfig(IConfiguration cfg)
         },
         Route53 = new
         {
-            AccessKeyId = GetString("KCert:Route53:AccessKeyId"),
-            SecretAccessKey = HideString(GetString("KCert:Route53:SecretAccessKey")),
+            AccessKeyId = Route53AccessKeyId,
+            SecretAccessKey = HideString(Route53SecretAccessKey),
             Region = Route53Region,
         },
         Cloudflare = new
