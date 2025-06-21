@@ -63,7 +63,7 @@ public class CloudflareProvider(KCertConfig cfg, ILogger<CloudflareProvider> log
             }
 
             // Assuming the first result is the correct one if multiple are returned (shouldn't happen for exact name match)
-            var zoneId = cfResponse.Result.First().Id;
+            var zoneId = cfResponse.Result.First().Id ?? throw new InvalidOperationException($"No zone ID found for domain {registrableDomain} in Cloudflare response.");
             log.LogInformation("Found zone ID: {ZoneId} for domain: {Domain}", zoneId, registrableDomain);
             _zoneIdCache.TryAdd(registrableDomain, zoneId);
             return zoneId;
@@ -71,7 +71,7 @@ public class CloudflareProvider(KCertConfig cfg, ILogger<CloudflareProvider> log
         catch (Exception ex)
         {
             log.LogError(ex, "Exception fetching zone ID for {Domain}", registrableDomain);
-            return null;
+            throw;
         }
     }
 

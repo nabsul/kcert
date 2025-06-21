@@ -164,10 +164,6 @@ public class AcmeClient(CertClient cert, KCertConfig cfg, ILogger<AcmeClient> lo
         var content = await GetContentAsync(resp);
         var result = JsonSerializer.Deserialize<T>(content, options) ?? throw new Exception($"Invalid content: {content}");
         result.Nonce = GetHeader(resp, HeaderReplayNonce);
-        if (string.IsNullOrEmpty(result.Nonce))
-        {
-            _logger.LogWarning("Replay-Nonce header was missing from ACME server response when processing {ResponseType}. This may cause subsequent requests to fail.", typeof(T).Name);
-        }
         result.Location = GetHeader(resp, HeaderLocation);
         return result;
     }
@@ -206,9 +202,9 @@ public class AcmeClient(CertClient cert, KCertConfig cfg, ILogger<AcmeClient> lo
     {
         if (!message.Headers.TryGetValues(header, out var headers))
         {
-            headers = [];
+            throw new Exception($"Header '{header}' not found in response.");
         }
 
-        return headers.FirstOrDefault(); // Changed to FirstOrDefault
+        return headers.First();
     }
 }
