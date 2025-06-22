@@ -1,10 +1,8 @@
-﻿using KCert.Models;
-using Microsoft.AspNetCore.Authentication; // For Base64UrlTextEncoder
-using System;
-using System.Linq;
-using System.Security.Cryptography; // For SHA256
-using System.Text; // For Encoding
-using System.Threading.Tasks;
+﻿using KCert.Challenge;
+using KCert.Models;
+using Microsoft.AspNetCore.Authentication;
+using System.Security.Cryptography;
+using System.Text;
 
 namespace KCert.Services;
 
@@ -15,8 +13,7 @@ public class RenewalHandler(
     K8sClient kube, 
     KCertConfig cfg, 
     CertClient cert, 
-    AwsRoute53Provider route53Provider, 
-    CloudflareProvider cloudflareProvider)
+    ChallengeProviderFactory providerFactory)
 {
     public async Task RenewCertAsync(string ns, string secretName, string[] hosts)
     {
@@ -103,7 +100,7 @@ public class RenewalHandler(
                 throw new Exception($"ACME server did not provide a DNS-01 challenge for wildcard domain {originalIdentifier}.");
             }
         }
-        else if (dnsChallenge != null && cfg.PreferredChallengeType?.ToLower() == "dns-01")
+        else if (dnsChallenge != null && cfg.ChallengeType?.ToLower() == "dns-01")
         {
             logbuf.LogInformation($"DNS-01 is preferred and available for '{originalIdentifier}'.");
             attemptDns = true;
@@ -126,9 +123,7 @@ public class RenewalHandler(
                 txtRecordValue = Base64UrlTextEncoder.Encode(sha256.ComputeHash(Encoding.UTF8.GetBytes(keyAuth)));
             }
 
-            IDnsProvider? selectedProvider = null;
-            if (cfg.EnableRoute53) selectedProvider = route53Provider;
-            else if (cfg.EnableCloudflare) selectedProvider = cloudflareProvider;
+            var selectedProvider = providerFactory.CreateProvider();
 
             if (selectedProvider != null)
             {

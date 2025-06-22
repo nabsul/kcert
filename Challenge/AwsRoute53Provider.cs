@@ -1,11 +1,12 @@
 using Amazon;
 using Amazon.Route53;
 using Amazon.Route53.Model;
+using KCert.Services;
 
-namespace KCert.Services;
+namespace KCert.Challenge;
 
 [Service]
-public class AwsRoute53Provider(KCertConfig cfg, ILogger<AwsRoute53Provider> log) : IDnsProvider
+public class AwsRoute53Provider(KCertConfig cfg, ILogger<AwsRoute53Provider> log) : IChallengeProvider
 {
     private static AmazonRoute53Client GetClient(string id, string key, string region) {
         var awsCredentials = new Amazon.Runtime.BasicAWSCredentials(id, key);

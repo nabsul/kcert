@@ -74,7 +74,7 @@ public class KCertClient
         try
         {
             bool shouldManageHttpChallengeIngress = true;
-            if (_cfg.PreferredChallengeType?.ToLower() == "dns-01" && (_cfg.EnableRoute53 || _cfg.EnableCloudflare))
+            if (_cfg.ChallengeType != "http")
             {
                 shouldManageHttpChallengeIngress = false;
                 _log.LogInformation("DNS-01 is preferred and a DNS provider is enabled. Skipping HTTP challenge Ingress setup for hosts: {hosts}", string.Join(", ", hosts));

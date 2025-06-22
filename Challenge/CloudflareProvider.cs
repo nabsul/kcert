@@ -2,12 +2,13 @@ using System.Net.Http.Headers;
 using System.Text;
 using System.Text.Json;
 using System.Text.Json.Serialization;
-using System.Collections.Concurrent; // For zone ID cache
+using System.Collections.Concurrent;
+using KCert.Services;
 
-namespace KCert.Services;
+namespace KCert.Challenge;
 
 [Service]
-public class CloudflareProvider(KCertConfig cfg, ILogger<CloudflareProvider> log) : IDnsProvider
+public class CloudflareProvider(KCertConfig cfg, ILogger<CloudflareProvider> log) : IChallengeProvider
 {
     private readonly HttpClient _httpClient = GetHttpClient(cfg);
     private static readonly ConcurrentDictionary<string, string> _zoneIdCache = new();
@@ -19,7 +20,7 @@ public class CloudflareProvider(KCertConfig cfg, ILogger<CloudflareProvider> log
         {
             BaseAddress = new Uri("https://api.cloudflare.com/client/v4/")
         };
-        
+
         client.DefaultRequestHeaders.Authorization = new AuthenticationHeaderValue("Bearer", cfg.CloudflareApiToken);
         client.DefaultRequestHeaders.Accept.Add(new MediaTypeWithQualityHeaderValue("application/json"));
         return client;

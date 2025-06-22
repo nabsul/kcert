@@ -1,8 +1,6 @@
-using System.Threading.Tasks;
+namespace KCert.Challenge;
 
-namespace KCert.Services;
-
-public interface IDnsProvider
+public interface IChallengeProvider
 {
     Task CreateTxtRecordAsync(string domainName, string recordName, string recordValue);
     Task DeleteTxtRecordAsync(string domainName, string recordName, string recordValue);

@@ -59,7 +59,7 @@ public class KCertConfig(IConfiguration cfg)
     public string CloudflareApiToken => GetRequiredString("Cloudflare:ApiToken");
     public string CloudflareAccountId => GetRequiredString("Cloudflare:AccountId");
 
-    public string PreferredChallengeType => GetRequiredString("KCert:PreferredChallengeType");
+    public string ChallengeType => GetRequiredString("KCert:ChallengeType");
 
     public object AllConfigs => new
     {
@@ -72,7 +72,7 @@ public class KCertConfig(IConfiguration cfg)
             ServicePort = KCertServicePort,
             ShowRenewButton,
             NamespaceConstraints,
-            PreferredChallengeType,
+            ChallengeType,
         },
         ACME = new
         {
