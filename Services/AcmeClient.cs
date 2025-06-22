@@ -4,14 +4,12 @@ using System.Net.Http.Headers;
 using System.Security.Cryptography;
 using System.Text;
 using System.Text.Json;
-using Microsoft.Extensions.Logging; // Added for ILogger
 
 namespace KCert.Services;
 
 [Service]
-public class AcmeClient(CertClient cert, KCertConfig cfg, ILogger<AcmeClient> logger)
+public class AcmeClient(CertClient cert, KCertConfig cfg)
 {
-    private readonly ILogger<AcmeClient> _logger = logger; // Added logger field
     private const string HeaderReplayNonce = "Replay-Nonce";
     private const string HeaderLocation = "Location";
     private const string ContentType = "application/jose+json";
@@ -159,7 +157,7 @@ public class AcmeClient(CertClient cert, KCertConfig cfg, ILogger<AcmeClient> lo
         return await _http.PostAsync(uri, content);
     }
 
-    private async Task<T> ParseJsonAsync<T>(HttpResponseMessage resp) where T : AcmeResponse
+    private static async Task<T> ParseJsonAsync<T>(HttpResponseMessage resp) where T : AcmeResponse
     {
         var content = await GetContentAsync(resp);
         var result = JsonSerializer.Deserialize<T>(content, options) ?? throw new Exception($"Invalid content: {content}");
