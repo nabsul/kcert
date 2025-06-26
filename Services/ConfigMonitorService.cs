@@ -10,7 +10,7 @@ public class ConfigMonitorService(ILogger<ConfigMonitorService> log, KCertConfig
         if (cfg.WatchConfigMaps)
         {
             log.LogInformation("Watching for configmaps is enabled");
-            var action = () => WatchConfigMapsAsync(cancellationToken);
+            Task action() => WatchConfigMapsAsync(cancellationToken);
             _ = exp.DoWithExponentialBackoffAsync("Watch configmaps", action, cancellationToken);
         }
         else
