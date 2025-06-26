@@ -69,11 +69,11 @@ public class K8sClient(KCertConfig cfg, Kubernetes client)
         }
     }
 
-    public async Task<V1Ingress?> GetIngressAsync(string ns, string name)
+    public async Task<V1Ingress?> GetIngressAsync(string ns, string name, CancellationToken tok)
     {
         try
         {
-            return await client.ReadNamespacedIngressAsync(name, ns);
+            return await client.ReadNamespacedIngressAsync(name, ns, cancellationToken: tok);
         }
         catch (HttpOperationException ex)
         {
@@ -86,11 +86,11 @@ public class K8sClient(KCertConfig cfg, Kubernetes client)
         }
     }
 
-    public async Task DeleteIngressAsync(string ns, string name)
+    public async Task DeleteIngressAsync(string ns, string name, CancellationToken tok)
     {
         try
         {
-            await client.DeleteNamespacedIngressAsync(name, ns);
+            await client.DeleteNamespacedIngressAsync(name, ns, cancellationToken: tok);
         }
         catch (HttpOperationException ex)
         {

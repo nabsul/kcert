@@ -1,4 +1,4 @@
-﻿using KCert.Models;
+using KCert.Models;
 using Microsoft.AspNetCore.Authentication;
 using System.Net.Http.Headers;
 using System.Security.Cryptography;
@@ -161,8 +161,8 @@ public class AcmeClient(CertClient cert, KCertConfig cfg)
     {
         var content = await GetContentAsync(resp);
         var result = JsonSerializer.Deserialize<T>(content, options) ?? throw new Exception($"Invalid content: {content}");
-        result.Nonce = GetHeader(resp, HeaderReplayNonce);
-        result.Location = GetHeader(resp, HeaderLocation);
+        result.Nonce = resp.Headers.GetValues(HeaderReplayNonce).First();
+        result.Location = resp.Headers.GetValues(HeaderLocation).First();
         return result;
     }
 
@@ -178,7 +178,7 @@ public class AcmeClient(CertClient cert, KCertConfig cfg)
             throw new Exception($"Unexpected response to get-nonce with status {resp.StatusCode} and content: {content}");
         }
 
-        return GetHeader(resp, HeaderReplayNonce);
+        return message.Headers.GetValues(HeaderReplayNonce).First();
     }
 
     private static async Task<string> GetContentAsync(HttpResponseMessage resp)
@@ -194,15 +194,5 @@ public class AcmeClient(CertClient cert, KCertConfig cfg)
             var content = await resp.Content.ReadAsStringAsync();
             throw new Exception($"Request failed with status {resp.StatusCode} and content: {content}");
         }
-    }
-
-    private static string GetHeader(HttpResponseMessage message, string header)
-    {
-        if (!message.Headers.TryGetValues(header, out var headers))
-        {
-            headers = [];
-        }
-
-        return headers.First();
     }
 }

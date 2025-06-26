@@ -52,6 +52,15 @@ public class KCertConfig(IConfiguration cfg)
 
     public string IngressLabelValue => GetRequiredString("ChallengeIngress:IngressLabelValue");
 
+    public string Route53AccessKeyId => GetRequiredString("Route53:AccessKeyId");
+    public string Route53SecretAccessKey => GetRequiredString("Route53:SecretAccessKey");
+    public string Route53Region => GetRequiredString("Route53:Region");
+
+    public string CloudflareApiToken => GetRequiredString("Cloudflare:ApiToken");
+    public string CloudflareAccountId => GetRequiredString("Cloudflare:AccountId");
+
+    public string ChallengeType => GetRequiredString("KCert:ChallengeType");
+
     public object AllConfigs => new
     {
         KCert = new
@@ -63,6 +72,7 @@ public class KCertConfig(IConfiguration cfg)
             ServicePort = KCertServicePort,
             ShowRenewButton,
             NamespaceConstraints,
+            ChallengeType,
         },
         ACME = new
         {
@@ -83,6 +93,17 @@ public class KCertConfig(IConfiguration cfg)
             Port = SmtpPort,
             User = HideString(SmtpUser),
             Pass = HideString(SmtpPass)
+        },
+        Route53 = new
+        {
+            AccessKeyId = Route53AccessKeyId,
+            SecretAccessKey = HideString(Route53SecretAccessKey),
+            Region = Route53Region,
+        },
+        Cloudflare = new
+        {
+            ApiToken = HideString(CloudflareApiToken),
+            AccountId = CloudflareAccountId,
         },
     };
 
