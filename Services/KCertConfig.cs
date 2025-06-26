@@ -94,17 +94,17 @@ public class KCertConfig(IConfiguration cfg)
             User = HideString(SmtpUser),
             Pass = HideString(SmtpPass)
         },
-        Route53 = ChallengeType == "route53" ? new
+        Route53 = new
         {
             AccessKeyId = Route53AccessKeyId,
             SecretAccessKey = HideString(Route53SecretAccessKey),
             Region = Route53Region,
-        } : null,
-        Cloudflare = ChallengeType == "cloudflare" ? new
+        },
+        Cloudflare = new
         {
             ApiToken = HideString(CloudflareApiToken),
             AccountId = CloudflareAccountId,
-        } : null,
+        },
     };
 
     private static string HideString(string? val) => string.IsNullOrEmpty(val) ? "" : "[REDACTED]";
