@@ -8,7 +8,10 @@ namespace KCert.Challenge;
 [Service]
 public class AwsRoute53Provider(KCertConfig cfg, ILogger<AwsRoute53Provider> log) : IChallengeProvider
 {
-    private static AmazonRoute53Client GetClient(string id, string key, string region) {
+    public string AcmeChallengeType => "dns-01";
+
+    private static AmazonRoute53Client GetClient(string id, string key, string region)
+    {
         var awsCredentials = new Amazon.Runtime.BasicAWSCredentials(id, key);
         return new AmazonRoute53Client(awsCredentials, RegionEndpoint.GetBySystemName(region));
     }

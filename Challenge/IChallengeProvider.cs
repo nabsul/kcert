@@ -2,6 +2,7 @@ namespace KCert.Challenge;
 
 public interface IChallengeProvider
 {
-    Task CreateTxtRecordAsync(string domainName, string recordName, string recordValue);
-    Task DeleteTxtRecordAsync(string domainName, string recordName, string recordValue);
+    string AcmeChallengeType { get; }
+    Task<object?> PrepareChallengeAsync(string[] hosts, CancellationToken tok);
+    Task CleanupChallengeAsync(object? state, CancellationToken tok);
 }

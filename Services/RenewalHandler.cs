@@ -15,6 +15,8 @@ public class RenewalHandler(
     CertClient cert, 
     ChallengeProviderFactory providerFactory)
 {
+    private readonly IChallengeProvider chal = providerFactory.CreateProvider();
+
     public async Task RenewCertAsync(string ns, string secretName, string[] hosts)
     {
         var logbuf = new BufferedLogger<RenewalHandler>(log);
@@ -73,20 +75,15 @@ public class RenewalHandler(
 
     private async Task<string> ValidateAuthorizationAsync(string key, string kid, string nonce, Uri authUri, ILogger logbuf)
     {
-        if (cfg.ChallengeType != "http")
-        {
-            return await ValidateAuthorizationDnsAsync(key, kid, nonce, authUri, logbuf);
-        }
-
         var (waitTime, numRetries) = (cfg.AcmeWaitTime, cfg.AcmeNumRetries);
         var auth = await acme.GetAuthzAsync(key, authUri, kid, nonce);
         nonce = auth.Nonce;
         logbuf.LogInformation("Get Auth {authUri}: {status}", authUri, auth.Status);
 
-        var url = auth.Challenges.FirstOrDefault(c => c.Type == "http-01")?.Url;
-        var challengeUri = new Uri(url ?? throw new Exception("No http-01 url found in challenge"));
+        var url = auth.Challenges.First(c => c.Type == chal.AcmeChallengeType).Url;
+        var challengeUri = new Uri(url);
         var chall = await acme.TriggerChallengeAsync(key, challengeUri, kid, nonce);
-                    nonce = chall.Nonce;
+        nonce = chall.Nonce;
         logbuf.LogInformation("TriggerChallenge {challengeUri}: {status}", challengeUri, chall.Status);
 
         do
@@ -117,19 +114,17 @@ public class RenewalHandler(
         logbuf.LogInformation("Get Auth {authUri}: Initial Status: {status}, Identifier: {originalIdentifier}, Wildcard: {isWildcard}, Domain for DNS: {domainForDnsChallenge}",
             authUri, auth.Status, originalIdentifier, isWildcard, domainForDnsChallenge);
 
-        var dnsChallenge = auth.Challenges.FirstOrDefault(c => c.Type == "dns-01");
+        var dnsChallenge = auth.Challenges.First(c => c.Type == "dns-01");
 
         // This block assumes dnsChallenge is not null due to the logic setting attemptDns = true
         logbuf.LogInformation("Attempting DNS-01 challenge for {originalIdentifier} (using DNS domain {domainForDnsChallenge})", originalIdentifier, domainForDnsChallenge);
         string txtRecordName = $"_acme-challenge.{domainForDnsChallenge}";
-        string keyAuth = cert.GetKeyAuthorization(dnsChallenge!.Token); // dnsChallenge asserted non-null by attemptDns logic
+        string keyAuth = cert.GetKeyAuthorization(dnsChallenge.Token); // dnsChallenge asserted non-null by attemptDns logic
         string txtRecordValue;
         using (var sha256 = SHA256.Create())
         {
             txtRecordValue = Base64UrlTextEncoder.Encode(sha256.ComputeHash(Encoding.UTF8.GetBytes(keyAuth)));
         }
-
-        var selectedProvider = providerFactory.CreateProvider() ?? throw new Exception("No DNS provider configured or enabled for DNS-01 challenge.");
 
         logbuf.LogInformation("Attempting to create TXT record {txtRecordName} with value {txtRecordValue} for DNS domain {domainForDnsChallenge} using {providerName}.",
             txtRecordName, txtRecordValue, domainForDnsChallenge, selectedProvider.GetType().Name);

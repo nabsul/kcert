@@ -10,6 +10,8 @@ namespace KCert.Challenge;
 [Service]
 public class CloudflareProvider(KCertConfig cfg, ILogger<CloudflareProvider> log) : IChallengeProvider
 {
+    public string AcmeChallengeType => "dns-01";
+
     private readonly HttpClient _httpClient = GetHttpClient(cfg);
     private static readonly ConcurrentDictionary<string, string> _zoneIdCache = new();
     private static readonly JsonSerializerOptions _jsonOptions = new() { PropertyNameCaseInsensitive = true };
