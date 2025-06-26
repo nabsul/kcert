@@ -6,7 +6,7 @@ using KCert.Services;
 
 namespace KCert.Challenge;
 
-[Service]
+[Challenge("route53")]
 public class AwsRoute53Provider(KCertConfig cfg, DnsUtils util, ILogger<AwsRoute53Provider> log) : IChallengeProvider
 {
     public string AcmeChallengeType => "dns-01";

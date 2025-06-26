@@ -8,7 +8,7 @@ using KCert.Models;
 
 namespace KCert.Challenge;
 
-[Service]
+[Challenge("cloudflare")]
 public class CloudflareProvider(KCertConfig cfg, DnsUtils util, ILogger<CloudflareProvider> log) : IChallengeProvider
 {
     public string AcmeChallengeType => "dns-01";

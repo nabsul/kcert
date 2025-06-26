@@ -4,6 +4,7 @@ using KCert.Services;
 
 namespace KCert.Challenge;
 
+[Challenge("http")]
 public class HttpChallengeProvider(K8sClient kube, KCertConfig cfg, ILogger<HttpChallengeProvider> log) : IChallengeProvider
 {
     public string AcmeChallengeType => "http-01";
@@ -22,9 +23,9 @@ public class HttpChallengeProvider(K8sClient kube, KCertConfig cfg, ILogger<Http
     {
         if (state is not HttpChallengeState { Hosts: var hosts })
         {
-            throw new ArgumentException("Invalid state provided for HTTP challenge cleanup. Expected HttpChallengeState.",nameof(state));
+            throw new ArgumentException("Invalid state provided for HTTP challenge cleanup. Expected HttpChallengeState.", nameof(state));
         }
-    
+
         log.LogInformation("Deleting HTTP challenge Ingress for hosts: {hosts}", string.Join(", ", hosts));
         await kube.DeleteIngressAsync(cfg.KCertNamespace, cfg.KCertIngressName, tok);
     }

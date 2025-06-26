@@ -1,8 +1,5 @@
 ﻿using KCert.Challenge;
 using KCert.Models;
-using Microsoft.AspNetCore.Authentication;
-using System.Security.Cryptography;
-using System.Text;
 
 namespace KCert.Services;
 
@@ -13,10 +10,8 @@ public class RenewalHandler(
     K8sClient kube, 
     KCertConfig cfg, 
     CertClient cert, 
-    ChallengeProviderFactory providerFactory)
+    IChallengeProvider chal)
 {
-    private readonly IChallengeProvider chal = providerFactory.CreateProvider();
-
     public async Task RenewCertAsync(string ns, string secretName, string[] hosts, CancellationToken tok)
     {
         var logbuf = new BufferedLogger<RenewalHandler>(log);
