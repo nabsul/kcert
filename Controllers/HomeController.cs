@@ -38,11 +38,7 @@ public class HomeController(KCertClient kcert, K8sClient kube, KCertConfig cfg, 
     [HttpGet("configuration")]
     public async Task<IActionResult> ConfigurationAsync()
     {
-        if (TermsOfServiceUrl == null)
-        {
-            TermsOfServiceUrl = await acme.GetTermsOfServiceUrlAsync();
-        }
-
+        TermsOfServiceUrl ??= await acme.GetTermsOfServiceUrlAsync();
         ViewBag.TermsOfService = TermsOfServiceUrl;
         return View();
     }

@@ -17,7 +17,11 @@ public class CertClient(KCertConfig cfg)
 
     private readonly RSA _rsa = RSA.Create(2048);
 
-    public X509Certificate2 GetCert(V1Secret secret) => new(secret.Data["tls.crt"]);
+    public X509Certificate2 GetCert(V1Secret secret)
+    {
+        var certData = secret.Data["tls.crt"] ?? throw new ArgumentException("Certificate data is missing in the secret.");
+        return X509Certificate2.CreateFromPem(Encoding.UTF8.GetString(certData));
+    }
 
     public List<string> GetHosts(X509Certificate2 cert)
     {
@@ -59,8 +63,7 @@ public class CertClient(KCertConfig cfg)
         var jwk = GetJwk(sign);
         var jwkJson = JsonSerializer.Serialize(jwk);
         var jwkBytes = Encoding.UTF8.GetBytes(jwkJson);
-        using var hasher = SHA256.Create();
-        var result = hasher.ComputeHash(jwkBytes);
+        var result = SHA256.HashData(jwkBytes);
         return Base64UrlTextEncoder.Encode(result);
     }
 

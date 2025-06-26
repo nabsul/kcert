@@ -7,7 +7,7 @@ public class CertChangeService(ILogger<CertChangeService> log, K8sClient k8s, KC
 {
     private DateTime _lastRun = DateTime.MinValue;
 
-    private SemaphoreSlim _sem = new(1, 1);
+    private readonly SemaphoreSlim _sem = new(1, 1);
 
     // Ensures that at least one whole check for changes is executed after every call to this function
     // In otherwords:

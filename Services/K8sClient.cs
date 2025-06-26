@@ -15,9 +15,9 @@ public class K8sClient(KCertConfig cfg, Kubernetes client)
     private const string TlsTypeSelector = "type=kubernetes.io/tls";
 
     private string IngressLabel => $"{IngressLabelKey}={cfg.IngressLabelValue}";
-    private string ConfigMapLabel => $"{K8sWatchClient.CertRequestKey}={K8sWatchClient.CertRequestValue}";
+    private static string ConfigMapLabel => $"{K8sWatchClient.CertRequestKey}={K8sWatchClient.CertRequestValue}";
     private string ManagedSecretLabel => $"{CertLabelKey}={cfg.IngressLabelValue}";
-    private string UnManagedSecretLabel => $"!{CertLabelKey}";
+    private static string UnManagedSecretLabel => $"!{CertLabelKey}";
 
 
     public IAsyncEnumerable<V1Ingress> GetAllIngressesAsync()
