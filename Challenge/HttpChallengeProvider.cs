@@ -7,16 +7,22 @@ public class HttpChallengeProvider(K8sClient kube, KCertConfig cfg, ILogger<Http
 {
     public string AcmeChallengeType => "http-01";
 
+    private record HttpChallengeState(string[] Hosts);
+
     public async Task<object?> PrepareChallengeAsync(string[] hosts, CancellationToken tok)
     {
         log.LogInformation("HTTP-01 challenge Ingress will be managed for hosts: {hosts}", string.Join(", ", hosts));
         await AddChallengeHostsAsync(hosts);
-        return new { Hosts = hosts };
+        return new HttpChallengeState(hosts);
     }
 
     public async Task CleanupChallengeAsync(object? state, CancellationToken tok)
     {
-        var hosts = (string[])((dynamic)state!).Hosts;
+        if (state is not HttpChallengeState { Hosts: var hosts })
+        {
+            throw new ArgumentException("Invalid state provided for HTTP challenge cleanup. Expected HttpChallengeState.",nameof(state));
+        }
+    
         log.LogInformation("Deleting HTTP challenge Ingress for hosts: {hosts}", string.Join(", ", hosts));
         await kube.DeleteIngressAsync(cfg.KCertNamespace, cfg.KCertIngressName);
     }
