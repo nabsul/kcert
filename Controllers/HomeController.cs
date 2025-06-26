@@ -29,9 +29,9 @@ public class HomeController(KCertClient kcert, K8sClient kube, KCertConfig cfg, 
     }
 
     [HttpGet("challenge")]
-    public async Task<IActionResult> ChallengeAsync()
+    public async Task<IActionResult> ChallengeAsync(CancellationToken tok)
     {
-        var ingress = await kube.GetIngressAsync(cfg.KCertNamespace, cfg.KCertIngressName);
+        var ingress = await kube.GetIngressAsync(cfg.KCertNamespace, cfg.KCertIngressName, tok);
         return View(ingress);
     }
 

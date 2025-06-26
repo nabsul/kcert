@@ -1,14 +1,48 @@
 using Amazon;
 using Amazon.Route53;
 using Amazon.Route53.Model;
+using KCert.Models;
 using KCert.Services;
 
 namespace KCert.Challenge;
 
 [Service]
-public class AwsRoute53Provider(KCertConfig cfg, ILogger<AwsRoute53Provider> log) : IChallengeProvider
+public class AwsRoute53Provider(KCertConfig cfg, DnsUtils util, ILogger<AwsRoute53Provider> log) : IChallengeProvider
 {
     public string AcmeChallengeType => "dns-01";
+    private record AwsRoute53State(string HostedZoneId, string Domain, string RecordName, string RecordValue);
+
+    public async Task<object?> PrepareChallengesAsync(IEnumerable<AcmeAuthzResponse> auths, CancellationToken tok)
+    {
+        var res = new List<AwsRoute53State>();
+
+        foreach (var auth in auths)
+        {
+            var domain = util.StripWildcard(auth.Identifier.Value);
+            var recordName = util.GetTextRecordKey(domain);
+            var recordValue = util.GetTextRecordValue(auth, domain);
+
+            log.LogInformation("Preparing DNS challenge for domain {domain} with record {recordName} and value {recordValue}", domain, recordName, recordValue);
+            var zoneId = await CreateTxtRecordAsync(domain, recordName, recordValue, tok);
+            res.Add(new AwsRoute53State(zoneId, domain, recordName, recordValue));
+        }
+
+        return res;
+    }
+
+    public async Task CleanupChallengeAsync(object? state, CancellationToken tok)
+    {
+        if (state is not List<AwsRoute53State> states)
+        {
+            throw new ArgumentException("Invalid state provided for AWS Route53 challenge cleanup. Expected List<AwsRoute53State>.", nameof(state));
+        }
+
+        foreach (var s in states)
+        {
+            log.LogInformation("Cleaning up DNS challenge for domain {domain} with record {recordName} and value {recordValue}", s.Domain, s.RecordName, s.RecordValue);
+            await DeleteTxtRecordAsync(s.HostedZoneId, s.RecordName, s.RecordValue, tok);
+        }
+    }
 
     private static AmazonRoute53Client GetClient(string id, string key, string region)
     {
@@ -18,9 +52,9 @@ public class AwsRoute53Provider(KCertConfig cfg, ILogger<AwsRoute53Provider> log
 
     private readonly AmazonRoute53Client _client = GetClient(cfg.Route53AccessKeyId, cfg.Route53SecretAccessKey, cfg.Route53Region);
 
-    private async Task<string> GetHostedZoneIdAsync(string domainName)
+    private async Task<string> GetHostedZoneIdAsync(string domainName, CancellationToken tok)
     {
-        var zonesResponse = await _client.ListHostedZonesAsync();
+        var zonesResponse = await _client.ListHostedZonesAsync(tok);
 
         try
         {
@@ -35,9 +69,9 @@ public class AwsRoute53Provider(KCertConfig cfg, ILogger<AwsRoute53Provider> log
         }
     }
 
-    public async Task CreateTxtRecordAsync(string domainName, string recordName, string recordValue)
+    public async Task<string> CreateTxtRecordAsync(string domainName, string recordName, string recordValue, CancellationToken tok)
     {
-        var hostedZoneId = await GetHostedZoneIdAsync(domainName);
+        var hostedZoneId = await GetHostedZoneIdAsync(domainName, tok);
 
         // TXT record values need to be enclosed in quotes.
         var properlyQuotedValue = $"\"{recordValue.Replace("\"", "\\\"")}\"";
@@ -63,9 +97,9 @@ public class AwsRoute53Provider(KCertConfig cfg, ILogger<AwsRoute53Provider> log
         try
         {
             log.LogInformation("Attempting to create/update TXT record: {recordName} with value: {properlyQuotedValue} in zone {hostedZoneId}", recordName, properlyQuotedValue, hostedZoneId);
-            var response = await _client.ChangeResourceRecordSetsAsync(request);
+            var response = await _client.ChangeResourceRecordSetsAsync(request, tok);
             log.LogInformation("Successfully sent request to create/update TXT record {recordName}. Status: {response.ChangeInfo.Status}, ID: {response.ChangeInfo.Id}", recordName, response.ChangeInfo.Status, response.ChangeInfo.Id);
-            // Optionally, wait for the change to propagate if needed, though ACME validation usually handles this.
+            return hostedZoneId;
         }
         catch (Exception ex)
         {
@@ -73,15 +107,8 @@ public class AwsRoute53Provider(KCertConfig cfg, ILogger<AwsRoute53Provider> log
         }
     }
 
-    public async Task DeleteTxtRecordAsync(string domainName, string recordName, string recordValue)
+    public async Task DeleteTxtRecordAsync(string hostedZoneId, string recordName, string recordValue, CancellationToken tok)
     {
-        var hostedZoneId = await GetHostedZoneIdAsync(domainName);
-        if (string.IsNullOrEmpty(hostedZoneId))
-        {
-            log.LogError("Cannot delete TXT record for {recordName}. Hosted zone ID not found for domain {domainName}.", recordName, domainName);
-            return;
-        }
-
         var properlyQuotedValue = $"\"{recordValue.Replace("\"", "\\\"")}\"";
 
         var change = new Change
@@ -105,7 +132,7 @@ public class AwsRoute53Provider(KCertConfig cfg, ILogger<AwsRoute53Provider> log
         try
         {
             log.LogInformation("Attempting to delete TXT record: {recordName} with value: {properlyQuotedValue} in zone {hostedZoneId}", recordName, properlyQuotedValue, hostedZoneId);
-            var response = await _client.ChangeResourceRecordSetsAsync(request);
+            var response = await _client.ChangeResourceRecordSetsAsync(request, tok);
             log.LogInformation("Successfully sent request to delete TXT record {recordName}. Status: {response.ChangeInfo.Status}, ID: {response.ChangeInfo.Id}", recordName, response.ChangeInfo.Status, response.ChangeInfo.Id);
         }
         catch (InvalidChangeBatchException ex)

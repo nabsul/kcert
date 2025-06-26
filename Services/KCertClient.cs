@@ -55,7 +55,7 @@ public class KCertClient(K8sClient kube, RenewalHandler getCert, ILogger<KCertCl
 
         try
         {
-            await getCert.RenewCertAsync(ns, secretName, hosts);
+            await getCert.RenewCertAsync(ns, secretName, hosts, tok);
             tok.ThrowIfCancellationRequested();
 
             await email.NotifyRenewalResultAsync(ns, secretName, null);

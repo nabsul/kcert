@@ -4,13 +4,47 @@ using System.Text.Json;
 using System.Text.Json.Serialization;
 using System.Collections.Concurrent;
 using KCert.Services;
+using KCert.Models;
 
 namespace KCert.Challenge;
 
 [Service]
-public class CloudflareProvider(KCertConfig cfg, ILogger<CloudflareProvider> log) : IChallengeProvider
+public class CloudflareProvider(KCertConfig cfg, DnsUtils util, ILogger<CloudflareProvider> log) : IChallengeProvider
 {
     public string AcmeChallengeType => "dns-01";
+    private record CloudflareChallengeState(string ZoneId, string DomainName, string RecordName, string RecordValue);
+
+    public async Task<object?> PrepareChallengesAsync(IEnumerable<AcmeAuthzResponse> auths, CancellationToken tok)
+    {
+        var res = new List<CloudflareChallengeState>();
+
+        foreach (var auth in auths)
+        {
+            var domain = util.StripWildcard(auth.Identifier.Value);
+            var recordName = util.GetTextRecordKey(domain);
+            var recordValue = util.GetTextRecordValue(auth, domain);
+
+            log.LogInformation("Preparing DNS challenge for domain {domain} with record {recordName} and value {recordValue}", domain, recordName, recordValue);
+            var zoneId = await CreateTxtRecordAsync(domain, recordName, recordValue, tok);
+            res.Add(new CloudflareChallengeState(zoneId, domain, recordName, recordValue));
+        }
+
+        return res;
+    }
+
+    public async Task CleanupChallengeAsync(object? state, CancellationToken tok)
+    {
+        if (state is not List<CloudflareChallengeState> states)
+        {
+            throw new ArgumentException("Invalid state provided for Cloudflare challenge cleanup. Expected List<CloudflareChallengeState>.", nameof(state));
+        }
+
+        foreach (var s in states)
+        {
+            await DeleteTxtRecordAsync(s.ZoneId, s.DomainName, s.RecordName, s.RecordValue, tok);
+        }
+    }
+
 
     private readonly HttpClient _httpClient = GetHttpClient(cfg);
     private static readonly ConcurrentDictionary<string, string> _zoneIdCache = new();
@@ -28,7 +62,7 @@ public class CloudflareProvider(KCertConfig cfg, ILogger<CloudflareProvider> log
         return client;
     }
 
-    private async Task<string?> GetZoneIdAsync(string domainName)
+    private async Task<string> GetZoneIdAsync(string domainName, CancellationToken tok)
     {
         // Cloudflare's API matches zones by name. If domainName is "sub.example.com",
         // it will find "example.com" zone.
@@ -47,21 +81,19 @@ public class CloudflareProvider(KCertConfig cfg, ILogger<CloudflareProvider> log
         }
 
         log.LogDebug("Attempting to find zone ID for domain: {Domain}", registrableDomain);
-        var response = await _httpClient.GetAsync($"zones?name={registrableDomain}");
+        var response = await _httpClient.GetAsync($"zones?name={registrableDomain}", tok);
         if (!response.IsSuccessStatusCode)
         {
-            var errorBody = await response.Content.ReadAsStringAsync();
-            log.LogError("Error fetching zone ID for {Domain}. Status: {StatusCode}. Body: {Body}", registrableDomain, response.StatusCode, errorBody);
-            return null;
+            var errorBody = await response.Content.ReadAsStringAsync(tok);
+            throw new Exception($"Error fetching zone ID for {registrableDomain}. Status: {response.StatusCode}. Body: {errorBody}");
         }
 
-        var content = await response.Content.ReadAsStringAsync();
+        var content = await response.Content.ReadAsStringAsync(tok);
         var cfResponse = JsonSerializer.Deserialize<CloudflareZonesResponse>(content, _jsonOptions);
 
         if (cfResponse?.Result == null || !cfResponse.Result.Any())
         {
-            log.LogWarning("No zone found for domain: {Domain}", registrableDomain);
-            return null;
+            throw new Exception($"No zone found for domain: {registrableDomain}");
         }
 
         // Assuming the first result is the correct one if multiple are returned (shouldn't happen for exact name match)
@@ -71,15 +103,9 @@ public class CloudflareProvider(KCertConfig cfg, ILogger<CloudflareProvider> log
         return zoneId;
     }
 
-    public async Task CreateTxtRecordAsync(string domainName, string recordName, string recordValue)
+    public async Task<string> CreateTxtRecordAsync(string domainName, string recordName, string recordValue, CancellationToken tok)
     {
-        var zoneId = await GetZoneIdAsync(domainName);
-        if (string.IsNullOrEmpty(zoneId))
-        {
-            log.LogError("Cannot create TXT record for {RecordName}. Zone ID not found for domain {DomainName}.", recordName, domainName);
-            return;
-        }
-
+        var zoneId = await GetZoneIdAsync(domainName, tok);
         var payload = new CloudflareDnsRequest
         {
             Type = "TXT",
@@ -92,92 +118,60 @@ public class CloudflareProvider(KCertConfig cfg, ILogger<CloudflareProvider> log
         var httpContent = new StringContent(jsonPayload, Encoding.UTF8, "application/json");
 
         log.LogInformation("Attempting to create TXT record: {RecordName} with value: {RecordValue} in zone {ZoneId}", recordName, recordValue, zoneId);
-        var response = await _httpClient.PostAsync($"zones/{zoneId}/dns_records", httpContent);
-        var responseBody = await response.Content.ReadAsStringAsync();
+        var response = await _httpClient.PostAsync($"zones/{zoneId}/dns_records", httpContent, tok);
+        var responseBody = await response.Content.ReadAsStringAsync(tok);
 
-        if (response.IsSuccessStatusCode)
+        if (!response.IsSuccessStatusCode)
         {
-            log.LogInformation("Successfully created TXT record {RecordName}. Response: {ResponseBody}", recordName, responseBody);
+            throw new Exception($"Error creating TXT record {recordName}. Status: {response.StatusCode}. Response: {responseBody}");
         }
-        else
-        {
-            log.LogError("Error creating TXT record {RecordName}. Status: {StatusCode}. Response: {ResponseBody}", recordName, response.StatusCode, responseBody);
-        }
+
+        return zoneId;
     }
 
-    public async Task DeleteTxtRecordAsync(string domainName, string recordName, string recordValue)
+    public async Task DeleteTxtRecordAsync(string zoneId, string domainName, string recordName, string recordValue, CancellationToken tok)
     {
-        var zoneId = await GetZoneIdAsync(domainName);
-        if (string.IsNullOrEmpty(zoneId))
+        // Note: Cloudflare API expects the 'name' to be the FQDN of the record.
+        log.LogDebug("Attempting to find DNS record ID for Name: {RecordName}, Content: {RecordValue} in zone {ZoneId}", recordName, recordValue, zoneId);
+        var listResponse = await _httpClient.GetAsync($"zones/{zoneId}/dns_records?type=TXT&name={recordName}&content={recordValue}", tok);
+
+        if (!listResponse.IsSuccessStatusCode)
         {
-            log.LogError("Cannot delete TXT record for {RecordName}. Zone ID not found for domain {DomainName}.", recordName, domainName);
-            return;
+            var errorBody = await listResponse.Content.ReadAsStringAsync(tok);
+            throw new Exception($"Error listing DNS records to find ID for {recordName}. Status: {listResponse.StatusCode}. Body: {errorBody}");
         }
 
-        // First, find the record ID
-        string? recordId = null;
-        try
-        {
-            // Note: Cloudflare API expects the 'name' to be the FQDN of the record.
-            log.LogDebug("Attempting to find DNS record ID for Name: {RecordName}, Content: {RecordValue} in zone {ZoneId}", recordName, recordValue, zoneId);
-            var listResponse = await _httpClient.GetAsync($"zones/{zoneId}/dns_records?type=TXT&name={recordName}&content={recordValue}");
-            
-            if (!listResponse.IsSuccessStatusCode)
-            {
-                var errorBody = await listResponse.Content.ReadAsStringAsync();
-                log.LogError("Error listing DNS records to find ID for {RecordName}. Status: {StatusCode}. Body: {Body}", recordName, listResponse.StatusCode, errorBody);
-                return;
-            }
+        var listContent = await listResponse.Content.ReadAsStringAsync(tok);
+        var cfListResponse = JsonSerializer.Deserialize<CloudflareDnsListResponse>(listContent, _jsonOptions);
 
-            var listContent = await listResponse.Content.ReadAsStringAsync();
-            var cfListResponse = JsonSerializer.Deserialize<CloudflareDnsListResponse>(listContent, _jsonOptions);
-
-            if (cfListResponse?.Result != null && cfListResponse.Result.Any())
-            {
-                recordId = cfListResponse.Result.First().Id; // Assuming first one is the match
-                log.LogInformation("Found DNS record ID: {RecordId} for {RecordName}", recordId, recordName);
-            }
-            else
-            {
-                log.LogWarning("No TXT record found for Name: {RecordName} and Content: {RecordValue} in zone {ZoneId}. It might have been already deleted.", recordName, recordValue, zoneId);
-                return; // Nothing to delete
-            }
-        }
-        catch (Exception ex)
+        var result = cfListResponse?.Result;
+        if (result == null || result.Count == 0)
         {
-            log.LogError(ex, "Exception finding DNS record ID for {RecordName}", recordName);
-            return;
+            throw new Exception($"No TXT record found for Name: {recordName} and Content: {recordValue} in zone {zoneId}. It might have been already deleted.");
         }
 
+        var recordId = result.First().Id; // Assuming first one is the match
         if (string.IsNullOrEmpty(recordId))
         {
-            log.LogWarning("TXT record ID for {RecordName} not found, cannot delete.", recordName);
-            return;
+            throw new Exception($"TXT record ID for {recordName} not found, cannot delete.");
         }
 
-        // Now delete the record
-        try
-        {
-            log.LogInformation("Attempting to delete TXT record ID: {RecordId} ({RecordName}) in zone {ZoneId}", recordId, recordName, zoneId);
-            var deleteResponse = await _httpClient.DeleteAsync($"zones/{zoneId}/dns_records/{recordId}");
-            var deleteResponseBody = await deleteResponse.Content.ReadAsStringAsync();
+        log.LogInformation("Found DNS record ID: {RecordId} for {RecordName}", recordId, recordName);
 
-            if (deleteResponse.IsSuccessStatusCode)
-            {
-                log.LogInformation("Successfully deleted TXT record ID: {RecordId}. Response: {ResponseBody}", recordId, deleteResponseBody);
-            }
-            else
-            {
-                log.LogError("Error deleting TXT record ID: {RecordId}. Status: {StatusCode}. Response: {ResponseBody}", recordId, deleteResponse.StatusCode, deleteResponseBody);
-            }
-        }
-        catch (Exception ex)
+        log.LogInformation("Attempting to delete TXT record ID: {RecordId} ({RecordName}) in zone {ZoneId}", recordId, recordName, zoneId);
+        var deleteResponse = await _httpClient.DeleteAsync($"zones/{zoneId}/dns_records/{recordId}", tok);
+        var deleteResponseBody = await deleteResponse.Content.ReadAsStringAsync(tok);
+
+        if (!deleteResponse.IsSuccessStatusCode)
         {
-            log.LogError(ex, "Exception deleting TXT record ID: {RecordId}", recordId);
+            throw new Exception($"Error deleting TXT record ID: {recordId}. Status: {deleteResponse.StatusCode}. Response: {deleteResponseBody}");
         }
+
+        log.LogInformation("Successfully deleted TXT record ID: {RecordId}. Response: {ResponseBody}", recordId, deleteResponseBody);
     }
 
     // Helper classes for JSON deserialization
+
     private class CloudflareZonesResponse
     {
         public List<CloudflareZone>? Result { get; set; }

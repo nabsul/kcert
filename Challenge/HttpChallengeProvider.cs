@@ -1,4 +1,5 @@
 using k8s.Models;
+using KCert.Models;
 using KCert.Services;
 
 namespace KCert.Challenge;
@@ -9,10 +10,11 @@ public class HttpChallengeProvider(K8sClient kube, KCertConfig cfg, ILogger<Http
 
     private record HttpChallengeState(string[] Hosts);
 
-    public async Task<object?> PrepareChallengeAsync(string[] hosts, CancellationToken tok)
+    public async Task<object?> PrepareChallengesAsync(IEnumerable<AcmeAuthzResponse> auths, CancellationToken tok)
     {
+        var hosts = auths.Select(auth => auth.Identifier.Value).ToArray();
         log.LogInformation("HTTP-01 challenge Ingress will be managed for hosts: {hosts}", string.Join(", ", hosts));
-        await AddChallengeHostsAsync(hosts);
+        await AddChallengeHostsAsync(hosts, tok);
         return new HttpChallengeState(hosts);
     }
 
@@ -24,15 +26,15 @@ public class HttpChallengeProvider(K8sClient kube, KCertConfig cfg, ILogger<Http
         }
     
         log.LogInformation("Deleting HTTP challenge Ingress for hosts: {hosts}", string.Join(", ", hosts));
-        await kube.DeleteIngressAsync(cfg.KCertNamespace, cfg.KCertIngressName);
+        await kube.DeleteIngressAsync(cfg.KCertNamespace, cfg.KCertIngressName, tok);
     }
 
-    private async Task AddChallengeHostsAsync(IEnumerable<string> hosts)
+    private async Task AddChallengeHostsAsync(IEnumerable<string> hosts, CancellationToken tok)
     {
-        var kcertIngress = await kube.GetIngressAsync(cfg.KCertNamespace, cfg.KCertIngressName);
+        var kcertIngress = await kube.GetIngressAsync(cfg.KCertNamespace, cfg.KCertIngressName, tok);
         if (kcertIngress != null)
         {
-            await kube.DeleteIngressAsync(cfg.KCertNamespace, cfg.KCertIngressName);
+            await kube.DeleteIngressAsync(cfg.KCertNamespace, cfg.KCertIngressName, tok);
         }
 
         kcertIngress = new()
@@ -68,7 +70,7 @@ public class HttpChallengeProvider(K8sClient kube, KCertConfig cfg, ILogger<Http
 
         if (!cfg.SkipIngressPropagationCheck)
         {
-            await AwaitIngressPropagationAsync(kcertIngress);
+            await AwaitIngressPropagationAsync(kcertIngress, tok);
         }
         else
         {
@@ -102,12 +104,12 @@ public class HttpChallengeProvider(K8sClient kube, KCertConfig cfg, ILogger<Http
         };
     }
 
-    private async Task AwaitIngressPropagationAsync(V1Ingress kcertIngress)
+    private async Task AwaitIngressPropagationAsync(V1Ingress kcertIngress, CancellationToken tok)
     {
         var timeoutCancellationToken = new CancellationTokenSource(cfg.ChallengeIngressMaxPropagationWaitTime).Token;
         while (timeoutCancellationToken.IsCancellationRequested is false)
         {
-            if (await IsIngressPropagated(kcertIngress)) return;
+            if (await IsIngressPropagated(kcertIngress, tok)) return;
 
             await Task.Delay(cfg.ChallengeIngressPropagationCheckInterval, cancellationToken: timeoutCancellationToken);
         }
@@ -118,9 +120,9 @@ public class HttpChallengeProvider(K8sClient kube, KCertConfig cfg, ILogger<Http
           + $"({nameof(KCertConfig.ChallengeIngressMaxPropagationWaitTime)}:{cfg.ChallengeIngressMaxPropagationWaitTime})");
     }
 
-    private async Task<bool> IsIngressPropagated(V1Ingress kcertIngress)
+    private async Task<bool> IsIngressPropagated(V1Ingress kcertIngress, CancellationToken tok)
     {
-        var ingress = await kube.GetIngressAsync(kcertIngress.Namespace(), kcertIngress.Name());
+        var ingress = await kube.GetIngressAsync(kcertIngress.Namespace(), kcertIngress.Name(), tok);
         return ingress?.Status.LoadBalancer.Ingress?.Any() ?? false;
     }
 }

@@ -64,11 +64,6 @@ public class CertClient(KCertConfig cfg)
         return Base64UrlTextEncoder.Encode(result);
     }
 
-    public string GetKeyAuthorization(string token)
-    {
-        return token + "." + GetThumbprint();
-    }
-
     public ECDsa GetSigner(string key)
     {
         var sign = ECDsa.Create();
