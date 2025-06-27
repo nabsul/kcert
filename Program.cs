@@ -13,15 +13,21 @@ if (args.Length > 0 && args[^1] == "generate-key")
 
 var builder = WebApplication.CreateBuilder(args);
 var cfg = new KCertConfig(builder.Configuration);
-var allTypes = Assembly.GetExecutingAssembly().GetTypes();
+builder.Services.AddSingleton(cfg);
 
-// Add all services marked with the [Service] attribute
-allTypes.Where(t => t.GetCustomAttribute<ServiceAttribute>() != null)
-    .ToList().ForEach(t => builder.Services.AddSingleton(t));
+foreach (var t in Assembly.GetExecutingAssembly().GetTypes())
+{
+    if (t.GetCustomAttribute<ServiceAttribute>() is not null)
+    {
+        builder.Services.AddSingleton(t);
+        continue;
+    }
 
-// Find the challenge provider based on the configured challenge type
-allTypes.Where(t => t.GetCustomAttribute<ChallengeAttribute>() is ChallengeAttribute attr && attr.ChallengeType == cfg.ChallengeType)
-    .ToList().ForEach(t => builder.Services.AddSingleton(typeof(IChallengeProvider), t));
+    if (t.GetCustomAttribute<ChallengeAttribute>() is ChallengeAttribute attr && attr.ChallengeType == cfg.ChallengeType)
+    {
+        builder.Services.AddSingleton(typeof(IChallengeProvider), t);
+    }
+}
 
 builder.Services.AddSingleton(s => s.GetRequiredService<KubernetesFactory>().GetClient());
 builder.Services.AddConnections();

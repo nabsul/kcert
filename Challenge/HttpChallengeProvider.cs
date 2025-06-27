@@ -51,20 +51,13 @@ public class HttpChallengeProvider(K8sClient kube, KCertConfig cfg, ILogger<Http
             }
         };
 
-        if (cfg.UseChallengeIngressClassName)
+        if (string.IsNullOrWhiteSpace(cfg.ChallengeIngressClassName) is false)
         {
             kcertIngress.Spec.IngressClassName = cfg.ChallengeIngressClassName;
         }
 
-        if (cfg.UseChallengeIngressAnnotations)
-        {
-            kcertIngress.Metadata.Annotations = cfg.ChallengeIngressAnnotations;
-        }
-
-        if (cfg.UseChallengeIngressLabels)
-        {
-            kcertIngress.Metadata.Labels = cfg.ChallengeIngressLabels;
-        }
+        kcertIngress.Metadata.Annotations = cfg.ChallengeIngressAnnotations;
+        kcertIngress.Metadata.Labels = cfg.ChallengeIngressLabels;
 
         await kube.CreateIngressAsync(kcertIngress);
         log.LogInformation("Giving challenge ingress time to propagate");

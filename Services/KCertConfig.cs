@@ -1,6 +1,5 @@
 ﻿namespace KCert.Services;
 
-[Service]
 public class KCertConfig(IConfiguration cfg)
 {
     private readonly string _backupKey = CertClient.GenerateNewKey();
@@ -17,13 +16,10 @@ public class KCertConfig(IConfiguration cfg)
     public int InitialSleepOnFailure => GetInt("KCert:InitialSleepOnFailure");
     public string[] NamespaceConstraints => GetString("KCert:NamespaceConstraints")?.Split(",") ?? [];
 
-    public bool UseChallengeIngressClassName => GetBool("ChallengeIngress:UseClassName");
     public string ChallengeIngressClassName => GetRequiredString("ChallengeIngress:ClassName");
 
-    public bool UseChallengeIngressAnnotations => GetBool("ChallengeIngress:UseAnnotations");
     public Dictionary<string, string> ChallengeIngressAnnotations => GetDictionary("ChallengeIngress:Annotations");
 
-    public bool UseChallengeIngressLabels => GetBool("ChallengeIngress:UseLabels");
     public Dictionary<string, string> ChallengeIngressLabels => GetDictionary("ChallengeIngress:Labels");
 
     public TimeSpan ChallengeIngressMaxPropagationWaitTime => TimeSpan.FromSeconds(GetInt("ChallengeIngress:MaxPropagationWaitTimeSeconds"));
@@ -41,11 +37,11 @@ public class KCertConfig(IConfiguration cfg)
     public string AcmeKey => cfg.GetValue("Acme:Key", _backupKey);
     public bool AcmeAccepted => GetBool("Acme:TermsAccepted");
 
-    public bool UseEabKey => GetBool("Acme:UseEabKey");
+    public bool UseEabKey => !string.IsNullOrEmpty(AcmeEabKeyId);
     public string AcmeEabKeyId => GetRequiredString("Acme:EabKeyId");
     public string AcmeHmacKey => GetRequiredString("Acme:EabHmacKey");
 
-    public bool SmtpEnabled => GetBool("Smtp:Enabled");
+    public bool SmtpEnabled => !string.IsNullOrEmpty(SmtpEmailFrom);
     public string SmtpEmailFrom => GetRequiredString("Smtp:EmailFrom");
     public string SmtpHost => GetRequiredString("Smtp:Host");
     public int SmtpPort => GetInt("Smtp:Port");
