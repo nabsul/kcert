@@ -3,11 +3,11 @@
 [Service]
 public class KCertConfig(IConfiguration cfg)
 {
-    private readonly string _key = CertClient.GenerateNewKey();
+    private readonly string _backupKey = CertClient.GenerateNewKey();
 
     public bool WatchIngresses => GetBool("KCert:WatchIngresses");
     public bool WatchConfigMaps => GetBool("KCert:WatchConfigMaps");
-    public string? K8sConfigFile => cfg["Config"];
+    public string K8sConfigFile => GetRequiredString("Config");
     public string KCertNamespace => GetRequiredString("KCert:Namespace");
     public string KCertSecretName => GetRequiredString("KCert:SecretName");
     public string KCertServiceName => GetRequiredString("KCert:ServiceName");
@@ -38,17 +38,19 @@ public class KCertConfig(IConfiguration cfg)
 
     public Uri AcmeDir => new(GetRequiredString("Acme:DirUrl"));
     public string AcmeEmail => GetRequiredString("Acme:Email");
-    public string AcmeKey => GetString("Acme:Key") ?? _key; // If no key is provided via configs, use generated key.
+    public string AcmeKey => cfg.GetValue("Acme:Key", _backupKey);
     public bool AcmeAccepted => GetBool("Acme:TermsAccepted");
 
-    public string? AcmeEabKeyId => GetString("Acme:EabKeyId");
-    public string? AcmeHmacKey => GetString("Acme:EabHmacKey");
+    public bool UseEabKey => GetBool("Acme:UseEabKey");
+    public string AcmeEabKeyId => GetRequiredString("Acme:EabKeyId");
+    public string AcmeHmacKey => GetRequiredString("Acme:EabHmacKey");
 
-    public string? SmtpEmailFrom => GetString("Smtp:EmailFrom");
-    public string? SmtpHost => GetString("Smtp:Host");
+    public bool SmtpEnabled => GetBool("Smtp:Enabled");
+    public string SmtpEmailFrom => GetRequiredString("Smtp:EmailFrom");
+    public string SmtpHost => GetRequiredString("Smtp:Host");
     public int SmtpPort => GetInt("Smtp:Port");
-    public string? SmtpUser => GetString("Smtp:User");
-    public string? SmtpPass => GetString("Smtp:Pass");
+    public string SmtpUser => GetRequiredString("Smtp:User");
+    public string SmtpPass => GetRequiredString("Smtp:Pass");
 
     public string IngressLabelValue => GetRequiredString("ChallengeIngress:IngressLabelValue");
 
@@ -115,7 +117,7 @@ public class KCertConfig(IConfiguration cfg)
 
     private Dictionary<string, string> GetDictionary(string key)
     {
-        var data = cfg.GetSection(key)?.GetChildren() ?? Enumerable.Empty<IConfigurationSection>();
+        var data = cfg.GetSection(key)?.GetChildren() ?? [];
         return data.ToDictionary(s => s.Key, s => s.Value ?? "");
     }
 }
