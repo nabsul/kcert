@@ -1,4 +1,5 @@
 ﻿using k8s.Models;
+using KCert.Config;
 using Microsoft.AspNetCore.Authentication;
 using System.Security.Cryptography;
 using System.Security.Cryptography.X509Certificates;
@@ -7,7 +8,6 @@ using System.Text.Json;
 
 namespace KCert.Services;
 
-[Service]
 public class CertClient(KCertConfig cfg)
 {
     private const int PEMLineLen = 64;

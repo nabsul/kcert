@@ -1,10 +1,10 @@
 ﻿using k8s;
 using k8s.Autorest;
 using k8s.Models;
+using KCert.Config;
 
 namespace KCert.Services;
 
-[Service]
 public class K8sWatchClient(KCertConfig cfg, ILogger<K8sClient> log, Kubernetes client)
 {
     public const string CertRequestKey = "kcert.dev/cert-request";

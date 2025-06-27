@@ -1,9 +1,9 @@
 ﻿using k8s.Models;
+using KCert.Config;
 using KCert.Models;
 
 namespace KCert.Services;
 
-[Service]
 public class RenewalService(ILogger<RenewalService> log, KCertClient kcert, KCertConfig cfg, K8sClient k8s, CertClient cert, EmailClient email) : IHostedService
 {
     private const int MaxServiceFailures = 5;

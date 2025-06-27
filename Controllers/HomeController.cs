@@ -1,4 +1,5 @@
 ﻿using k8s.Models;
+using KCert.Config;
 using KCert.Services;
 using Microsoft.AspNetCore.Mvc;
 

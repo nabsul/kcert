@@ -1,6 +1,6 @@
 using KCert.Challenge;
+using KCert.Config;
 using KCert.Services;
-using System.Reflection;
 
 // command line option for manually generating an ECDSA key
 if (args.Length > 0 && args[^1] == "generate-key")
@@ -13,25 +13,13 @@ if (args.Length > 0 && args[^1] == "generate-key")
 
 var builder = WebApplication.CreateBuilder(args);
 var cfg = new KCertConfig(builder.Configuration);
+
 builder.Services.AddSingleton(cfg);
-
-foreach (var t in Assembly.GetExecutingAssembly().GetTypes())
-{
-    if (t.GetCustomAttribute<ServiceAttribute>() is not null)
-    {
-        builder.Services.AddSingleton(t);
-        continue;
-    }
-
-    if (t.GetCustomAttribute<ChallengeAttribute>() is ChallengeAttribute attr && attr.ChallengeType == cfg.ChallengeType)
-    {
-        builder.Services.AddSingleton(typeof(IChallengeProvider), t);
-    }
-}
-
-builder.Services.AddSingleton(s => s.GetRequiredService<KubernetesFactory>().GetClient());
+builder.Services.AddSingleton(KubernetesFactory.GetClient(cfg));
 builder.Services.AddConnections();
 builder.Services.AddControllersWithViews();
+builder.Services.AddKCertServices();
+builder.Services.AddChallenge(cfg);
 
 builder.WebHost.ConfigureKestrel(opt =>
 {

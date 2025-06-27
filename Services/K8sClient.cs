@@ -1,12 +1,12 @@
 ﻿using k8s;
 using k8s.Autorest;
 using k8s.Models;
+using KCert.Config;
 using System.Net;
 using System.Text;
 
 namespace KCert.Services;
 
-[Service]
 public class K8sClient(KCertConfig cfg, Kubernetes client)
 {
     private const string TlsSecretType = "kubernetes.io/tls";

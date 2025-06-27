@@ -1,4 +1,6 @@
-﻿namespace KCert.Services;
+﻿using KCert.Services;
+
+namespace KCert.Config;
 
 public class KCertConfig(IConfiguration cfg)
 {

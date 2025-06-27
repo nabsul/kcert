@@ -1,9 +1,9 @@
 ﻿using KCert.Challenge;
+using KCert.Config;
 using KCert.Models;
 
 namespace KCert.Services;
 
-[Service]
 public class RenewalHandler(ILogger<RenewalHandler> log, AcmeClient acme, K8sClient kube, KCertConfig cfg, CertClient cert, IChallengeProvider chal)
 {
     public async Task RenewCertAsync(string ns, string secretName, string[] hosts, CancellationToken tok)

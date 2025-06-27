@@ -1,12 +1,11 @@
+namespace KCert.Challenge;
+
 using Amazon;
 using Amazon.Route53;
 using Amazon.Route53.Model;
+using KCert.Config;
 using KCert.Models;
-using KCert.Services;
 
-namespace KCert.Challenge;
-
-[Challenge("route53")]
 public class AwsRoute53Provider(KCertConfig cfg, DnsUtils util, ILogger<AwsRoute53Provider> log) : IChallengeProvider
 {
     public string AcmeChallengeType => "dns-01";
@@ -118,7 +117,7 @@ public class AwsRoute53Provider(KCertConfig cfg, DnsUtils util, ILogger<AwsRoute
             {
                 Name = recordName,
                 Type = RRType.TXT,
-                TTL = 60, 
+                TTL = 60,
                 ResourceRecords = [new ResourceRecord { Value = properlyQuotedValue }]
             }
         };

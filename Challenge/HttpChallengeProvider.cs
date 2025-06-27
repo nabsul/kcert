@@ -1,10 +1,10 @@
+namespace KCert.Challenge;
+
 using k8s.Models;
+using KCert.Config;
 using KCert.Models;
 using KCert.Services;
 
-namespace KCert.Challenge;
-
-[Challenge("http")]
 public class HttpChallengeProvider(K8sClient kube, KCertConfig cfg, ILogger<HttpChallengeProvider> log) : IChallengeProvider
 {
     public string AcmeChallengeType => "http-01";

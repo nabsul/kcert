@@ -1,14 +1,13 @@
-﻿using k8s;
+﻿namespace KCert.Config;
+
+using k8s;
 using k8s.Exceptions;
 
-namespace KCert.Services;
-
-[Service]
-public class KubernetesFactory(KCertConfig cfg)
+public static class KubernetesFactory
 {
-    public Kubernetes GetClient() => new(GetConfig());
+    public static Kubernetes GetClient(KCertConfig cfg) => new(GetConfig(cfg));
 
-    private KubernetesClientConfiguration GetConfig()
+    private static KubernetesClientConfiguration GetConfig(KCertConfig cfg)
     {
         try
         {

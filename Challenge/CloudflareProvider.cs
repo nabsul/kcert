@@ -1,14 +1,13 @@
+namespace KCert.Challenge;
+
 using System.Net.Http.Headers;
 using System.Text;
 using System.Text.Json;
 using System.Text.Json.Serialization;
 using System.Collections.Concurrent;
-using KCert.Services;
 using KCert.Models;
+using KCert.Config;
 
-namespace KCert.Challenge;
-
-[Challenge("cloudflare")]
 public class CloudflareProvider(KCertConfig cfg, DnsUtils util, ILogger<CloudflareProvider> log) : IChallengeProvider
 {
     public string AcmeChallengeType => "dns-01";

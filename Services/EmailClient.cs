@@ -1,10 +1,10 @@
-﻿using KCert.Models;
+﻿using KCert.Config;
+using KCert.Models;
 using System.Net;
 using System.Net.Mail;
 
 namespace KCert.Services;
 
-[Service]
 public class EmailClient(ILogger<EmailClient> log, KCertConfig cfg)
 {
     private const string TestSubject = "KCert Test Email";

@@ -1,9 +1,9 @@
 ﻿using k8s;
 using k8s.Models;
+using KCert.Config;
 
 namespace KCert.Services;
 
-[Service]
 public class IngressMonitorService(ILogger<IngressMonitorService> log, KCertConfig cfg, ExponentialBackoff exp, K8sWatchClient watch, CertChangeService certChange) : IHostedService
 {
     public Task StopAsync(CancellationToken cancellationToken) => Task.CompletedTask;

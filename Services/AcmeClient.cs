@@ -1,3 +1,4 @@
+using KCert.Config;
 using KCert.Models;
 using Microsoft.AspNetCore.Authentication;
 using System.Net.Http.Headers;
@@ -7,7 +8,6 @@ using System.Text.Json;
 
 namespace KCert.Services;
 
-[Service]
 public class AcmeClient(CertClient cert, KCertConfig cfg)
 {
     private const string HeaderReplayNonce = "Replay-Nonce";

@@ -1,6 +1,7 @@
 ﻿namespace KCert.Services;
 
-[Service]
+using KCert.Config;
+
 public class ConfigMonitorService(ILogger<ConfigMonitorService> log, KCertConfig cfg, ExponentialBackoff exp, K8sWatchClient watch, CertChangeService certChange) : IHostedService
 {
     public Task StopAsync(CancellationToken cancellationToken) => Task.CompletedTask;

@@ -2,7 +2,6 @@ using k8s.Models;
 
 namespace KCert.Services;
 
-[Service]
 public class CertChangeService(ILogger<CertChangeService> log, K8sClient k8s, KCertClient kcert)
 {
     private DateTime _lastRun = DateTime.MinValue;
