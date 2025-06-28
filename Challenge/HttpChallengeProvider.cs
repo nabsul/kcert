@@ -5,11 +5,18 @@ using KCert.Config;
 using KCert.Models;
 using KCert.Services;
 
-public class HttpChallengeProvider(K8sClient kube, KCertConfig cfg, ILogger<HttpChallengeProvider> log) : IChallengeProvider
+public class HttpChallengeProvider(K8sClient kube, KCertConfig cfg, ILogger<HttpChallengeProvider> log, CertClient cert) : IChallengeProvider
 {
     public string AcmeChallengeType => "http-01";
 
     private record HttpChallengeState(string[] Hosts);
+
+    public string HandleChallenge(string token)
+    {
+        log.LogInformation("Received ACME Challenge: {token}", token);
+        var thumbprint = cert.GetThumbprint();
+        return $"{token}.{thumbprint}";
+    }
 
     public async Task<object?> PrepareChallengesAsync(IEnumerable<AcmeAuthzResponse> auths, CancellationToken tok)
     {
