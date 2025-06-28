@@ -1,17 +1,15 @@
 apiVersion: rbac.authorization.k8s.io/v1
 kind: RoleBinding
 metadata:
-  name: {{ include "kcert.fullname" . }}
+  name: {{ .Values.name | quote }}
   namespace: {{ .Release.Namespace | default "default" }}
-{{- if .Values.forHelm }}
   labels:
     {{- include "kcert.labels" . | nindent 4 }}
-{{- end }}
 subjects:
 - kind: ServiceAccount
-  name: {{ include "kcert.fullname" . }}
+  name: {{ .Values.name | quote }}
   namespace: {{ .Release.Namespace | default "default" }}
 roleRef:
   kind: Role
-  name: {{ include "kcert.fullname" . }}
+  name: {{ .Values.name | quote }}
   apiGroup: rbac.authorization.k8s.io

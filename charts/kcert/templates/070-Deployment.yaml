@@ -1,32 +1,26 @@
 apiVersion: apps/v1
 kind: Deployment
 metadata:
-  name: {{ include "kcert.fullname" . }}
+  name: {{ .Values.name | quote }}
   namespace: {{ .Release.Namespace | default "default" }}
   labels:
-    app: {{ include "kcert.fullname" . }}
-    {{- if .Values.forHelm }}
+    app: {{ .Values.name | quote }}
     {{- include "kcert.labels" . | nindent 4 }}
-    {{- end }}
 spec:
   replicas: 1
   selector:
     matchLabels:
-      app: {{ include "kcert.fullname" . }}
-      {{- if .Values.forHelm }}
+      app: {{ .Values.name | quote }}
       {{- include "kcert.selectorLabels" . | nindent 6 }}
-      {{- end }}
   template:
     metadata:
       labels:
-        app: {{ include "kcert.fullname" . }}
-        {{- if .Values.forHelm }}
+        app: {{ .Values.name | quote }}
         {{- include "kcert.selectorLabels" . | nindent 8 }}
-        {{- end }}
     spec:
-      serviceAccountName: {{ include "kcert.fullname" . }}
+      serviceAccountName: {{ .Values.name | quote }}
       containers:
-      - name: {{ include "kcert.fullname" . }}
+      - name: {{ .Values.name | quote }}
         image: {{ required "kcertImage is required" .Values.kcertImage }}
         securityContext:
           {{- toYaml .Values.securityContext | nindent 10 }}

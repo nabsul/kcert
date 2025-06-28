@@ -1,30 +1,20 @@
-kcertImage: nabsul/kcert:v1.2.0
+kcertImage: "nabsul/kcert:v1.2.0"
+name: "kcert"
 
+# KCert uses the standard .NET configuration system, which allows you to set configuration values via environment variables.
+# The following environment variables must be set for KCert to work properly. All others can be set according to your needs.
+# You can see all available configuration options in apsettings.json or in KCertConfig.cs.
 env:
-  KCERT__SHOWRENEWBUTTON: "false",
-  ACME__EMAIL: "",
-  ACME__TERMSACCEPTED: "false",
-  ACME__DIRURL: "https://acme-staging-v02.api.letsencrypt.org/directory", # https://acme-v02.api.letsencrypt.org/directory
-  #KCERT__NAMESPACE: "",
-  #KCERT__SERVICENAME: "", # set this to the name of the service you want to use for the ingress
-  #KCERT__INGRESSNAME: "", # set this to the name of the ingress you
-  #KCERT__ALLOWEDNAMESPACES: "", # set this to the namespaces you want to allow kcert to manage, or leave empty to allow all namespaces
-  #SMTP__EMAILFROM: "",
-  #SMTP__HOST: "",
-  #SMTP__PORT: "",
-  #SMTP__USER: "",
-  #SMTP__PASS: "",
-  #ACME__KEY: "", # set this to the secret containing the acmeKey
-  #ACME__EABKEYID: "",
-  #ACME__EABHMACKEY: "",
+  ACME__EMAIL: ""
+  ACME__TERMSACCEPTED: "false"
+  ACME__DIRURL: "https://acme-staging-v02.api.letsencrypt.org/directory" # https://acme-v02.api.letsencrypt.org/directory
+  KCERT__SHOWRENEWBUTTON: "false"
 
+# You can also set environment variables via Kubernetes secrets in this section.
 envSecrets:
   # - name: "ENV_VAR"
   #   secretName: "my-secret"
   #   secretKey: "key-in-secret"
-
-# set to null to allow managing all namespaces, or limit with array of namespaces
-allowedNamespaces: null #["namespace1", "namespace2", ...]
 
 securityContext: {}
   # capabilities:
@@ -35,6 +25,3 @@ securityContext: {}
   # runAsUser: 1000
 
 resources: {}
-
-# Set this to false in order to generate a plain yaml template without the Helm custom labels
-forHelm: true
