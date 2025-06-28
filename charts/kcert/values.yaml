@@ -1,31 +1,30 @@
-acmeDirUrl: https://acme-staging-v02.api.letsencrypt.org/directory
-acmeEmail: null
-acmeTermsAccepted: false
 kcertImage: nabsul/kcert:v1.2.0
 
-env: {}
+env:
+  KCERT__SHOWRENEWBUTTON: "false",
+  ACME__EMAIL: "",
+  ACME__TERMSACCEPTED: "false",
+  ACME__DIRURL: "https://acme-staging-v02.api.letsencrypt.org/directory", # https://acme-v02.api.letsencrypt.org/directory
+  #KCERT__NAMESPACE: "",
+  #KCERT__SERVICENAME: "", # set this to the name of the service you want to use for the ingress
+  #KCERT__INGRESSNAME: "", # set this to the name of the ingress you
+  #KCERT__ALLOWEDNAMESPACES: "", # set this to the namespaces you want to allow kcert to manage, or leave empty to allow all namespaces
+  #SMTP__EMAILFROM: "",
+  #SMTP__HOST: "",
+  #SMTP__PORT: "",
+  #SMTP__USER: "",
+  #SMTP__PASS: "",
+  #ACME__KEY: "", # set this to the secret containing the acmeKey
+  #ACME__EABKEYID: "",
+  #ACME__EABHMACKEY: "",
+
+envSecrets:
+  # - name: "ENV_VAR"
+  #   secretName: "my-secret"
+  #   secretKey: "key-in-secret"
 
 # set to null to allow managing all namespaces, or limit with array of namespaces
 allowedNamespaces: null #["namespace1", "namespace2", ...]
-
-acmeKey:
-  secretName: null
-  keyName: key
-
-acmeEabKey:
-  secretName: null
-  keyIdName: keyid
-  hmacKeyName: hmac
-
-showRenewButton: null
-
-smtp:
-  secretName: null # set this to the secret containing the smtp credentials in keys as defined below
-  emailName: email
-  hostName: host
-  portName: port
-  userName: user
-  passName: password
 
 securityContext: {}
   # capabilities:
