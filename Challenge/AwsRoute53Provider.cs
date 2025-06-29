@@ -9,6 +9,7 @@ using KCert.Models;
 public class AwsRoute53Provider(KCertConfig cfg, DnsUtils util, ILogger<AwsRoute53Provider> log) : IChallengeProvider
 {
     public string AcmeChallengeType => "dns-01";
+    private readonly AmazonRoute53Client _client = GetClient(cfg.Route53AccessKeyId, cfg.Route53SecretAccessKey, cfg.Route53Region);
     private record AwsRoute53State(string HostedZoneId, string Domain, string RecordName, string RecordValue);
 
     public async Task<object?> PrepareChallengesAsync(IEnumerable<AcmeAuthzResponse> auths, CancellationToken tok)
@@ -48,8 +49,6 @@ public class AwsRoute53Provider(KCertConfig cfg, DnsUtils util, ILogger<AwsRoute
         var awsCredentials = new Amazon.Runtime.BasicAWSCredentials(id, key);
         return new AmazonRoute53Client(awsCredentials, RegionEndpoint.GetBySystemName(region));
     }
-
-    private readonly AmazonRoute53Client _client = GetClient(cfg.Route53AccessKeyId, cfg.Route53SecretAccessKey, cfg.Route53Region);
 
     private async Task<string> GetHostedZoneIdAsync(string domainName, CancellationToken tok)
     {
@@ -133,19 +132,6 @@ public class AwsRoute53Provider(KCertConfig cfg, DnsUtils util, ILogger<AwsRoute
             log.LogInformation("Attempting to delete TXT record: {recordName} with value: {properlyQuotedValue} in zone {hostedZoneId}", recordName, properlyQuotedValue, hostedZoneId);
             var response = await _client.ChangeResourceRecordSetsAsync(request, tok);
             log.LogInformation("Successfully sent request to delete TXT record {recordName}. Status: {response.ChangeInfo.Status}, ID: {response.ChangeInfo.Id}", recordName, response.ChangeInfo.Status, response.ChangeInfo.Id);
-        }
-        catch (InvalidChangeBatchException ex)
-        {
-            // This can happen if the record doesn't exist or doesn't match.
-            // Check if it's a "tried to delete resource record set that does not exist" error
-            if (ex.Message.Contains("tried to delete resource record set") && ex.Message.Contains("but it was not found"))
-            {
-                log.LogWarning("Attempted to delete TXT record {recordName} but it was not found or already deleted. This may be normal.", recordName);
-            }
-            else
-            {
-                log.LogError(ex, "Error deleting TXT record {recordName} in zone {hostedZoneId}. InvalidChangeBatchException.", recordName, hostedZoneId);
-            }
         }
         catch (Exception ex)
         {
