@@ -13,6 +13,7 @@ if (args.Length > 0 && args[^1] == "generate-key")
 }
 
 var builder = WebApplication.CreateBuilder(args);
+Console.WriteLine($"KCert starting with environment {builder.Environment.EnvironmentName}...");
 var cfg = new KCertConfig(builder.Configuration);
 
 builder.Services.AddConnections();

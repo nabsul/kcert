@@ -8,7 +8,6 @@ public class KCertConfig(IConfiguration cfg)
 
     public bool WatchIngresses => GetBool("KCert:WatchIngresses");
     public bool WatchConfigMaps => GetBool("KCert:WatchConfigMaps");
-    public string K8sConfigFile => GetRequiredString("Config");
     public string KCertNamespace => GetRequiredString("KCert:Namespace");
     public string KCertSecretName => GetRequiredString("KCert:SecretName");
     public string KCertServiceName => GetRequiredString("KCert:ServiceName");
@@ -61,51 +60,24 @@ public class KCertConfig(IConfiguration cfg)
 
     public string ChallengeType => GetRequiredString("KCert:ChallengeType");
 
-    public object AllConfigs => new
+    public object AllConfigs
     {
-        KCert = new
+        get
         {
-            Namespace = KCertNamespace,
-            IngressName = KCertIngressName,
-            SecertName = KCertSecretName,
-            ServiceName = KCertServiceName,
-            ServicePort = KCertServicePort,
-            ShowRenewButton,
-            NamespaceConstraints,
-            ChallengeType,
-        },
-        ACME = new
-        {
-            ValidationWaitTimeSeconds = AcmeWaitTime,
-            ValidationNumRetries = AcmeNumRetries,
-            AutoRenewal = EnableAutoRenew,
-            RenewalCheckTimeHours = RenewalTimeBetweenChecks,
-            RenewalThresholdDays = RenewalExpirationLimit,
-            TermsAccepted = AcmeAccepted,
-            DirUrl = AcmeDir,
-            Email = HideString(AcmeEmail),
-            Key = HideString(AcmeKey)
-        },
-        SMTP = new
-        {
-            EmailFrom = HideString(SmtpEmailFrom),
-            Host = HideString(SmtpHost),
-            Port = SmtpPort,
-            User = HideString(SmtpUser),
-            Pass = HideString(SmtpPass)
-        },
-        Route53 = new
-        {
-            AccessKeyId = Route53AccessKeyId,
-            SecretAccessKey = HideString(Route53SecretAccessKey),
-            Region = Route53Region,
-        },
-        Cloudflare = new
-        {
-            ApiToken = HideString(CloudflareApiToken),
-            AccountId = CloudflareAccountId,
-        },
-    };
+            var res = new Dictionary<string, object>();
+            var props = typeof(KCertConfig).GetProperties(System.Reflection.BindingFlags.Instance | System.Reflection.BindingFlags.Public)
+                .Where(p => p.Name != nameof(AllConfigs));
+
+            foreach (var prop in props)
+            {
+                string[] redactTerms = ["Key", "Pass", "Token", "Secret"];
+                bool redact = redactTerms.Any(term => prop.Name.Contains(term, StringComparison.OrdinalIgnoreCase));
+                var val = prop.GetValue(this);
+                res[prop.Name] = redact ? HideString(val?.ToString()) : val ?? "[NOT CONFIGURED]";
+            }
+            return res;
+        }
+    }
 
     private static string HideString(string? val) => string.IsNullOrEmpty(val) ? "" : "[REDACTED]";
     private string? GetString(string key) => cfg.GetValue<string>(key);

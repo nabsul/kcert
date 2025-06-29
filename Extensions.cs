@@ -1,3 +1,4 @@
+using k8s;
 using KCert.Challenge;
 using KCert.Config;
 using KCert.Services;
@@ -25,7 +26,7 @@ public static class Extensions
             .AddSingleton(challengeType)
             .AddSingleton(typeof(IChallengeProvider), s => s.GetRequiredService(challengeType))
             .AddSingleton(cfg)
-            .AddSingleton(KubernetesFactory.GetClient(cfg))
+            .AddSingleton(new Kubernetes(KubernetesClientConfiguration.BuildDefaultConfig()))
             .AddSingleton<AcmeClient>()
             .AddSingleton<CertChangeService>()
             .AddSingleton<CertClient>()
