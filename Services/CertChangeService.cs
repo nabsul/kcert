@@ -1,8 +1,8 @@
+using System.Runtime.CompilerServices;
 using k8s.Models;
 
 namespace KCert.Services;
 
-[Service]
 public class CertChangeService(ILogger<CertChangeService> log, K8sClient k8s, KCertClient kcert)
 {
     private DateTime _lastRun = DateTime.MinValue;
@@ -14,12 +14,12 @@ public class CertChangeService(ILogger<CertChangeService> log, K8sClient k8s, KC
     // - If no check is currently running, it will kick off a check
     // - If a check is already running, it will queue up another one to run after the current one completes
     // - However, it will not queue up multiple checks
-    public void RunCheck()
+    public void RunCheck(CancellationToken tok)
     {
-        _ = CheckForChangesAsync();
+        _ = CheckForChangesAsync(tok);
     }
 
-    private async Task CheckForChangesAsync()
+    private async Task CheckForChangesAsync(CancellationToken tok)
     {
         var start = DateTime.UtcNow;
         log.LogInformation("CheckForChangesAsync: Waiting for semaphore.");
@@ -38,7 +38,7 @@ public class CertChangeService(ILogger<CertChangeService> log, K8sClient k8s, KC
         try
         {
             var nsLookup = new Dictionary<(string Namespace, string Name), HashSet<string>>();
-            await foreach (var (ns, name, hosts) in GetIngressCertsAsync().Concat(GetConfigMapCertsAsync()))
+            await foreach (var (ns, name, hosts) in GetIngressCertsAsync(tok).Concat(GetConfigMapCertsAsync(tok)))
             {
                 var key = (ns, name);
                 if (!nsLookup.TryGetValue(key, out var currHosts))
@@ -73,12 +73,12 @@ public class CertChangeService(ILogger<CertChangeService> log, K8sClient k8s, KC
 
     }
 
-    private async IAsyncEnumerable<(string Namespace, string Name, IEnumerable<string> Hosts)> GetIngressCertsAsync()
+    private async IAsyncEnumerable<(string Namespace, string Name, IEnumerable<string> Hosts)> GetIngressCertsAsync([EnumeratorCancellation] CancellationToken tok)
     {
         int ingressCount = 0;
         int skipped = 0;
         int hosts = 0;
-        await foreach (var ing in k8s.GetAllIngressesAsync())
+        await foreach (var ing in k8s.GetAllIngressesAsync(tok))
         {
             ingressCount++;
             if (ing?.Spec?.Tls == null || !ing.Spec.Tls.Any())
@@ -97,12 +97,12 @@ public class CertChangeService(ILogger<CertChangeService> log, K8sClient k8s, KC
         log.LogInformation("GetIngressCertsAsync: Processed {Count} Ingresses. Skipped {skipped} ingresses. Extracted {numHosts} hosts", ingressCount, skipped, hosts);
     }
 
-    private async IAsyncEnumerable<(string Namespace, string Name, IEnumerable<string> hosts)> GetConfigMapCertsAsync()
+    private async IAsyncEnumerable<(string Namespace, string Name, IEnumerable<string> hosts)> GetConfigMapCertsAsync([EnumeratorCancellation] CancellationToken tok)
     {
         int foundConfigMapsCount = 0;
         int skipped = 0;
         int numHosts = 0;
-        await foreach (var config in k8s.GetAllConfigMapsAsync())
+        await foreach (var config in k8s.GetAllConfigMapsAsync(tok))
         {
             foundConfigMapsCount++;
             var ns = config.Namespace();

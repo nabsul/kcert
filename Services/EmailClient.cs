@@ -4,7 +4,6 @@ using System.Net.Mail;
 
 namespace KCert.Services;
 
-[Service]
 public class EmailClient(ILogger<EmailClient> log, KCertConfig cfg)
 {
     private const string TestSubject = "KCert Test Email";
@@ -12,17 +11,32 @@ public class EmailClient(ILogger<EmailClient> log, KCertConfig cfg)
 
     public async Task SendTestEmailAsync()
     {
+        if (!cfg.SmtpEnabled)
+        {
+            return;
+        }
+
         log.LogInformation("Attempting to send a test email.");
         await SendAsync(TestSubject, TestMessage);
     }
 
     public async Task NotifyRenewalResultAsync(string secretNamespace, string secretName, RenewalException? ex)
     {
+        if (!cfg.SmtpEnabled)
+        {
+            return;
+        }
+
         await SendAsync(RenewalSubject(secretNamespace, secretName, ex), RenewalMessage(secretNamespace, secretName, ex));
     }
 
     public async Task NotifyFailureAsync(string message, Exception ex)
     {
+        if (!cfg.SmtpEnabled)
+        {
+            return;
+        }
+
         var subject = "KCert encountered an unexpected error";
         var body = $"{message}\n\n{ex.Message}\n\n{ex.StackTrace}";
         await SendAsync(subject, body);
@@ -30,12 +44,6 @@ public class EmailClient(ILogger<EmailClient> log, KCertConfig cfg)
 
     private async Task SendAsync(string subject, string text)
     {
-        if (cfg.SmtpHost == null || cfg.SmtpUser == null || cfg.SmtpPass == null || cfg.SmtpEmailFrom == null)
-        {
-            log.LogInformation("Cannot send email email because it's not configured correctly");
-            return;
-        }
-
         var client = new SmtpClient(cfg.SmtpHost, cfg.SmtpPort)
         {
             EnableSsl = true,

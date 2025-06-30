@@ -7,7 +7,6 @@ using System.Text.Json;
 
 namespace KCert.Services;
 
-[Service]
 public class AcmeClient(CertClient cert, KCertConfig cfg)
 {
     private const string HeaderReplayNonce = "Replay-Nonce";
@@ -57,7 +56,7 @@ public class AcmeClient(CertClient cert, KCertConfig cfg)
     {
         var contact = new[] { $"mailto:{cfg.AcmeEmail}" };
 
-        if (cfg.AcmeEabKeyId == null || cfg.AcmeHmacKey == null)
+        if (!cfg.UseEabKey)
         {
             return new { contact, termsOfServiceAgreed = cfg.AcmeAccepted };
         }

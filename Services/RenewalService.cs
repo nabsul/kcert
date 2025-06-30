@@ -3,7 +3,6 @@ using KCert.Models;
 
 namespace KCert.Services;
 
-[Service]
 public class RenewalService(ILogger<RenewalService> log, KCertClient kcert, KCertConfig cfg, K8sClient k8s, CertClient cert, EmailClient email) : IHostedService
 {
     private const int MaxServiceFailures = 5;
@@ -77,7 +76,7 @@ public class RenewalService(ILogger<RenewalService> log, KCertClient kcert, KCer
         }
 
         log.LogInformation("Checking for certs that need renewals...");
-        await foreach (var secret in k8s.GetManagedSecretsAsync())
+        await foreach (var secret in k8s.GetManagedSecretsAsync(tok))
         {
             tok.ThrowIfCancellationRequested();
             await TryRenewAsync(secret, tok);

@@ -1,32 +1,26 @@
 apiVersion: apps/v1
 kind: Deployment
 metadata:
-  name: {{ include "kcert.fullname" . }}
+  name: {{ .Values.name | quote }}
   namespace: {{ .Release.Namespace | default "default" }}
   labels:
-    app: {{ include "kcert.fullname" . }}
-    {{- if .Values.forHelm }}
+    app: {{ .Values.name | quote }}
     {{- include "kcert.labels" . | nindent 4 }}
-    {{- end }}
 spec:
   replicas: 1
   selector:
     matchLabels:
-      app: {{ include "kcert.fullname" . }}
-      {{- if .Values.forHelm }}
+      app: {{ .Values.name | quote }}
       {{- include "kcert.selectorLabels" . | nindent 6 }}
-      {{- end }}
   template:
     metadata:
       labels:
-        app: {{ include "kcert.fullname" . }}
-        {{- if .Values.forHelm }}
+        app: {{ .Values.name | quote }}
         {{- include "kcert.selectorLabels" . | nindent 8 }}
-        {{- end }}
     spec:
-      serviceAccountName: {{ include "kcert.fullname" . }}
+      serviceAccountName: {{ .Values.name | quote }}
       containers:
-      - name: {{ include "kcert.fullname" . }}
+      - name: {{ .Values.name | quote }}
         image: {{ required "kcertImage is required" .Values.kcertImage }}
         securityContext:
           {{- toYaml .Values.securityContext | nindent 10 }}
@@ -39,73 +33,15 @@ spec:
         resources:
           {{- toYaml .Values.resources | nindent 10 }}
         {{- end }}
-        env:
-        - name: KCERT__NAMESPACE
-          value: {{ .Release.Namespace | default "default" }}
-        - name: KCERT__SERVICENAME
-          value: {{ include "kcert.fullname" .}}
-        - name: KCERT__INGRESSNAME
-          value: {{ include "kcert.fullname" .}}
-        - name: ACME__DIRURL
-          # https://acme-staging-v02.api.letsencrypt.org/directory or https://acme-v02.api.letsencrypt.org/directory
-          value: {{ required "acmeDirUrl is required" .Values.acmeDirUrl }}
-        - name: ACME__TERMSACCEPTED
-          # You must set this to "true" to indicate your acceptance of Let's Encrypt's terms of service (https://letsencrypt.org/documents/LE-SA-v1.2-November-15-2017.pdf)
-          value: {{ required "acmeTermsAccepted is required" .Values.acmeTermsAccepted | quote }}
-        - name: ACME__EMAIL
-          # Your email address for Let's Encrypt and email notifications
-          value: {{ required "acmeEmail is required" .Values.acmeEmail }}
-{{- if .Values.smtp.secretName }}
-        - name: SMTP__EMAILFROM
-          valueFrom:
-            secretKeyRef:
-              name: {{ .Values.smtp.secretName }}
-              key: {{ required "smtp.emailName is required" .Values.smtp.emailName }}
-        - name: SMTP__HOST
-          valueFrom:
-            secretKeyRef:
-              name: {{ .Values.smtp.secretName }}
-              key: {{ required "smtp.hostName is required" .Values.smtp.hostName }}
-        - name: SMTP__PORT
-          valueFrom:
-            secretKeyRef:
-              name: {{ .Values.smtp.secretName }}
-              key: {{ required "smtp.portName is required" .Values.smtp.portName }}
-        - name: SMTP__USER
-          valueFrom:
-            secretKeyRef:
-              name: {{ .Values.smtp.secretName }}
-              key: {{ required "smtp.userName is required" .Values.smtp.userName }}
-        - name: SMTP__PASS
-          valueFrom:
-            secretKeyRef:
-              name: {{ .Values.smtp.secretName }}
-              key: {{ required "smtp.passName is required" .Values.smtp.passName }}
-{{- end }}
-{{- if .Values.acmeKey.secretName }}
-        - name: ACME__KEY
-          valueFrom:
-            secretKeyRef:
-              name: "{{ .Values.acmeKey.secretName }}"
-              key: "{{ required "acmeKey.keyName is required" .Values.acmeKey.keyName }}"
-{{- end }}
-{{- if .Values.acmeEabKey.secretName }}
-        - name: ACME__EABKEYID
-          valueFrom:
-            secretKeyRef:
-              name: "{{ .Values.acmeEabKey.secretName }}"
-              key: "{{ required "acmeEabKey.keyIdName is required" .Values.acmeEabKey.keyIdName }}"
-        - name: ACME__EABHMACKEY
-          valueFrom:
-            secretKeyRef:
-              name: "{{ .Values.acmeEabKey.secretName }}"
-              key: "{{ required "acmeEabKey.hmacKeyName is required" .Values.acmeEabKey.hmacKeyName }}"
-{{- end }}
-{{- if .Values.showRenewButton }}
-        - name: KCERT__SHOWRENEWBUTTON
-          value: "{{ .Values.showRenewButton }}"
-{{- end }}
-{{- range $key, $value := .Values.env }}
-        - name: "{{ $key }}"
-          value: "{{ $value }}"
-{{- end }}
+      env:
+      {{- range $key, $value := .Values.env }}
+      - name: "{{ $key }}"
+        value: "{{ $value }}"
+      {{- end }}
+      {{- range $secret := .Values.envSecrets }}
+      - name: "{{ $secret.name }}"
+        valueFrom:
+          secretKeyRef:
+            name: "{{ $secret.secretName }}"
+            key: "{{ $secret.secretKey }}"
+      {{- end }}

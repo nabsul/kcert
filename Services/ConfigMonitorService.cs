@@ -1,6 +1,5 @@
 ﻿namespace KCert.Services;
 
-[Service]
 public class ConfigMonitorService(ILogger<ConfigMonitorService> log, KCertConfig cfg, ExponentialBackoff exp, K8sWatchClient watch, CertChangeService certChange) : IHostedService
 {
     public Task StopAsync(CancellationToken cancellationToken) => Task.CompletedTask;
@@ -24,14 +23,14 @@ public class ConfigMonitorService(ILogger<ConfigMonitorService> log, KCertConfig
     private async Task WatchConfigMapsAsync(CancellationToken cancellationToken)
     {
         log.LogInformation("Watching for configmaps changes");
-        await watch.WatchConfigMapsAsync((_, _) => HandleConfigMapEventAsync(), cancellationToken);
+        await watch.WatchConfigMapsAsync((_, _, t) => HandleConfigMapEventAsync(t), cancellationToken);
     }
 
-    private Task HandleConfigMapEventAsync()
+    private Task HandleConfigMapEventAsync(CancellationToken tok)
     {
         try
         {
-            certChange.RunCheck();
+            certChange.RunCheck(tok);
         }
         catch (TaskCanceledException ex)
         {

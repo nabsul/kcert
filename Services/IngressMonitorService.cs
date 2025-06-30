@@ -3,7 +3,6 @@ using k8s.Models;
 
 namespace KCert.Services;
 
-[Service]
 public class IngressMonitorService(ILogger<IngressMonitorService> log, KCertConfig cfg, ExponentialBackoff exp, K8sWatchClient watch, CertChangeService certChange) : IHostedService
 {
     public Task StopAsync(CancellationToken cancellationToken) => Task.CompletedTask;
@@ -30,12 +29,12 @@ public class IngressMonitorService(ILogger<IngressMonitorService> log, KCertConf
         await watch.WatchIngressesAsync(HandleIngressEventAsync, tok);
     }
 
-    private Task HandleIngressEventAsync(WatchEventType type, V1Ingress ingress)
+    private Task HandleIngressEventAsync(WatchEventType type, V1Ingress ingress, CancellationToken tok)
     {
         try
         {
             log.LogInformation("Ingress change event [{type}] for {ns}-{name}", type, ingress.Namespace(), ingress.Name());
-            certChange.RunCheck();
+            certChange.RunCheck(tok);
         }
         catch (TaskCanceledException ex)
         {

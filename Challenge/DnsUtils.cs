@@ -1,12 +1,11 @@
+namespace KCert.Challenge;
+
 using System.Security.Cryptography;
 using System.Text;
 using KCert.Models;
 using KCert.Services;
 using Microsoft.AspNetCore.Authentication;
 
-namespace KCert.Challenge;
-
-[Service]
 public class DnsUtils(CertClient cert)
 {
     public string StripWildcard(string domain) => domain.StartsWith("*.") ? domain[2..] : domain;

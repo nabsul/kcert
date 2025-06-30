@@ -3,7 +3,6 @@ using KCert.Models;
 
 namespace KCert.Services;
 
-[Service]
 public class KCertClient(K8sClient kube, RenewalHandler getCert, ILogger<KCertClient> log, EmailClient email, CertClient cert)
 {
     private Task _running = Task.CompletedTask;

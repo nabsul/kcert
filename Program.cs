@@ -1,7 +1,6 @@
 using KCert;
 using KCert.Challenge;
 using KCert.Services;
-using System.Reflection;
 
 // command line option for manually generating an ECDSA key
 if (args.Length > 0 && args[^1] == "generate-key")
@@ -13,46 +12,43 @@ if (args.Length > 0 && args[^1] == "generate-key")
 }
 
 var builder = WebApplication.CreateBuilder(args);
+Console.WriteLine($"KCert starting with environment {builder.Environment.EnvironmentName}...");
+var cfg = new KCertConfig(builder.Configuration);
 
-// Add all services marked with the [Service] attribute
-foreach (var t in Assembly.GetExecutingAssembly().GetTypes())
-{
-    if (t.GetCustomAttribute<ServiceAttribute>() is not null)
-    {
-        builder.Services.AddSingleton(t);
-    }
-    else if (t.GetCustomAttribute<ChallengeAttribute>() is ChallengeAttribute attr && attr.ChallengeType != builder.Configuration.GetValue<string>("KCert:ChallengeType"))
-    {
-        builder.Services.AddSingleton(typeof(IChallengeProvider), t); 
-    }
-}
-
-builder.Services.AddSingleton(s => s.GetRequiredService<KubernetesFactory>().GetClient());
 builder.Services.AddConnections();
 builder.Services.AddControllersWithViews();
+builder.Services.AddKCertServices(cfg);
 
+var useHttpChallenge = cfg.ChallengeType == "http";
 builder.WebHost.ConfigureKestrel(opt =>
 {
-    opt.ListenAnyIP(80);
+    if (useHttpChallenge)
+    {
+        opt.ListenAnyIP(80);
+    }
     opt.ListenAnyIP(8080);
 });
 
-// add background services
-builder.Services.AddHostedService<RenewalService>();
-builder.Services.AddHostedService<IngressMonitorService>();
-builder.Services.AddHostedService<ConfigMonitorService>();
-
 var app = builder.Build();
 
+// Port 8080: Full admin interface with static files and all controllers
 app.MapWhen(c => c.Connection.LocalPort == 8080, b =>
 {
     b.UseStaticFiles();
     b.UseRouting().UseEndpoints(e => e.MapControllers());
 });
 
-app.MapWhen(c => c.Connection.LocalPort == 80 && c.Request.Path.HasValue && c.Request.Path.Value.StartsWith("/.well-known/acme-challenge"), b =>
+if (useHttpChallenge)
 {
-    b.UseRouting().UseEndpoints(e => e.MapControllers());
-});
+    // Port 80: Simple ACME challenge handler
+    app.MapWhen(c => c.Connection.LocalPort == 80, b =>
+    {
+        b.UseRouting();
+        b.UseEndpoints(endpoints =>
+        {
+            endpoints.MapGet("/.well-known/acme-challenge/{token}", (string token, HttpChallengeProvider c) => c.HandleChallenge(token));
+        });
+    });
+}
 
 app.Run();

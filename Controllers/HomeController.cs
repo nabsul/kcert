@@ -10,17 +10,17 @@ public class HomeController(KCertClient kcert, K8sClient kube, KCertConfig cfg, 
     private static string? TermsOfServiceUrl = null;
 
     [HttpGet("")]
-    public async Task<IActionResult> HomeAsync()
+    public async Task<IActionResult> HomeAsync(CancellationToken tok)
     {
-        var secrets = await kube.GetManagedSecretsAsync().ToListAsync();
+        var secrets = await kube.GetManagedSecretsAsync(tok).ToListAsync();
         return View(secrets);
     }
 
     [HttpGet("ingresses")]
-    public async Task<IActionResult> IngressesAsync()
+    public async Task<IActionResult> IngressesAsync(CancellationToken tok)
     {
         var ingresses = new List<V1Ingress>();
-        await foreach (var i in kube.GetAllIngressesAsync())
+        await foreach (var i in kube.GetAllIngressesAsync(tok))
         {
             ingresses.Add(i);
         }

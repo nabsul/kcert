@@ -1,6 +1,5 @@
 ﻿namespace KCert.Services;
 
-[Service]
 public class ExponentialBackoff(ILogger<ExponentialBackoff> log, KCertConfig cfg, EmailClient email)
 {
     public async Task DoWithExponentialBackoffAsync(string actionName, Func<Task> action, CancellationToken tok)
