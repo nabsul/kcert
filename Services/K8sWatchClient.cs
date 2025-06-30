@@ -55,10 +55,8 @@ public class K8sWatchClient(KCertConfig cfg, ILogger<K8sClient> log, Kubernetes 
 
     private Task WatchInLoopAsync<L, T>(ChangeCallback<T> callback, WatchNsFunc<L> func, CancellationToken tok)
     {
-        return Task.WhenAll(cfg.NamespaceConstraints
-            .Select(ns => WatchInLoopAsync($"{ns}:{typeof(T).Name}", callback, (t) => func(ns, t), tok))
-            .ToArray()
-        );
+        var tasks = cfg.NamespaceConstraints.Select(ns => WatchInLoopAsync($"{ns}:{typeof(T).Name}", callback, (t) => func(ns, t), tok));
+        return Task.WhenAll([..tasks]);
     }
 
     private async Task WatchInLoopAsync<L, T>(string id, ChangeCallback<T> callback, WatchAllFunc<L> watch, CancellationToken tok)
