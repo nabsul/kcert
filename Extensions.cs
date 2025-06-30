@@ -1,6 +1,5 @@
 using k8s;
 using KCert.Challenge;
-using KCert.Config;
 using KCert.Services;
 
 namespace KCert;

@@ -1,7 +1,6 @@
 namespace KCert.Challenge;
 
 using k8s.Models;
-using KCert.Config;
 using KCert.Models;
 using KCert.Services;
 

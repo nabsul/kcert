@@ -3,8 +3,9 @@ namespace KCert.Challenge;
 using Amazon;
 using Amazon.Route53;
 using Amazon.Route53.Model;
-using KCert.Config;
 using KCert.Models;
+using KCert.Services;
+
 
 public class AwsRoute53Provider(KCertConfig cfg, DnsUtils util, ILogger<AwsRoute53Provider> log) : IChallengeProvider
 {

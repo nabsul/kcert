@@ -1,5 +1,4 @@
 ﻿using k8s.Models;
-using KCert.Config;
 using KCert.Models;
 
 namespace KCert.Services;
@@ -77,7 +76,7 @@ public class RenewalService(ILogger<RenewalService> log, KCertClient kcert, KCer
         }
 
         log.LogInformation("Checking for certs that need renewals...");
-        await foreach (var secret in k8s.GetManagedSecretsAsync())
+        await foreach (var secret in k8s.GetManagedSecretsAsync(tok))
         {
             tok.ThrowIfCancellationRequested();
             await TryRenewAsync(secret, tok);

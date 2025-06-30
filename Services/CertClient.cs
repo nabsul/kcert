@@ -1,5 +1,4 @@
 ﻿using k8s.Models;
-using KCert.Config;
 using Microsoft.AspNetCore.Authentication;
 using System.Security.Cryptography;
 using System.Security.Cryptography.X509Certificates;

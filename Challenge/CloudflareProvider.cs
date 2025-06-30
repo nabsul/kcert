@@ -4,8 +4,7 @@ using System.Net.Http.Headers;
 using System.Text;
 using System.Text.Json;
 using KCert.Models;
-using KCert.Config;
-
+using KCert.Services;
 
 public class CloudflareProvider(KCertConfig cfg, DnsUtils util, ILogger<CloudflareProvider> log) : IChallengeProvider
 {

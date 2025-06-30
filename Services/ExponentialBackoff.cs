@@ -1,6 +1,4 @@
-﻿using KCert.Config;
-
-namespace KCert.Services;
+﻿namespace KCert.Services;
 
 public class ExponentialBackoff(ILogger<ExponentialBackoff> log, KCertConfig cfg, EmailClient email)
 {

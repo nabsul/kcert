@@ -1,7 +1,6 @@
 ﻿using k8s;
 using k8s.Autorest;
 using k8s.Models;
-using KCert.Config;
 
 namespace KCert.Services;
 
@@ -14,7 +13,7 @@ public class K8sWatchClient(KCertConfig cfg, ILogger<K8sClient> log, Kubernetes 
     public string IngressLabel => $"{IngressLabelKey}={cfg.IngressLabelValue}";
     public string ConfigLabel => $"{CertRequestKey}={CertRequestValue}";
 
-    public delegate Task ChangeCallback<T>(WatchEventType type, T item);
+    public delegate Task ChangeCallback<T>(WatchEventType type, T item, CancellationToken tok);
 
     public Task WatchIngressesAsync(ChangeCallback<V1Ingress> callback, CancellationToken tok)
     {
@@ -71,7 +70,7 @@ public class K8sWatchClient(KCertConfig cfg, ILogger<K8sClient> log, Kubernetes 
             {
                 await foreach (var (type, item) in watch(tok).WatchAsync<T, L>())
                 {
-                    await callback(type, item);
+                    await callback(type, item, tok);
                 }
             }
             catch (HttpRequestException ex)

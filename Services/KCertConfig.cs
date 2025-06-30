@@ -1,6 +1,4 @@
-﻿using KCert.Services;
-
-namespace KCert.Config;
+﻿namespace KCert.Services;
 
 public class KCertConfig(IConfiguration cfg)
 {
@@ -66,7 +64,7 @@ public class KCertConfig(IConfiguration cfg)
         {
             var res = new Dictionary<string, object>();
             var props = typeof(KCertConfig).GetProperties(System.Reflection.BindingFlags.Instance | System.Reflection.BindingFlags.Public)
-                .Where(p => p.Name != nameof(AllConfigs));
+                .Where(p => p.Name != nameof(AllConfigs)).OrderBy(p => p.Name);
 
             foreach (var prop in props)
             {

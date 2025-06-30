@@ -1,6 +1,5 @@
 using KCert;
 using KCert.Challenge;
-using KCert.Config;
 using KCert.Services;
 
 // command line option for manually generating an ECDSA key

@@ -1,5 +1,4 @@
-﻿using KCert.Config;
-using KCert.Models;
+﻿using KCert.Models;
 using System.Net;
 using System.Net.Mail;
 

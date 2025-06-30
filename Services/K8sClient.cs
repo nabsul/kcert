@@ -1,8 +1,9 @@
 ﻿using k8s;
 using k8s.Autorest;
 using k8s.Models;
-using KCert.Config;
+using Microsoft.AspNetCore.Components.Forms;
 using System.Net;
+using System.Runtime.CompilerServices;
 using System.Text;
 
 namespace KCert.Services;
@@ -19,38 +20,59 @@ public class K8sClient(KCertConfig cfg, Kubernetes client)
     private string ManagedSecretLabel => $"{CertLabelKey}={cfg.IngressLabelValue}";
     private static string UnManagedSecretLabel => $"!{CertLabelKey}";
 
+    private record ListResult<T>(string? Tok, IList<T> It);
 
-    public IAsyncEnumerable<V1Ingress> GetAllIngressesAsync()
+
+    public IAsyncEnumerable<V1Ingress> GetAllIngressesAsync(CancellationToken tok)
     {
-        return IterateAsync<V1Ingress, V1IngressList>(GetAllIngressesAsync, GetNsIngressesAsync);
+        return IterateAsync(GetAllIngressesAsync, GetNsIngressesAsync, tok);
     }
 
-    private Task<V1IngressList> GetAllIngressesAsync(string? tok) => client.ListIngressForAllNamespacesAsync(labelSelector: IngressLabel, continueParameter: tok);
-    private Task<V1IngressList> GetNsIngressesAsync(string ns, string? tok) => client.ListNamespacedIngressAsync(ns, labelSelector: IngressLabel, continueParameter: tok);
-
-    public IAsyncEnumerable<V1ConfigMap> GetAllConfigMapsAsync()
+    private async Task<ListResult<V1Ingress>> GetAllIngressesAsync(string? c, CancellationToken tok)
     {
-        return IterateAsync<V1ConfigMap, V1ConfigMapList>(GetAllConfigMapsAsync, GetNsConfigMapsAsync);
+        var res = await client.ListIngressForAllNamespacesAsync(labelSelector: IngressLabel, continueParameter: c, cancellationToken: tok);
+        return new ListResult<V1Ingress>(res.Continue(), res.Items);
     }
 
-    private Task<V1ConfigMapList> GetAllConfigMapsAsync(string? tok) => client.ListConfigMapForAllNamespacesAsync(labelSelector: ConfigMapLabel, continueParameter: tok);
-    private Task<V1ConfigMapList> GetNsConfigMapsAsync(string ns, string? tok) => client.ListNamespacedConfigMapAsync(ns, labelSelector: ConfigMapLabel, continueParameter: tok);
-
-    public IAsyncEnumerable<V1Secret> GetManagedSecretsAsync()
+    private async Task<ListResult<V1Ingress>> GetNsIngressesAsync(string ns, string? cTok, CancellationToken tok)
     {
-        return IterateAsync<V1Secret, V1SecretList>(GetAllManagedSecretsAsync, GetNsManagedSecretsAsync);
+        var res = await client.ListNamespacedIngressAsync(ns, labelSelector: IngressLabel, continueParameter: cTok, cancellationToken: tok);
+        return new ListResult<V1Ingress>(res.Continue(), res.Items);
     }
 
-    private Task<V1SecretList> GetAllManagedSecretsAsync(string? tok) => client.ListSecretForAllNamespacesAsync(labelSelector: ManagedSecretLabel, continueParameter: tok);
-    private Task<V1SecretList> GetNsManagedSecretsAsync(string ns, string? tok) => client.ListNamespacedSecretAsync(ns, labelSelector: ManagedSecretLabel, continueParameter: tok);
-
-    public IAsyncEnumerable<V1Secret> GetUnManagedSecretsAsync()
+    public IAsyncEnumerable<V1ConfigMap> GetAllConfigMapsAsync(CancellationToken tok)
     {
-        return IterateAsync<V1Secret, V1SecretList>(GetAllUnManagedSecretsAsync, GetNsUnManagedSecretsAsync);
+        return IterateAsync(GetAllConfigMapsAsync, GetNsConfigMapsAsync, tok);
     }
 
-    private Task<V1SecretList> GetAllUnManagedSecretsAsync(string? tok) => client.ListSecretForAllNamespacesAsync(fieldSelector: TlsTypeSelector, labelSelector: UnManagedSecretLabel, continueParameter: tok);
-    private Task<V1SecretList> GetNsUnManagedSecretsAsync(string ns, string? tok) => client.ListNamespacedSecretAsync(ns, fieldSelector: TlsTypeSelector, labelSelector: UnManagedSecretLabel, continueParameter: tok);
+    private async Task<ListResult<V1ConfigMap>> GetAllConfigMapsAsync(string? continuationToken, CancellationToken tok)
+    {
+        var res = await client.ListConfigMapForAllNamespacesAsync(labelSelector: ConfigMapLabel, continueParameter: continuationToken, cancellationToken: tok);
+        return new(res.Continue(), res.Items);
+    }
+    private async Task<ListResult<V1ConfigMap>> GetNsConfigMapsAsync(string ns, string? tok, CancellationToken t)
+    {
+        var res = await client.ListNamespacedConfigMapAsync(ns, labelSelector: ConfigMapLabel, continueParameter: tok, cancellationToken: t);
+        return new(res.Continue(), res.Items);
+    }
+
+    public IAsyncEnumerable<V1Secret> GetManagedSecretsAsync(CancellationToken tok)
+    {
+        return IterateAsync(GetAllManagedSecretsAsync, GetNsManagedSecretsAsync, tok);
+    }
+
+    private async Task<ListResult<V1Secret>> GetAllManagedSecretsAsync(string? tok, CancellationToken t)
+    {
+        var res = await client.ListSecretForAllNamespacesAsync(labelSelector: ManagedSecretLabel, continueParameter: tok, cancellationToken: t);
+        return new(res.Continue(), res.Items);
+    }
+
+
+    private async Task<ListResult<V1Secret>> GetNsManagedSecretsAsync(string ns, string? tok, CancellationToken t)
+    {
+        var res = await client.ListNamespacedSecretAsync(ns, labelSelector: ManagedSecretLabel, continueParameter: tok, cancellationToken: t);
+        return new(res.Continue(), res.Items);
+    }
 
     public async Task<V1Secret?> GetSecretAsync(string ns, string name)
     {
@@ -158,35 +180,35 @@ public class K8sClient(KCertConfig cfg, Kubernetes client)
         };
     }
 
-    private delegate Task<TList> ListAllFunc<TList>(string? tok);
-    private delegate Task<TList> ListNsFunc<TList>(string ns, string? tok);
+    private delegate Task<ListResult<T>> ListAllFunc<T>(string? continueToken, CancellationToken tok);
+    private delegate Task<ListResult<T>> ListNsFunc<T>(string ns, string? continueToken, CancellationToken tokt);
 
-    private IAsyncEnumerable<TItem> IterateAsync<TItem, TList>(ListAllFunc<TList> all, ListNsFunc<TList> byNs) where TList : IKubernetesObject<V1ListMeta>, IItems<TItem>
+    private IAsyncEnumerable<T> IterateAsync<T>(ListAllFunc<T> all, ListNsFunc<T> byNs, CancellationToken tok)
     {
         return cfg.NamespaceConstraints.Length == 0
-            ? IterateAsync<TItem, TList>(all)
-            : IterateAsync<TItem, TList>(byNs);
+            ? IterateAsync(all, tok)
+            : IterateAsync(byNs, tok);
     }
 
-    private static async IAsyncEnumerable<TItem> IterateAsync<TItem, TList>(ListAllFunc<TList> callback) where TList : IKubernetesObject<V1ListMeta>, IItems<TItem>
+    private static async IAsyncEnumerable<T> IterateAsync<T>(ListAllFunc<T> callback, [EnumeratorCancellation] CancellationToken tok)
     {
-        string? tok = null;
+        string? continueToken = null;
         do
         {
-            var result = await callback(tok);
-            tok = result.Continue();
-            foreach (var item in result.Items)
+            var res = await callback(continueToken, tok);
+            continueToken = res.Tok;
+            foreach (var item in res.It)
             {
                 yield return item;
             }
-        } while (tok != null);
+        } while (continueToken != null);
     }
 
-    private async IAsyncEnumerable<TItem> IterateAsync<TItem, TList>(ListNsFunc<TList> callback) where TList : IKubernetesObject<V1ListMeta>, IItems<TItem>
+    private async IAsyncEnumerable<T> IterateAsync<T>(ListNsFunc<T> callback, [EnumeratorCancellation] CancellationToken tok)
     {
         foreach (var ns in cfg.NamespaceConstraints)
         {
-            await foreach (var item in IterateAsync<TItem, TList>(tok => callback(ns, tok)))
+            await foreach (var item in IterateAsync((t, c) => callback(ns, t, c), tok))
             {
                 yield return item;
             }
