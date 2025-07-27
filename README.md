@@ -41,12 +41,12 @@ For setting up SMTP email notifications and other parameters, please check the `
 The SMTP password must be stored in a secret. If you stick with the defaults, you can simply create that secret with the following command:
 
 ```sh
-kubectl create secret -n [YOUR NAMESPACE] generic kcert-smpt-secret --from-literal=password=[YOUR PASSWORD]
+kubectl create secret -n [YOUR NAMESPACE] generic kcert-smtp-secret --from-literal=password=[YOUR PASSWORD]
 ```
 
 ### Creating a Certificate via Ingress
 
-KCert automatically looks for ingresses that reference a certicate.
+KCert automatically looks for ingresses that reference a certificate.
 If that certificate doesn't exist, it will create it (and renew it).
 KCert only monitors ingresses with the `kcert.dev/ingress: "managed"` label.
 You can either create your own ingress manually, or use the `kcert-ingress` chart:
@@ -143,7 +143,7 @@ helm template kcert-test .\charts\kcert --values .\temp\kcert-values.yaml
 
 If this is your first time using KCert you should probably start out with `https://acme-staging-v02.api.letsencrypt.org/directory`.
 Experiment and make sure everything is working as expected, then switch over to `https://acme-v02.api.letsencrypt.org/directory`.
-More information this topic can be found [here](https://letsencrypt.org/docs/staging-environment/).
+More information on this topic can be found [here](https://letsencrypt.org/docs/staging-environment/).
 
 ### Using EAB (External Account Binding)
 
@@ -327,7 +327,7 @@ To check that everything is running as expected:
 
 ### Testing SMTP Configuration
 
-To test your email configuration you can connect to the KCert dasboard by running
+To test your email configuration you can connect to the KCert dashboard by running
 `kubectl -n kcert port-forward svc/kcert 8080` and opening `http://localhost:8080` in your browser.
 From there, navigate to the configuration section.
 Check that your settings are listed there, and then click "Send Test Email" to receive a test email.
@@ -453,7 +453,7 @@ spec:
 
 Once every 6 hours KCert will check for certificates that are expiring in 30 days or less.
 It will attempt to automatically renew those certificates.
-If you have email notifications set up, you will receive a notifications of success of failure of the renewal process.
+If you have email notifications set up, you will receive a notification of success or failure of the renewal process.
 
 ## Further Configuration Settings
 
@@ -481,7 +481,7 @@ For more information see the [official .NET Core documentation](https://docs.mic
 
 ### Deployment and Setup Notes for DNS-01
 
-- **Update Configuration:** When deploying KCert, ensure you set the necessary environment variables for your chosen DNS provider (AWS Route53 or Cloudflare) and the `KCERT__PREFERREDCHallenGETYPE` if you wish to use DNS-01. Remember to store sensitive information like API keys and tokens securely, preferably using Kubernetes secrets.
+- **Update Configuration:** When deploying KCert, ensure you set the necessary environment variables for your chosen DNS provider (AWS Route53 or Cloudflare) and the `KCERT__PREFERREDCHALLENGETYPE` if you wish to use DNS-01. Remember to store sensitive information like API keys and tokens securely, preferably using Kubernetes secrets.
 - **Kubernetes RBAC:** The existing Kubernetes Role-Based Access Control (RBAC) permissions for KCert (ClusterRoles for watching Ingresses and Secrets, and a Role for managing its own challenge Ingress if HTTP-01 is used) generally do **not** need to be changed for DNS-01 support. DNS provider interactions happen directly with the provider's API, not through Kubernetes resources for the challenge itself.
 
 ## Building from Scratch
