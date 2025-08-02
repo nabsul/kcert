@@ -55,6 +55,8 @@ spec:
         - name: ACME__EMAIL
           # Your email address for Let's Encrypt and email notifications
           value: {{ required "acmeEmail is required" .Values.acmeEmail }}
+        - name: KCERT_PATH_TYPE
+          value: {{ .Values.kcertPathType | default "Prefix" | quote }}
 {{- if .Values.smtp.secretName }}
         - name: SMTP__EMAILFROM
           valueFrom:

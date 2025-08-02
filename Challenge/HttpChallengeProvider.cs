@@ -79,12 +79,17 @@ public class HttpChallengeProvider(K8sClient kube, KCertConfig cfg, ILogger<Http
         }
     }
 
+    private static string GetPathType()
+    {
+        return Environment.GetEnvironmentVariable("KCERT_PATH_TYPE") ?? "Prefix";
+    }
+
     private V1IngressRule CreateRule(string host)
     {
         var path = new V1HTTPIngressPath
         {
             Path = "/.well-known/acme-challenge/",
-            PathType = "Prefix",
+            PathType = GetPathType(),
             Backend = new()
             {
                 Service = new()
