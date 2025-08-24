@@ -1,11 +1,15 @@
-﻿namespace KCert.Models;
+﻿using System.Text.Json.Nodes;
+
+namespace KCert.Models;
 
 public class AcmeOrderResponse : AcmeResponse
 {
-    public string Status { get; set; } = default!;
-    public string Expires { get; set; } = default!;
-    public AcmeIdentifier[] Identifiers { get; set; } = default!;
-    public string[] Authorizations { get; set; } = default!;
-    public string Finalize { get; set; } = default!;
-    public string Certificate { get; set; } = default!;
+    public required string Status { get; init; }
+    public required string Expires { get; init; }
+    public AcmeIdentifier[] Identifiers { get; init; }
+    public required string[] Authorizations { get; init; }
+    public required string Finalize { get; init; }
+    public required string Certificate { get; init; }
+    
+    public JsonObject? Error { get; init; }
 }
