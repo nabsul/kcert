@@ -7,3 +7,5 @@ appsettings.local.json
 temp
 *.tgz
 test.yml
+testing/kcert-*
+values.yaml
