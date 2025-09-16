@@ -7,7 +7,7 @@ using System.Text.Json;
 
 namespace KCert.Services;
 
-public class AcmeClient(CertClient cert, KCertConfig cfg)
+public class AcmeClient(CertClient cert, KCertConfig cfg, ILogger<AcmeClient> log)
 {
     private const string HeaderReplayNonce = "Replay-Nonce";
     private const string HeaderLocation = "Location";
@@ -47,7 +47,7 @@ public class AcmeClient(CertClient cert, KCertConfig cfg)
     {
         var uri = new Uri(Dir.NewAccount);
         var payload = GetAccountRequestPayload(uri);
-        return await PostAsync<AcmeAccountResponse>(cfg.AcmeKey, uri, payload, _nonce, tok);
+        return await PostAsync<AcmeAccountResponse>(cfg.AcmeKey, uri, payload, tok);
     }
 
     private object GetAccountRequestPayload(Uri uri)
@@ -106,7 +106,7 @@ public class AcmeClient(CertClient cert, KCertConfig cfg)
 
     public async Task<string> GetCertAsync(string key, Uri certUri, string kid, CancellationToken tok)
     {
-        var protectedObject = new { alg = Alg, kid, _nonce, url = certUri.AbsoluteUri };
+        var protectedObject = new { alg = Alg, kid, nonce = _nonce, url = certUri.AbsoluteUri };
         using var resp = await PostAsync(key, certUri, null, protectedObject, tok);
         return await GetContentAsync(resp, tok);
     }
@@ -120,13 +120,13 @@ public class AcmeClient(CertClient cert, KCertConfig cfg)
     private async Task<T> PostAsync<T>(string key, Uri uri, object payloadObject, CancellationToken tok) where T : AcmeResponse
     {
         var sign = cert.GetSigner(key);
-        var protectedObject = new { alg = Alg, jwk = cert.GetJwk(sign), _nonce, url = uri.AbsoluteUri };
+        var protectedObject = new { alg = Alg, jwk = cert.GetJwk(sign), nonce = _nonce, url = uri.AbsoluteUri };
         return await PostAsync<T>(key, uri, payloadObject, protectedObject, tok);
     }
 
     private async Task<T> PostAsync<T>(string key, Uri uri, object? payloadObject, string kid, CancellationToken tok) where T : AcmeResponse
     {
-        var protectedObject = new { alg = Alg, kid, _nonce, url = uri.AbsoluteUri };
+        var protectedObject = new { alg = Alg, kid, nonce = _nonce, url = uri.AbsoluteUri };
         return await PostAsync<T>(key, uri, payloadObject, protectedObject, tok);
     }
 
@@ -178,7 +178,7 @@ public class AcmeClient(CertClient cert, KCertConfig cfg)
             throw new Exception($"Unexpected response to get-nonce with status {resp.StatusCode} and content: {content}");
         }
 
-        _nonce = message.Headers.GetValues(HeaderReplayNonce).First();
+        _nonce = resp.Headers.GetValues(HeaderReplayNonce).First();
     }
 
     private static async Task<string> GetContentAsync(HttpResponseMessage resp, CancellationToken tok)

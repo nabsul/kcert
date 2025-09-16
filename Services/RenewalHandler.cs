@@ -44,7 +44,6 @@ public class RenewalHandler(ILogger<RenewalHandler> log, AcmeClient acme, K8sCli
         }
         catch (Exception ex)
         {
-            logbuf.LogError(ex, "Certificate renewal failed.");
             throw new RenewalException(ex.Message, ex)
             {
                 SecretNamespace = ns,
