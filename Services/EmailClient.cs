@@ -4,38 +4,46 @@ using System.Net.Mail;
 
 namespace KCert.Services;
 
-[Service]
 public class EmailClient(ILogger<EmailClient> log, KCertConfig cfg)
 {
     private const string TestSubject = "KCert Test Email";
     private const string TestMessage = "If you received this, then KCert is able to send emails!";
 
-    public async Task SendTestEmailAsync()
+    public async Task SendTestEmailAsync(CancellationToken tok)
     {
-        log.LogInformation("Attempting to send a test email.");
-        await SendAsync(TestSubject, TestMessage);
-    }
-
-    public async Task NotifyRenewalResultAsync(string secretNamespace, string secretName, RenewalException? ex)
-    {
-        await SendAsync(RenewalSubject(secretNamespace, secretName, ex), RenewalMessage(secretNamespace, secretName, ex));
-    }
-
-    public async Task NotifyFailureAsync(string message, Exception ex)
-    {
-        var subject = "KCert encountered an unexpected error";
-        var body = $"{message}\n\n{ex.Message}\n\n{ex.StackTrace}";
-        await SendAsync(subject, body);
-    }
-
-    private async Task SendAsync(string subject, string text)
-    {
-        if (cfg.SmtpHost == null || cfg.SmtpUser == null || cfg.SmtpPass == null || cfg.SmtpEmailFrom == null)
+        if (!cfg.SmtpEnabled)
         {
-            log.LogInformation("Cannot send email email because it's not configured correctly");
             return;
         }
 
+        log.LogInformation("Attempting to send a test email.");
+        await SendAsync(TestSubject, TestMessage, tok);
+    }
+
+    public async Task NotifyRenewalResultAsync(string secretNamespace, string secretName, RenewalException? ex, CancellationToken tok)
+    {
+        if (!cfg.SmtpEnabled)
+        {
+            return;
+        }
+
+        await SendAsync(RenewalSubject(secretNamespace, secretName, ex), RenewalMessage(secretNamespace, secretName, ex), tok);
+    }
+
+    public async Task NotifyFailureAsync(string message, Exception ex, CancellationToken tok)
+    {
+        if (!cfg.SmtpEnabled)
+        {
+            return;
+        }
+
+        var subject = "KCert encountered an unexpected error";
+        var body = $"{message}\n\n{ex.Message}\n\n{ex.StackTrace}";
+        await SendAsync(subject, body, tok);
+    }
+
+    private async Task SendAsync(string subject, string text, CancellationToken tok)
+    {
         var client = new SmtpClient(cfg.SmtpHost, cfg.SmtpPort)
         {
             EnableSsl = true,
@@ -44,7 +52,7 @@ public class EmailClient(ILogger<EmailClient> log, KCertConfig cfg)
 
         var message = new MailMessage(cfg.SmtpEmailFrom, cfg.AcmeEmail, subject, text);
 
-        await client.SendMailAsync(message);
+        await client.SendMailAsync(message, tok);
     }
 
     private static string RenewalSubject(string secretNamespace, string secretName, RenewalException? ex = null)

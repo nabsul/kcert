@@ -3,68 +3,57 @@ using KCert.Models;
 
 namespace KCert.Services;
 
-[Service]
-public class KCertClient(K8sClient kube, RenewalHandler getCert, ILogger<KCertClient> log, EmailClient email, CertClient cert)
+public class KCertClient(K8sClient kube, ILogger<KCertClient> log, EmailClient email, CertClient cert, IServiceProvider svc)
 {
-    private Task _running = Task.CompletedTask;
+    private readonly SemaphoreSlim _semaphore = new(1);
 
     public async Task RenewIfNeededAsync(string ns, string name, string[] hosts, CancellationToken tok)
     {
-        var secret = await kube.GetSecretAsync(ns, name);
-        tok.ThrowIfCancellationRequested();
-
-        if (secret != null)
+        var secret = await kube.GetSecretAsync(ns, name, tok);
+        if (false == await IsRenewalNeededAsync(ns, name, hosts, tok))
         {
-            var c = cert.GetCert(secret);
-            var certHosts = cert.GetHosts(c).ToHashSet();
-            if (hosts.Length == certHosts.Count && hosts.All(h => certHosts.Contains(h)))
-            {
-                // nothing to do, cert already has all the hosts it needs to have
-                log.LogInformation("Certificate already has all the needed hosts configured");
-                return;
-            }
+            // nothing to do, cert already has all the hosts it needs to have
+            log.LogInformation("Certificate already has all the needed hosts configured");
+            return;
         }
 
-        await StartRenewalProcessAsync(ns, name, hosts, tok);
+        await StartRenewalProcessAsync(ns, name, hosts, tok);   
     }
 
-    // Ensure that no certs are renewed in parallel
-    public Task StartRenewalProcessAsync(string ns, string secretName, string[] hosts, CancellationToken tok)
+    private async Task<bool> IsRenewalNeededAsync(string ns, string name, string[] hosts, CancellationToken tok)
     {
-        Task task;
-        lock (this)
-        {
-            task = RenewCertAsync(_running, ns, secretName, hosts, tok);
-            _running = task;
-        }
-
-        return task;
+        var secret = await kube.GetSecretAsync(ns, name, tok);
+        if (secret == null) return true;
+        var currentHosts = cert.GetHosts(cert.GetCert(secret));
+        return hosts.Union(currentHosts).Count() != hosts.Length;
     }
 
-    private async Task RenewCertAsync(Task prev, string ns, string secretName, string[] hosts, CancellationToken tok)
+    public async Task StartRenewalProcessAsync(string ns, string secretName, string[] hosts, CancellationToken tok)
     {
+        await _semaphore.WaitAsync(tok);
         try
         {
-            await prev;
-            tok.ThrowIfCancellationRequested();
+            log.LogInformation("Starting renewal process for secret {ns}/{secretName} with hosts {hosts}", ns, secretName, string.Join(", ", hosts));
+            await RenewCertAsync(ns, secretName, hosts, tok);
         }
-        catch (Exception ex)
+        finally
         {
-            log.LogError(ex, "Previous task in rewal chain failed.");
+            _semaphore.Release();
         }
+    }
 
+    private async Task RenewCertAsync(string ns, string secretName, string[] hosts, CancellationToken tok)
+    {
+        var getCert = svc.GetRequiredService<RenewalHandler>();
         try
         {
             await getCert.RenewCertAsync(ns, secretName, hosts, tok);
-            tok.ThrowIfCancellationRequested();
-
-            await email.NotifyRenewalResultAsync(ns, secretName, null);
-            tok.ThrowIfCancellationRequested();
+            await email.NotifyRenewalResultAsync(ns, secretName, null, tok);
         }
         catch (RenewalException ex)
         {
             log.LogError(ex, "Renewal failed");
-            await email.NotifyRenewalResultAsync(ns, secretName, ex);
+            await email.NotifyRenewalResultAsync(ns, secretName, ex, tok);
         }
         catch (HttpOperationException ex)
         {

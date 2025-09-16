@@ -5,22 +5,20 @@ using Microsoft.AspNetCore.Mvc;
 namespace KCert.Controllers;
 
 [Route("")]
-public class HomeController(KCertClient kcert, K8sClient kube, KCertConfig cfg, EmailClient email, AcmeClient acme, CertClient cert) : Controller
+public class HomeController(KCertClient kcert, K8sClient kube, KCertConfig cfg, EmailClient email, CertClient cert) : Controller
 {
-    private static string? TermsOfServiceUrl = null;
-
     [HttpGet("")]
-    public async Task<IActionResult> HomeAsync()
+    public async Task<IActionResult> HomeAsync(CancellationToken tok)
     {
-        var secrets = await kube.GetManagedSecretsAsync().ToListAsync();
+        var secrets = await kube.GetManagedSecretsAsync(tok).ToListAsync();
         return View(secrets);
     }
 
     [HttpGet("ingresses")]
-    public async Task<IActionResult> IngressesAsync()
+    public async Task<IActionResult> IngressesAsync(CancellationToken tok)
     {
         var ingresses = new List<V1Ingress>();
-        await foreach (var i in kube.GetAllIngressesAsync())
+        await foreach (var i in kube.GetAllIngressesAsync(tok))
         {
             ingresses.Add(i);
         }
@@ -36,24 +34,23 @@ public class HomeController(KCertClient kcert, K8sClient kube, KCertConfig cfg, 
     }
 
     [HttpGet("configuration")]
-    public async Task<IActionResult> ConfigurationAsync()
+    public IActionResult Configuration()
     {
-        TermsOfServiceUrl ??= await acme.GetTermsOfServiceUrlAsync();
-        ViewBag.TermsOfService = TermsOfServiceUrl;
+        ViewBag.TermsOfService = AcmeClient.Dir.Meta.TermsOfService; 
         return View();
     }
 
     [HttpGet("test-email")]
-    public async Task<IActionResult> TestEmailAsync()
+    public async Task<IActionResult> TestEmailAsync(CancellationToken tok)
     {
-        await email.SendTestEmailAsync();
+        await email.SendTestEmailAsync(tok);
         return RedirectToAction("Configuration");
     }
 
     [HttpGet("renew/{ns}/{name}")]
-    public async Task<IActionResult> RenewAsync(string ns, string name)
+    public async Task<IActionResult> RenewAsync(string ns, string name, CancellationToken tok)
     {
-        var secret = await kube.GetSecretAsync(ns, name);
+        var secret = await kube.GetSecretAsync(ns, name, tok);
         if (secret == null)
         {
             return NotFound();
@@ -62,7 +59,7 @@ public class HomeController(KCertClient kcert, K8sClient kube, KCertConfig cfg, 
         var certVal = cert.GetCert(secret);
         var hosts = cert.GetHosts(certVal).ToArray();
 
-        await kcert.StartRenewalProcessAsync(ns, name, hosts, CancellationToken.None);
+        await kcert.StartRenewalProcessAsync(ns, name, hosts, tok);
         return RedirectToAction("Home");
     }
 }

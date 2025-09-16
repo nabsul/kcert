@@ -1,15 +1,21 @@
+namespace KCert.Challenge;
+
 using k8s.Models;
 using KCert.Models;
 using KCert.Services;
 
-namespace KCert.Challenge;
-
-[Challenge("http")]
-public class HttpChallengeProvider(K8sClient kube, KCertConfig cfg, ILogger<HttpChallengeProvider> log) : IChallengeProvider
+public class HttpChallengeProvider(K8sClient kube, KCertConfig cfg, ILogger<HttpChallengeProvider> log, CertClient cert) : IChallengeProvider
 {
     public string AcmeChallengeType => "http-01";
 
     private record HttpChallengeState(string[] Hosts);
+
+    public string HandleChallenge(string token)
+    {
+        log.LogInformation("Received ACME Challenge: {token}", token);
+        var thumbprint = cert.GetThumbprint();
+        return $"{token}.{thumbprint}";
+    }
 
     public async Task<object?> PrepareChallengesAsync(IEnumerable<AcmeAuthzResponse> auths, CancellationToken tok)
     {
@@ -51,22 +57,15 @@ public class HttpChallengeProvider(K8sClient kube, KCertConfig cfg, ILogger<Http
             }
         };
 
-        if (cfg.UseChallengeIngressClassName)
+        if (string.IsNullOrWhiteSpace(cfg.ChallengeIngressClassName) is false)
         {
             kcertIngress.Spec.IngressClassName = cfg.ChallengeIngressClassName;
         }
 
-        if (cfg.UseChallengeIngressAnnotations)
-        {
-            kcertIngress.Metadata.Annotations = cfg.ChallengeIngressAnnotations;
-        }
+        kcertIngress.Metadata.Annotations = cfg.ChallengeIngressAnnotations;
+        kcertIngress.Metadata.Labels = cfg.ChallengeIngressLabels;
 
-        if (cfg.UseChallengeIngressLabels)
-        {
-            kcertIngress.Metadata.Labels = cfg.ChallengeIngressLabels;
-        }
-
-        await kube.CreateIngressAsync(kcertIngress);
+        await kube.CreateIngressAsync(kcertIngress, tok);
         log.LogInformation("Giving challenge ingress time to propagate");
 
         if (!cfg.SkipIngressPropagationCheck)
@@ -75,7 +74,7 @@ public class HttpChallengeProvider(K8sClient kube, KCertConfig cfg, ILogger<Http
         }
         else
         {
-            await Task.Delay(cfg.ChallengeIngressMaxPropagationWaitTime);
+            await Task.Delay(cfg.ChallengeIngressMaxPropagationWaitTime, tok);
         }
     }
 

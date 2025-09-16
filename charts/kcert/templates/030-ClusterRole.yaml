@@ -1,12 +1,10 @@
-{{ if !.Values.allowedNamespaces }}
+{{ if not .Values.env.KCERT__NAMESPACECONSTRAINTS }}
 apiVersion: rbac.authorization.k8s.io/v1
 kind: ClusterRole
 metadata:
-  name: {{ include "kcert.fullname" . }}
-{{- if .Values.forHelm }}
+  name: {{ .Values.name | quote }}
   labels:
     {{- include "kcert.labels" . | nindent 4 }}
-{{- end }}
 rules:
 - apiGroups: [""]
   resources: ["secrets"]
@@ -18,19 +16,17 @@ rules:
   resources: ["configmaps"]
   verbs: ["get", "list", "watch"]
 {{ else }}
-{{- range $index, $value := .Values.allowedNamespaces }}
-{{- if ne $index 0 }}
+{{- range $index, $value := split "," .Values.env.KCERT__NAMESPACECONSTRAINTS }}
+{{- if ne $index "0" }}
 ---
 {{- end }}
 apiVersion: rbac.authorization.k8s.io/v1
 kind: Role
 metadata:
-  name: {{ include "kcert.fullname" . }}
-  namespace: {{ $value }}
-{{- if .Values.forHelm }}
+  name: {{ $.Values.name | quote }}
+  namespace: {{ $value | quote }}
   labels:
-    {{- include "kcert.labels" . | nindent 4 }}
-{{- end }}
+    {{- include "kcert.labels" $ | nindent 4 }}
 rules:
 - apiGroups: [""]
   resources: ["secrets"]
@@ -42,4 +38,4 @@ rules:
   resources: ["configmaps"]
   verbs: ["get", "list", "watch"]
 {{- end }}
-{{ end }}
+{{- end }}
