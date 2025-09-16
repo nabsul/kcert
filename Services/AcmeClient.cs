@@ -23,6 +23,15 @@ public class AcmeClient(CertClient cert, KCertConfig cfg, ILogger<AcmeClient> lo
 
     private string _nonce = string.Empty;
 
+    private void SaveNonce(HttpResponseMessage resp)
+    {
+        var nonce = resp.Headers.GetValues(HeaderReplayNonce).FirstOrDefault();
+        if (nonce != null)
+        {
+            _nonce = nonce;
+        }
+    }
+
     public Task<AcmeAccountResponse> DeactivateAccountAsync(string key, string kid, CancellationToken tok) => PostAsync<AcmeAccountResponse>(key, new Uri(kid), new { status = "deactivated" }, kid, tok);
     public Task<AcmeOrderResponse> GetOrderAsync(string key, Uri uri, string kid, CancellationToken tok) => PostAsync<AcmeOrderResponse>(key, uri, null, kid, tok);
     public Task<AcmeAuthzResponse> GetAuthzAsync(string key, Uri authzUri, string kid, CancellationToken tok) => PostAsync<AcmeAuthzResponse>(key, authzUri, null, kid, tok);
@@ -161,8 +170,11 @@ public class AcmeClient(CertClient cert, KCertConfig cfg, ILogger<AcmeClient> lo
     {
         var content = await GetContentAsync(resp, tok);
         var result = JsonSerializer.Deserialize<T>(content, options) ?? throw new Exception($"Invalid content: {content}");
-        _nonce = resp.Headers.GetValues(HeaderReplayNonce).First();
-        result.Location = resp.Headers.GetValues(HeaderLocation).First();
+        SaveNonce(resp);
+        if (resp.Headers.TryGetValues(HeaderLocation, out var values) && values.FirstOrDefault() is string loc)
+        {
+            result.Location = loc;
+        }
         return result;
     }
 
@@ -178,7 +190,7 @@ public class AcmeClient(CertClient cert, KCertConfig cfg, ILogger<AcmeClient> lo
             throw new Exception($"Unexpected response to get-nonce with status {resp.StatusCode} and content: {content}");
         }
 
-        _nonce = resp.Headers.GetValues(HeaderReplayNonce).First();
+        SaveNonce(resp);
     }
 
     private static async Task<string> GetContentAsync(HttpResponseMessage resp, CancellationToken tok)
