@@ -8,10 +8,15 @@
   </PropertyGroup>
 
   <ItemGroup>
-    <PackageReference Include="KubernetesClient" Version="17.0.4" />
-    <PackageReference Include="Polly" Version="8.6.1" />
+    <PackageReference Include="KubernetesClient" Version="17.0.14" />
+    <PackageReference Include="Newtonsoft.Json" Version="13.0.4" />
+    <PackageReference Include="Polly" Version="8.6.4" />
     <PackageReference Include="System.Linq.Async" Version="6.0.3" />
-    <PackageReference Include="AWSSDK.Route53" Version="4.0.1.5" />
+    <PackageReference Include="AWSSDK.Route53" Version="4.0.4.2" />
+  </ItemGroup>
+
+  <ItemGroup>
+    <Folder Include="Kubernetes\" />
   </ItemGroup>
 
 </Project>

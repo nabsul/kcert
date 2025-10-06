@@ -74,7 +74,9 @@ public class HttpChallengeProvider(K8sClient kube, KCertConfig cfg, ILogger<Http
         }
         else
         {
-            await Task.Delay(cfg.ChallengeIngressMaxPropagationWaitTime, tok);
+            var waitTime = cfg.ChallengeIngressMaxPropagationWaitTime;
+            log.LogInformation("Skipping ingress propagation check and waiting configured time: {waitTime}", waitTime);
+            await Task.Delay(waitTime, tok);
         }
     }
 
