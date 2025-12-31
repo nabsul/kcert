@@ -5,4 +5,15 @@ metadata:
   namespace: metallb-system
 spec:
   addresses:
-  - _VM-IP_/32
+  - __PRIVATE_IP__/32
+---
+apiVersion: metallb.io/v1beta1
+kind: L2Advertisement
+metadata:
+  name: default
+  namespace: metallb-system
+spec:
+  # This tells MetalLB to advertise all pools, which in our
+  # case is just the "default" pool we created above.
+  ipAddressPools:
+    - default
