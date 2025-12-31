@@ -20,6 +20,7 @@ create-vm:
     $vmIp = $vm[0].networks.v4 | where {$_.type -eq 'public'} | Select-Object -ExpandProperty ip_address
     echo "VM created with IP address: $vmIp"
     echo $vmIp > $vmName/ip.txt
+    echo "Sleeping for 10 seconds to let droplet fully start..."
     echo "Initializing Talos cluster at $vmIp"
     talosctl gen config $vmName "https://${vmIp}:6443" --additional-sans $vmIp -o $vmName
     $env:TALOSCONFIG = (Resolve-Path "$vmName/talosconfig").Path
@@ -45,7 +46,7 @@ create-vm:
     helm install eg oci://docker.io/envoyproxy/gateway-helm --version v1.5.1 -n envoy-gateway-system --create-namespace
     kubectl wait --timeout=5m -n envoy-gateway-system deployment/envoy-gateway --for=condition=Available
     echo "Setting up kcert test app"
-    kubectl apply -f .\kcert-test-svc.yaml
+    kubectl apply -f .\test-svc.yaml
     helm install kcert ..\charts\kcert --namespace kcert --create-namespace -f ..\values.yaml
     kubectl wait --timeout=5m -n kcert deployment/kcert --for=condition=Available
     kubectl apply -f .\gw-settings.yaml
