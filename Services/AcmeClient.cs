@@ -7,7 +7,7 @@ using System.Text.Json;
 
 namespace KCert.Services;
 
-public class AcmeClient(CertClient cert, KCertConfig cfg, ILogger<AcmeClient> log)
+public class AcmeClient(CertClient cert, KCertConfig cfg)
 {
     private const string HeaderReplayNonce = "Replay-Nonce";
     private const string HeaderLocation = "Location";
