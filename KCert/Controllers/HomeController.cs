@@ -5,7 +5,7 @@ using Microsoft.AspNetCore.Mvc;
 namespace KCert.Controllers;
 
 [Route("")]
-public class HomeController(KCertClient kcert, K8sClient kube, KCertConfig cfg, EmailClient email, CertClient cert) : Controller
+public class HomeController(KCertClient kcert, K8sClient kube, IKCertConfig cfg, EmailClient email, CertClient cert) : Controller
 {
     [HttpGet("")]
     public async Task<IActionResult> HomeAsync(CancellationToken tok)

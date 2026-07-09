@@ -13,7 +13,7 @@ public static class Extensions
         { "cloudflare", typeof(CloudflareProvider) }
     };
 
-    public static IServiceCollection AddKCertServices(this IServiceCollection services, KCertConfig cfg)
+    public static IServiceCollection AddKCertServices(this IServiceCollection services, IKCertConfig cfg)
     {
         if (!ChallengeTypes.TryGetValue(cfg.ChallengeType, out var challengeType))
         {

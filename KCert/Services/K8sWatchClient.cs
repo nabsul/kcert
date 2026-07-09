@@ -4,7 +4,7 @@ using k8s.Models;
 
 namespace KCert.Services;
 
-public class K8sWatchClient(KCertConfig cfg, ILogger<K8sClient> log, Kubernetes client)
+public class K8sWatchClient(IKCertConfig cfg, ILogger<K8sClient> log, Kubernetes client)
 {
     public const string CertRequestKey = "kcert.dev/cert-request";
     public const string CertRequestValue = "request";

@@ -7,7 +7,7 @@ using KCert.Models;
 using KCert.Services;
 
 
-public class AwsRoute53Provider(KCertConfig cfg, DnsUtils util, ILogger<AwsRoute53Provider> log) : IChallengeProvider
+public class AwsRoute53Provider(IKCertConfig cfg, DnsUtils util, ILogger<AwsRoute53Provider> log) : IChallengeProvider
 {
     public string AcmeChallengeType => "dns-01";
     private readonly AmazonRoute53Client _client = GetClient(cfg.Route53AccessKeyId, cfg.Route53SecretAccessKey, cfg.Route53Region);

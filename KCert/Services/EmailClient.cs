@@ -4,7 +4,7 @@ using System.Net.Mail;
 
 namespace KCert.Services;
 
-public class EmailClient(ILogger<EmailClient> log, KCertConfig cfg)
+public class EmailClient(ILogger<EmailClient> log, IKCertConfig cfg)
 {
     private const string TestSubject = "KCert Test Email";
     private const string TestMessage = "If you received this, then KCert is able to send emails!";

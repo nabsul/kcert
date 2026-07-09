@@ -5,7 +5,7 @@ using Polly.Retry;
 
 namespace KCert.Services;
 
-public class IngressMonitorService(ILogger<IngressMonitorService> log, KCertConfig cfg, K8sWatchClient watch, CertChangeService certChange) : IHostedService
+public class IngressMonitorService(ILogger<IngressMonitorService> log, IKCertConfig cfg, K8sWatchClient watch, CertChangeService certChange) : IHostedService
 {
     public Task StopAsync(CancellationToken cancellationToken) => Task.CompletedTask;
 

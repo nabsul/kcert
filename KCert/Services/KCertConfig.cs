@@ -1,6 +1,6 @@
 ﻿namespace KCert.Services;
 
-public class KCertConfig(IConfiguration cfg)
+public class KCertConfig(IConfiguration cfg) : IKCertConfig
 {
     private readonly string _backupKey = CertClient.GenerateNewKey();
 
