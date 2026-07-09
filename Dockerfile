@@ -1,11 +1,10 @@
-FROM --platform=$BUILDPLATFORM mcr.microsoft.com/dotnet/sdk:10.0 AS build
-ARG TARGETARCH
+FROM mcr.microsoft.com/dotnet/sdk:10.0 AS build
 
 WORKDIR /build
-COPY KCert.csproj .
-RUN dotnet restore -a $TARGETARCH
-COPY . .
-RUN dotnet publish "KCert.csproj" -a $TARGETARCH --no-restore -c Release -o /app
+COPY KCert/KCert.csproj .
+RUN dotnet restore KCert.csproj
+COPY KCert/ .
+RUN dotnet publish "KCert.csproj" --no-restore -c Release -o /app
 
 FROM mcr.microsoft.com/dotnet/aspnet:10.0 AS final
 WORKDIR /app
