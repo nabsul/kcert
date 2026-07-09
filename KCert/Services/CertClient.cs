@@ -7,7 +7,7 @@ using System.Text.Json;
 
 namespace KCert.Services;
 
-public class CertClient(KCertConfig cfg)
+public class CertClient(IKCertConfig cfg)
 {
     private const int PEMLineLen = 64;
     private const string PEMStart = "-----BEGIN PRIVATE KEY-----";

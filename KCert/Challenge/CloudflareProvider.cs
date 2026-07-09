@@ -6,7 +6,7 @@ using System.Text.Json;
 using KCert.Models;
 using KCert.Services;
 
-public class CloudflareProvider(KCertConfig cfg, DnsUtils util, ILogger<CloudflareProvider> log) : IChallengeProvider
+public class CloudflareProvider(IKCertConfig cfg, DnsUtils util, ILogger<CloudflareProvider> log) : IChallengeProvider
 {
     public string AcmeChallengeType => "dns-01";
     private record CloudflareChallengeState(string ZoneId, string DomainName, string RecordName, string RecordValue);
@@ -45,7 +45,7 @@ public class CloudflareProvider(KCertConfig cfg, DnsUtils util, ILogger<Cloudfla
     private readonly HttpClient _httpClient = GetHttpClient(cfg);
     private static readonly JsonSerializerOptions _jsonOptions = new() { PropertyNameCaseInsensitive = true };
 
-    private static HttpClient GetHttpClient(KCertConfig cfg)
+    private static HttpClient GetHttpClient(IKCertConfig cfg)
     {
         var client = new HttpClient
         {

@@ -4,7 +4,7 @@ using k8s.Models;
 using KCert.Models;
 using KCert.Services;
 
-public class HttpChallengeProvider(K8sClient kube, KCertConfig cfg, ILogger<HttpChallengeProvider> log, CertClient cert) : IChallengeProvider
+public class HttpChallengeProvider(K8sClient kube, IKCertConfig cfg, ILogger<HttpChallengeProvider> log, CertClient cert) : IChallengeProvider
 {
     public string AcmeChallengeType => "http-01";
 

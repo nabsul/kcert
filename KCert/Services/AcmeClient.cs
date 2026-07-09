@@ -7,7 +7,7 @@ using System.Text.Json;
 
 namespace KCert.Services;
 
-public class AcmeClient(CertClient cert, KCertConfig cfg)
+public class AcmeClient(CertClient cert, IKCertConfig cfg)
 {
     private const string HeaderReplayNonce = "Replay-Nonce";
     private const string HeaderLocation = "Location";
@@ -37,9 +37,15 @@ public class AcmeClient(CertClient cert, KCertConfig cfg)
     public Task<AcmeAuthzResponse> GetAuthzAsync(string key, Uri authzUri, string kid, CancellationToken tok) => PostAsync<AcmeAuthzResponse>(key, authzUri, null, kid, tok);
     public Task<AcmeChallengeResponse> TriggerChallengeAsync(string key, Uri challengeUri, string kid, CancellationToken tok) => PostAsync<AcmeChallengeResponse>(key, challengeUri, new { }, kid, tok);
 
-    public static async Task ReadDirectoryAsync(KCertConfig cfg, CancellationToken tok)
+    public async Task<AcmeDirectoryResponse?> ReadDirectoryAsync(CancellationToken tok)
     {
-        using var http = new HttpClient();
+        var handler = new HttpClientHandler
+        {
+            ServerCertificateCustomValidationCallback = HttpClientHandler.DangerousAcceptAnyServerCertificateValidator
+        };
+        using var http = new HttpClient(handler);
+        http.DefaultRequestHeaders.Add("User-Agent", "KCert/2.0");
+        http.DefaultRequestHeaders.Add("Accept", "application/json");
         using var resp = await http.GetAsync(cfg.AcmeDir, tok);
         if (!resp.IsSuccessStatusCode)
         {
@@ -50,6 +56,7 @@ public class AcmeClient(CertClient cert, KCertConfig cfg)
 
         using var stream = await resp.Content.ReadAsStreamAsync(tok);
         _dir = await JsonSerializer.DeserializeAsync<AcmeDirectoryResponse>(stream, options, tok);
+        return _dir;
     }
 
     public async Task<AcmeAccountResponse> CreateAccountAsync(CancellationToken tok)

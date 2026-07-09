@@ -3,7 +3,7 @@ using KCert.Models;
 
 namespace KCert.Services;
 
-public class RenewalService(ILogger<RenewalService> log, KCertClient kcert, KCertConfig cfg, K8sClient k8s, CertClient cert, EmailClient email) : IHostedService
+public class RenewalService(ILogger<RenewalService> log, KCertClient kcert, IKCertConfig cfg, K8sClient k8s, CertClient cert, EmailClient email) : IHostedService
 {
     private const int MaxServiceFailures = 5;
 

@@ -31,7 +31,7 @@ builder.WebHost.ConfigureKestrel(opt =>
 
 var app = builder.Build();
 
-await AcmeClient.ReadDirectoryAsync(cfg, app.Lifetime.ApplicationStopped);
+await app.Services.GetRequiredService<AcmeClient>().ReadDirectoryAsync(app.Lifetime.ApplicationStopped);
 
 // Port 8080: Full admin interface with static files and all controllers
 app.MapWhen(c => c.Connection.LocalPort == 8080, b =>

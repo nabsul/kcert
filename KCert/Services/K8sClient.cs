@@ -7,7 +7,7 @@ using System.Text;
 
 namespace KCert.Services;
 
-public class K8sClient(KCertConfig cfg, Kubernetes client)
+public class K8sClient(IKCertConfig cfg, Kubernetes client)
 {
     private const string TlsSecretType = "kubernetes.io/tls";
     private const string CertLabelKey = "kcert.dev/secret";
