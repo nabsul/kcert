@@ -17,56 +17,40 @@ public class K8sWatchClient(KCertConfig cfg, ILogger<K8sClient> log, Kubernetes 
 
     public Task WatchIngressesAsync(ChangeCallback<V1Ingress> callback, CancellationToken tok)
     {
-        return WatchInLoopAsync(callback, WatchAllIngressAsync, WatchNsIngressAsync, tok);
-    }
-
-    private Task<HttpOperationResponse<V1IngressList>> WatchAllIngressAsync(CancellationToken tok)
-    {
-        return client.NetworkingV1.ListIngressForAllNamespacesWithHttpMessagesAsync(watch: true, cancellationToken: tok, labelSelector: IngressLabel);
-    }
-
-    private Task<HttpOperationResponse<V1IngressList>> WatchNsIngressAsync(string ns, CancellationToken tok)
-    {
-        return client.NetworkingV1.ListNamespacedIngressWithHttpMessagesAsync(ns, watch: true, cancellationToken: tok, labelSelector: IngressLabel);
+        IAsyncEnumerable<(WatchEventType, V1Ingress)> all(CancellationToken t) => client.NetworkingV1.WatchListIngressForAllNamespacesAsync(cancellationToken: t);
+        IAsyncEnumerable<(WatchEventType, V1Ingress)> ns(string ns, CancellationToken t) => client.NetworkingV1.WatchListNamespacedIngressAsync(ns, cancellationToken: t);
+        return WatchInLoopAsync(callback, all, ns, tok);
     }
 
     public Task WatchConfigMapsAsync(ChangeCallback<V1ConfigMap> callback, CancellationToken tok)
     {
-        return WatchInLoopAsync(callback, WatchAllConfigMapsAsync, WatchNsConfigMapsAsync, tok);
+        IAsyncEnumerable<(WatchEventType, V1ConfigMap)> all(CancellationToken t) => client.CoreV1.WatchListConfigMapForAllNamespacesAsync(cancellationToken: t);
+        IAsyncEnumerable<(WatchEventType, V1ConfigMap)> ns(string ns, CancellationToken t) => client.CoreV1.WatchListNamespacedConfigMapAsync(ns, cancellationToken: t);
+        return WatchInLoopAsync(callback, all, ns, tok);
     }
 
-    private Task<HttpOperationResponse<V1ConfigMapList>> WatchAllConfigMapsAsync(CancellationToken tok)
-    {
-        return client.CoreV1.ListConfigMapForAllNamespacesWithHttpMessagesAsync(watch: true, cancellationToken: tok, labelSelector: ConfigLabel);
-    }
+    delegate IAsyncEnumerable<(WatchEventType, T)> WatchAllFunc<T>(CancellationToken tok);
+    delegate IAsyncEnumerable<(WatchEventType, T)> WatchNsFunc<T>(string ns, CancellationToken tok);
 
-    private Task<HttpOperationResponse<V1ConfigMapList>> WatchNsConfigMapsAsync(string ns, CancellationToken tok)
-    {
-        return client.CoreV1.ListNamespacedConfigMapWithHttpMessagesAsync(ns, watch: true, cancellationToken: tok, labelSelector: ConfigLabel);
-    }
-
-    delegate Task<HttpOperationResponse<L>> WatchAllFunc<L>(CancellationToken tok);
-    delegate Task<HttpOperationResponse<L>> WatchNsFunc<L>(string ns, CancellationToken tok);
-
-    private Task WatchInLoopAsync<L, T>(ChangeCallback<T> callback, WatchAllFunc<L> all, WatchNsFunc<L> ns, CancellationToken tok)
+    private Task WatchInLoopAsync<T>(ChangeCallback<T> callback, WatchAllFunc<T> all, WatchNsFunc<T> ns, CancellationToken tok)
     {
         return cfg.NamespaceConstraints.Length == 0 ? WatchInLoopAsync(typeof(T).Name, callback, all, tok) : WatchInLoopAsync(callback, ns, tok);
     }
 
-    private Task WatchInLoopAsync<L, T>(ChangeCallback<T> callback, WatchNsFunc<L> func, CancellationToken tok)
+    private Task WatchInLoopAsync<T>(ChangeCallback<T> callback, WatchNsFunc<T> func, CancellationToken tok)
     {
         var tasks = cfg.NamespaceConstraints.Select(ns => WatchInLoopAsync($"{ns}:{typeof(T).Name}", callback, (t) => func(ns, t), tok));
         return Task.WhenAll([..tasks]);
     }
 
-    private async Task WatchInLoopAsync<L, T>(string id, ChangeCallback<T> callback, WatchAllFunc<L> watch, CancellationToken tok)
+    private async Task WatchInLoopAsync<T>(string id, ChangeCallback<T> callback, WatchAllFunc<T> watch, CancellationToken tok)
     {
         var typeName = typeof(T).Name;
         while (true)
         {
             try
             {
-                await foreach (var (type, item) in watch(tok).WatchAsync<T, L>())
+                await foreach (var (type, item) in watch(tok))
                 {
                     await callback(type, item, tok);
                 }

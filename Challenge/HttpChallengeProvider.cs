@@ -91,7 +91,7 @@ public class HttpChallengeProvider(K8sClient kube, KCertConfig cfg, ILogger<Http
                 Service = new()
                 {
                     Name = cfg.KCertServiceName,
-                    Port = new(number: cfg.KCertServicePort)
+                    Port = new(){ Number = cfg.KCertServicePort }
                 },
             },
         };
