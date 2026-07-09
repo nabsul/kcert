@@ -1,31 +1,20 @@
-acmeDirUrl: https://acme-staging-v02.api.letsencrypt.org/directory
-acmeEmail: null
-acmeTermsAccepted: false
-kcertImage: nabsul/kcert:v1.2.0
+kcertImage: "nabsul/kcert:v1.2.0"
+name: "kcert"
 
-env: {}
+# KCert uses the standard .NET configuration system, which allows you to set configuration values via environment variables.
+# The following environment variables must be set for KCert to work properly. All others can be set according to your needs.
+# You can see all available configuration options in apsettings.json or in KCertConfig.cs.
+env:
+  ACME__EMAIL: ""
+  ACME__TERMSACCEPTED: "false"
+  ACME__DIRURL: "https://acme-staging-v02.api.letsencrypt.org/directory" # https://acme-v02.api.letsencrypt.org/directory
+  KCERT__SHOWRENEWBUTTON: "false"
 
-# set to null to allow managing all namespaces, or limit with array of namespaces
-allowedNamespaces: null #["namespace1", "namespace2", ...]
-
-acmeKey:
-  secretName: null
-  keyName: key
-
-acmeEabKey:
-  secretName: null
-  keyIdName: keyid
-  hmacKeyName: hmac
-
-showRenewButton: null
-
-smtp:
-  secretName: null # set this to the secret containing the smtp credentials in keys as defined below
-  emailName: email
-  hostName: host
-  portName: port
-  userName: user
-  passName: password
+# You can also set environment variables via Kubernetes secrets in this section.
+envSecrets:
+  # - name: "ENV_VAR"
+  #   secretName: "my-secret"
+  #   secretKey: "key-in-secret"
 
 securityContext: {}
   # capabilities:
@@ -36,6 +25,3 @@ securityContext: {}
   # runAsUser: 1000
 
 resources: {}
-
-# Set this to false in order to generate a plain yaml template without the Helm custom labels
-forHelm: true

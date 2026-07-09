@@ -3,7 +3,6 @@ using KCert.Models;
 
 namespace KCert.Services;
 
-[Service]
 public class RenewalService(ILogger<RenewalService> log, KCertClient kcert, KCertConfig cfg, K8sClient k8s, CertClient cert, EmailClient email) : IHostedService
 {
     private const int MaxServiceFailures = 5;
@@ -48,7 +47,7 @@ public class RenewalService(ILogger<RenewalService> log, KCertClient kcert, KCer
             {
                 try
                 {
-                    await email.NotifyFailureAsync("Certificate renewal failed unexpectedly", error);
+                    await email.NotifyFailureAsync("Certificate renewal failed unexpectedly", error, cancellationToken);
                 }
                 catch (Exception ex)
                 {
@@ -62,7 +61,6 @@ public class RenewalService(ILogger<RenewalService> log, KCertClient kcert, KCer
     {
         while (true)
         {
-            tok.ThrowIfCancellationRequested();
             await StartRenewalJobAsync(tok);
             log.LogInformation("Sleeping for {renewalTime}", cfg.RenewalTimeBetweenChecks);
             await Task.Delay(cfg.RenewalTimeBetweenChecks, tok);
@@ -77,9 +75,8 @@ public class RenewalService(ILogger<RenewalService> log, KCertClient kcert, KCer
         }
 
         log.LogInformation("Checking for certs that need renewals...");
-        await foreach (var secret in k8s.GetManagedSecretsAsync())
+        await foreach (var secret in k8s.GetManagedSecretsAsync(tok))
         {
-            tok.ThrowIfCancellationRequested();
             await TryRenewAsync(secret, tok);
         }
 
@@ -97,17 +94,16 @@ public class RenewalService(ILogger<RenewalService> log, KCertClient kcert, KCer
             return;
         }
 
-        tok.ThrowIfCancellationRequested();
         log.LogInformation("Renewing: {ns} / {name} / {hosts}", secret.Namespace(), secret.Name(), string.Join(',', hosts));
 
         try
         {
-            await kcert.StartRenewalProcessAsync(secret.Namespace(), secret.Name(), hosts.ToArray(), tok);
-            await email.NotifyRenewalResultAsync(secret.Namespace(), secret.Name(), null);
+            await kcert.StartRenewalProcessAsync(secret.Namespace(), secret.Name(), [.. hosts], tok);
+            await email.NotifyRenewalResultAsync(secret.Namespace(), secret.Name(), null, tok);
         }
         catch (RenewalException ex)
         {
-            await email.NotifyRenewalResultAsync(secret.Namespace(), secret.Name(), ex);
+            await email.NotifyRenewalResultAsync(secret.Namespace(), secret.Name(), ex, tok);
         }
     }
 }

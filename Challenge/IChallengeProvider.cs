@@ -1,6 +1,6 @@
-using KCert.Models;
-
 namespace KCert.Challenge;
+
+using KCert.Models;
 
 public interface IChallengeProvider
 {

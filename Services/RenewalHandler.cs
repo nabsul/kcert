@@ -3,7 +3,6 @@ using KCert.Models;
 
 namespace KCert.Services;
 
-[Service]
 public class RenewalHandler(ILogger<RenewalHandler> log, AcmeClient acme, K8sClient kube, KCertConfig cfg, CertClient cert, IChallengeProvider chal)
 {
     public async Task RenewCertAsync(string ns, string secretName, string[] hosts, CancellationToken tok)
@@ -13,19 +12,18 @@ public class RenewalHandler(ILogger<RenewalHandler> log, AcmeClient acme, K8sCli
 
         try
         {
-            var account = await InitAsync();
+            var account = await InitAsync(tok);
             var kid = account.Location;
             logbuf.LogInformation("Initialized renewal process for secret {ns}/{secretName} - hosts {hosts} - kid {kid}", ns, secretName, string.Join(",", hosts), kid);
 
-            var (orderUri, finalizeUri, authorizations, nonce) = await CreateOrderAsync(cfg.AcmeKey, hosts, kid, account.Nonce, logbuf);
+            var (orderUri, finalizeUri, authorizations) = await CreateOrderAsync(cfg.AcmeKey, hosts, kid, logbuf, tok);
             logbuf.LogInformation("Order {orderUri} created with finalizeUri {finalizeUri}", orderUri, finalizeUri);
 
             List<AcmeAuthzResponse> auths = [];
             foreach (var authUrl in authorizations)
             {
-                var auth = await acme.GetAuthzAsync(cfg.AcmeKey, authUrl, kid, nonce);
+                var auth = await acme.GetAuthzAsync(cfg.AcmeKey, authUrl, kid, tok);
                 auths.Add(auth);
-                nonce = auth.Nonce;
                 logbuf.LogInformation("Get Auth {authUri}: {status}", authUrl, auth.Status);
             }
 
@@ -33,20 +31,19 @@ public class RenewalHandler(ILogger<RenewalHandler> log, AcmeClient acme, K8sCli
 
             foreach (var auth in auths)
             {
-                nonce = await ValidateAuthorizationAsync(auth, cfg.AcmeKey, kid, nonce, new Uri(auth.Location), logbuf);
+                await ValidateAuthorizationAsync(auth, cfg.AcmeKey, kid, new Uri(auth.Location), logbuf, tok);
                 logbuf.LogInformation("Validated auth: {authUrl}", auth.Location);
             }
 
-            var (certUri, finalizeNonce) = await FinalizeOrderAsync(cfg.AcmeKey, orderUri, finalizeUri, hosts, kid, nonce, logbuf);
+            var certUri = await FinalizeOrderAsync(cfg.AcmeKey, orderUri, finalizeUri, hosts, kid, logbuf, tok);
             logbuf.LogInformation("Finalized order and received cert URI: {certUri}", certUri);
-            await SaveCertAsync(cfg.AcmeKey, ns, secretName, certUri, kid, finalizeNonce);
+            await SaveCertAsync(cfg.AcmeKey, ns, secretName, certUri, kid, tok);
             logbuf.LogInformation("Saved cert");
 
             await chal.CleanupChallengeAsync(chalState, tok);
         }
         catch (Exception ex)
         {
-            logbuf.LogError(ex, "Certificate renewal failed.");
             throw new RenewalException(ex.Message, ex)
             {
                 SecretNamespace = ns,
@@ -56,35 +53,32 @@ public class RenewalHandler(ILogger<RenewalHandler> log, AcmeClient acme, K8sCli
         }
     }
 
-    private async Task<AcmeAccountResponse> InitAsync()
+    private async Task<AcmeAccountResponse> InitAsync(CancellationToken tok)
     {
-        await acme.ReadDirectoryAsync(cfg.AcmeDir);
-        var nonce = await acme.GetNonceAsync();
-        return await acme.CreateAccountAsync(nonce);
+        await acme.InitAsync(tok);
+        return await acme.CreateAccountAsync(tok);
     }
 
-    private async Task<(Uri OrderUri, Uri FinalizeUri, List<Uri> Authorizations, string Nonce)> CreateOrderAsync(string key, string[] hosts, string kid, string nonce, ILogger logbuf)
+    private async Task<(Uri OrderUri, Uri FinalizeUri, List<Uri> Authorizations)> CreateOrderAsync(string key, string[] hosts, string kid, ILogger logbuf, CancellationToken tok)
     {
-        var order = await acme.CreateOrderAsync(key, kid, hosts, nonce);
+        var order = await acme.CreateOrderAsync(key, kid, hosts, tok);
         logbuf.LogInformation("Created order: {status}", order.Status);
         var urls = order.Authorizations.Select(a => new Uri(a)).ToList();
-        return (new Uri(order.Location), new Uri(order.Finalize), urls, order.Nonce);
+        return (new Uri(order.Location), new Uri(order.Finalize), urls);
     }
 
-    private async Task<string> ValidateAuthorizationAsync(AcmeAuthzResponse auth, string key, string kid, string nonce, Uri authUri, ILogger logbuf)
+    private async Task ValidateAuthorizationAsync(AcmeAuthzResponse auth, string key, string kid, Uri authUri, ILogger logbuf, CancellationToken tok)
     {
         var (waitTime, numRetries) = (cfg.AcmeWaitTime, cfg.AcmeNumRetries);
         var url = auth.Challenges.First(c => c.Type == chal.AcmeChallengeType).Url;
         var challengeUri = new Uri(url);
-        var chall = await acme.TriggerChallengeAsync(key, challengeUri, kid, nonce);
-        nonce = chall.Nonce;
+        var chall = await acme.TriggerChallengeAsync(key, challengeUri, kid, tok);
         logbuf.LogInformation("TriggerChallenge {challengeUri}: {status}", challengeUri, chall.Status);
 
         do
         {
-            await Task.Delay(waitTime);
-            auth = await acme.GetAuthzAsync(key, authUri, kid, nonce);
-            nonce = auth.Nonce;
+            await Task.Delay(waitTime, tok);
+            auth = await acme.GetAuthzAsync(key, authUri, kid, tok);
             logbuf.LogInformation("Get Auth {authUri}: {status}", authUri, auth.Status);
         } while (numRetries-- > 0 && !auth.Challenges.Any(c => c.Status == "valid"));
 
@@ -92,21 +86,19 @@ public class RenewalHandler(ILogger<RenewalHandler> log, AcmeClient acme, K8sCli
         {
             throw new Exception($"Auth {authUri} did not complete in time. Last Response: {auth.Status}");
         }
-
-        return nonce;
     }
 
-    private async Task<(Uri CertUri, string Nonce)> FinalizeOrderAsync(string key, Uri orderUri, Uri finalizeUri,
-        IEnumerable<string> hosts, string kid, string nonce, ILogger logbuf)
+    private async Task<Uri> FinalizeOrderAsync(string key, Uri orderUri, Uri finalizeUri,
+        IEnumerable<string> hosts, string kid, ILogger logbuf, CancellationToken tok)
     {
         var (waitTime, numRetries) = (cfg.AcmeWaitTime, cfg.AcmeNumRetries);
-        var finalize = await acme.FinalizeOrderAsync(key, finalizeUri, hosts, kid, nonce);
+        var finalize = await acme.FinalizeOrderAsync(key, finalizeUri, hosts, kid, tok);
         logbuf.LogInformation("Finalize {finalizeUri}: {status}", finalizeUri, finalize.Status);
 
         while (numRetries-- >= 0 && finalize.Status != "valid")
         {
-            await Task.Delay(waitTime);
-            finalize = await acme.GetOrderAsync(key, orderUri, kid, finalize.Nonce);
+            await Task.Delay(waitTime, tok);
+            finalize = await acme.GetOrderAsync(key, orderUri, kid, tok);
             logbuf.LogInformation("Check Order {orderUri}: {finalize.Status}", orderUri, finalize.Status);
         }
 
@@ -115,13 +107,13 @@ public class RenewalHandler(ILogger<RenewalHandler> log, AcmeClient acme, K8sCli
             throw new Exception($"Order not complete: {finalize.Status}");
         }
 
-        return (new Uri(finalize.Certificate), finalize.Nonce);
+        return new Uri(finalize.Certificate);
     }
 
-    private async Task SaveCertAsync(string key, string ns, string secretName, Uri certUri, string kid, string nonce)
+    private async Task SaveCertAsync(string key, string ns, string secretName, Uri certUri, string kid, CancellationToken tok)
     {
-        var certVal = await acme.GetCertAsync(key, certUri, kid, nonce);
+        var certVal = await acme.GetCertAsync(key, certUri, kid, tok);
         var pem = cert.GetPemKey();
-        await kube.UpdateTlsSecretAsync(ns, secretName, pem, certVal);
+        await kube.UpdateTlsSecretAsync(ns, secretName, pem, certVal, tok);
     }
 }

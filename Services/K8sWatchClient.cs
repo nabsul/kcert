@@ -4,7 +4,6 @@ using k8s.Models;
 
 namespace KCert.Services;
 
-[Service]
 public class K8sWatchClient(KCertConfig cfg, ILogger<K8sClient> log, Kubernetes client)
 {
     public const string CertRequestKey = "kcert.dev/cert-request";
@@ -14,7 +13,7 @@ public class K8sWatchClient(KCertConfig cfg, ILogger<K8sClient> log, Kubernetes 
     public string IngressLabel => $"{IngressLabelKey}={cfg.IngressLabelValue}";
     public string ConfigLabel => $"{CertRequestKey}={CertRequestValue}";
 
-    public delegate Task ChangeCallback<T>(WatchEventType type, T item);
+    public delegate Task ChangeCallback<T>(WatchEventType type, T item, CancellationToken tok);
 
     public Task WatchIngressesAsync(ChangeCallback<V1Ingress> callback, CancellationToken tok)
     {
@@ -56,10 +55,8 @@ public class K8sWatchClient(KCertConfig cfg, ILogger<K8sClient> log, Kubernetes 
 
     private Task WatchInLoopAsync<L, T>(ChangeCallback<T> callback, WatchNsFunc<L> func, CancellationToken tok)
     {
-        return Task.WhenAll(cfg.NamespaceConstraints
-            .Select(ns => WatchInLoopAsync($"{ns}:{typeof(T).Name}", callback, (t) => func(ns, t), tok))
-            .ToArray()
-        );
+        var tasks = cfg.NamespaceConstraints.Select(ns => WatchInLoopAsync($"{ns}:{typeof(T).Name}", callback, (t) => func(ns, t), tok));
+        return Task.WhenAll([..tasks]);
     }
 
     private async Task WatchInLoopAsync<L, T>(string id, ChangeCallback<T> callback, WatchAllFunc<L> watch, CancellationToken tok)
@@ -71,7 +68,7 @@ public class K8sWatchClient(KCertConfig cfg, ILogger<K8sClient> log, Kubernetes 
             {
                 await foreach (var (type, item) in watch(tok).WatchAsync<T, L>())
                 {
-                    await callback(type, item);
+                    await callback(type, item, tok);
                 }
             }
             catch (HttpRequestException ex)
